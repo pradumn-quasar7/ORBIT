@@ -1,7 +1,8 @@
 # ORBIT Project Status
 
 ## Current Phase
-Phase 8 — Perception adapter + web inspection UI (COMPLETE). Next: Phase 9 — ORBIT-BENCH + ablations.
+**ORBIT v0.1 complete** — Phases 0–9 done (spec §48 steps 1–17 and 20). All spec §36 MVP
+acceptance criteria are covered by passing tests (table below). Next: v0.2 (see *Next*).
 
 ## Phase Log
 
@@ -113,13 +114,79 @@ Phase 8 — Perception adapter + web inspection UI (COMPLETE). Next: Phase 9 —
 - API: `POST /perception/frames`, `POST /observations/{id}/redact`, `GET /inspect/summary`, `/ui/`, `/dashboard`. Migration `0007`. ADR-025, ADR-026.
 - Verified in a browser: desktop and 375 px mobile (no page-level horizontal scroll); two UI bugs found and fixed (nested-node rendering in conflicts, confirmed-absent objects shown with their old location).
 
-## Known Issues / Limitations (to be addressed in named phases)
-- Ambiguous entities cannot yet be merged into their true identity after verification (future work).
+### Phase 9 — ORBIT-BENCH + ablations (§48 step 20)
+**Planned**
+- Scenario format with explicit ground truth (§30), scenarios for the §26 table and §37 failure modes, runner across ablations (§28), §27 metrics, run metadata (§22.10), report.
+
+**Implemented**
+- `OrbitConfig` switches in the composition root (one per ablated component).
+- `evaluation/bench.py` (scenario DSL, `ScenarioRunner`, 7 variants, 14 metrics, Markdown/JSON report), `experiments/scenarios/catalog.py` (12 scenarios), `experiments/runners/run_bench.py`, `experiments/results/latest.{md,json}`.
+- `test_bench.py`: full ORBIT meets ground truth; each ablation degrades its target metric; deterministic.
+- ADR-027.
+
+**Result (12 scenarios × 7 variants)** — see `experiments/results/latest.md`:
+
+| Metric | ORBIT | Ablation that removes the component | Ablated value |
+|---|---|---|---|
+| diff precision / recall | 1.00 / 1.00 | event-log diff | 0.60 / 0.38 |
+| stale-claim rate ↓ | 0.00 | no freshness · last writer wins · no evidence gate | 0.20 · 0.25 · 0.18 |
+| conflict detection | 1.00 | last writer wins | 0.00 |
+| correct abstention | 1.00 | no evidence gate | 0.17 |
+| unsafe continuation ↓ | 0.00 | naive resume · no freshness | 0.67 · 0.33 |
+| unsupported causal claims ↓ | 0.00 | no evidence gate | 1.00 |
+| search coverage precision | 1.00 | unobserved ⇒ removed | 0.67 |
+| entity persistence / false merges | 0.97 / 0.00 | — (abstains on an undecidable look-alike) | — |
+
+## MVP Acceptance (spec §36)
+
+| Criterion | Evidence (test) |
+|---|---|
+| Create persistent entity | `test_api.py::test_post_entity_is_backed_by_evidence` |
+| Re-observe entity / preserve identity | `test_spatial_persistence.py::test_same_object_persists_across_two_sessions` |
+| Preserve state history | `test_memory_core.py::test_timeline_and_attribute_history` |
+| Every transition references evidence; timestamp/provenance | `test_foundations.py::test_evidence_links_back_to_each_observation`, `test_evidence_engine.py::test_evidence_has_provenance_and_integrity` |
+| Contradiction can be represented | `test_evidence_engine.py::test_cross_channel_disagreement_is_contradiction_not_overwrite` |
+| State can become stale | `test_evidence_engine.py::test_freshness_is_attribute_specific` |
+| Current-state retrieval respects freshness | `test_evidence_engine.py::test_unsupported_current_state_claims_are_blocked_or_downgraded` |
+| Invalidation propagates to dependent claims | `test_evidence_engine.py::test_dependency_propagation_is_transitive_and_cycle_safe` |
+| Partial visibility does not create false removal | `test_world_diff.py::test_not_reobserved_is_not_removed` |
+| Unsupported queries can abstain | `test_query_agent.py::test_where_is_stale_abstains_and_requests_observation` |
+| Detect movement / state change / additions | `test_world_diff.py::test_moves_state_changes_additions_and_revisions` |
+| Removed vs unobserved distinction | `test_world_diff.py::test_validated_search_confirms_absence_then_refound`, `::test_inadequate_search_is_inconclusive` |
+| Detect relation changes / evidence conflict | `test_world_diff.py::test_relation_changes`, `::test_evidence_conflict_in_diff` |
+| Persist task, steps, dependencies | `test_memory_core.py::test_task_progress_is_evidence_backed_and_replayable` |
+| Mark blocked steps | `test_task_continuity.py::test_stale_outcome_blocks_and_requests_observation` |
+| Resume from verified state | `test_task_continuity.py::test_resume_from_verified_state_without_changes` |
+| Query current / historical state | `test_query_agent.py::test_where_is_fresh`, `::test_historical_question` |
+| Answer "what changed?" | `test_query_agent.py::test_what_changed_since_last_session` |
+| Request fresh observation when needed | `test_task_continuity.py::test_unverified_precondition_requests_targeted_observation` |
+| Return evidence / freshness / status | `test_query_agent.py::test_where_is_fresh` |
+| No consequential autonomous actuation | `test_perception_and_safety.py::test_agent_can_recommend_but_never_authorize_or_actuate` |
+| Authorization boundary exists | `test_perception_and_safety.py::test_full_action_lifecycle_with_outcome_memory` |
+| Important claims are auditable | `test_evidence_engine.py::test_tampered_evidence_fails_integrity`, action audit events |
+
+## Known Issues / Limitations
+- Ambiguous entities cannot yet be merged into their true identity after verification.
+- No multi-workspace / multi-tenant separation or authentication on the API (spec §17 access control is principal-scoped for actions only).
+- Reasoning provider is rule-based; free-form language coverage is limited to the supported question types. An LLM provider can be added behind `ReasoningProvider`.
+- Real camera perception requires plugging a detector into `DetectionPerceptionProvider`; none is bundled.
+- In-memory vector index is rebuilt per process; a pgvector `RetrievalProvider` is needed for large memories.
+- PostgreSQL is supported by the schema but CI runs on SQLite only (no Postgres available in this environment).
+- AR client and VR counterfactual replay (§48 steps 18–19) are intentionally deferred.
+
+## Next (v0.2 candidates)
+1. Identity merge workflow (verify an AMBIGUOUS entity → merge histories with provenance).
+2. Counterfactual replay: clone a `WorldSnapshot` into a sandbox repository and vary one claim (Experiment H foundation, no VR needed).
+3. Randomised scenario generator for ORBIT-BENCH with seeds and confidence intervals.
+4. Real detector integration (e.g. OWL-ViT/YOLO) behind the adapter + latency measurement on real frames.
+5. API authentication and workspace separation.
 
 ## Tests
-- `.venv/bin/pytest` → 328 passed.
+- `.venv/bin/pytest` → 345 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
-## Recent Architecture Decisions
+## Architecture Decisions
+- ADR-001…004 initial principles
 - ADR-005 Repository boundary + SQL store · ADR-006 UTC time · ADR-007 §48 phase order · ADR-008 status classification
 - ADR-009 Conservative re-identification · ADR-010 Relation semantics
 - ADR-011 Evidence policy · ADR-012 Read-time freshness · ADR-013 Invalidation propagation
@@ -129,16 +196,11 @@ Phase 8 — Perception adapter + web inspection UI (COMPLETE). Next: Phase 9 —
 - ADR-021 Deterministic replaceable providers · ADR-022 Grounded response contract
 - ADR-023 Marginal information-gain perception · ADR-024 Action safety boundary
 - ADR-025 Vendor-neutral perception, hash-only retention · ADR-026 Static dashboard
+- ADR-027 ORBIT-BENCH design and metric definitions
 
 ## Research Experiments Enabled
-- Experiment A (persistent identity): re-ID decisions are auditable per observation.
-- Experiment C (stale-memory resistance): freshness gate + ablation switch.
-- Evidence-gate ablation (`gate_evidence=False`) and vector recall vs structured state.
-- Conflict handling ablation: `detect_contradictions=False` (last writer wins).
-- Experiment D (task resumption): resume plans expose blocked/invalidated steps and requests.
-- Experiment F (active perception): information-gain vs fixed vs random policies.
-- Experiment E (evidence and causality): causal hypotheses gated on causal-test evidence.
-- Experiment B-0 (world diff) runnable as a test with precision/recall; negative-search ablations available.
+- A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.
+- G (AR utility) and H (VR counterfactuals) — deferred.
 
 ## Last Updated
 - 2026-10-01
