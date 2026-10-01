@@ -1,7 +1,7 @@
 # ORBIT-BENCH results
 
-- **run_at**: `2026-10-01T11:59:12+00:00`
-- **git_commit**: `af7a65c+dirty`
+- **run_at**: `2026-10-01T12:01:41+00:00`
+- **git_commit**: `62ea2b6+dirty`
 - **schema_revision**: `0007`
 - **scenario_catalog**: `v0.1`
 - **scenarios**: `12`
@@ -65,10 +65,10 @@
 
 | Variant | observation_ms_p50 | observation_ms_p95 | query_ms_p50 | query_ms_p95 |
 |---|---|---|---|---|
-| orbit | 0.54 | 1.05 | 0.28 | 0.37 |
-| no_freshness | 0.52 | 0.99 | 0.24 | 0.29 |
-| last_writer_wins | 0.53 | 1.03 | 0.23 | 0.28 |
-| unobserved_removed | 0.54 | 1.03 | 0.26 | 0.29 |
-| no_evidence_gate | 0.56 | 1.07 | 0.25 | 0.27 |
-| event_log_diff | 0.53 | 0.98 | 0.23 | 0.28 |
-| naive_resume | 0.53 | 0.99 | 0.24 | 0.27 |
+| orbit | 0.59 | 1.25 | 0.32 | 0.47 |
+| no_freshness | 0.55 | 1.09 | 0.24 | 0.30 |
+| last_writer_wins | 0.57 | 1.07 | 0.25 | 0.30 |
+| unobserved_removed | 0.56 | 1.04 | 0.26 | 0.30 |
+| no_evidence_gate | 0.56 | 1.06 | 0.25 | 0.29 |
+| event_log_diff | 0.56 | 1.06 | 0.25 | 0.30 |
+| naive_resume | 0.59 | 1.33 | 0.29 | 0.43 |
