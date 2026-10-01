@@ -10,10 +10,9 @@ from backend.app.domain.models import (
     FreshnessPolicy,
 )
 from backend.app.services.world_state_engine import WorldStateEngine
-from backend.app.repositories.in_memory_repository import InMemoryRepository
 
 
-def test_first_technical_milestone_acceptance():
+def test_first_technical_milestone_acceptance(repo):
     """
     Acceptance test from Section 43 & 49:
     Observation A: bottle_01 is at desk_left.
@@ -27,7 +26,6 @@ def test_first_technical_milestone_acceptance():
     - evidence links to both observations;
     - a structured world diff can report the movement.
     """
-    repo = InMemoryRepository()
     engine = WorldStateEngine(repository=repo)
 
     t0 = datetime(2026, 9, 30, 10, 0, 0, tzinfo=timezone.utc)
@@ -104,8 +102,7 @@ def test_first_technical_milestone_acceptance():
     assert move_changes[0].after == "desk_right"
 
 
-def test_new_entity_creation_and_re_identification():
-    repo = InMemoryRepository()
+def test_new_entity_creation_and_re_identification(repo):
     engine = WorldStateEngine(repository=repo)
     t = datetime(2026, 9, 30, 9, 0, 0, tzinfo=timezone.utc)
 
@@ -155,8 +152,7 @@ def test_new_entity_creation_and_re_identification():
     assert entity_revisit.observed_at == t_next
 
 
-def test_state_attribute_change():
-    repo = InMemoryRepository()
+def test_state_attribute_change(repo):
     engine = WorldStateEngine(repository=repo)
 
     t0 = datetime(2026, 9, 30, 8, 0, 0, tzinfo=timezone.utc)
@@ -197,12 +193,11 @@ def test_state_attribute_change():
     assert pump.current_state["power"] == "on"
 
 
-def test_unknown_is_not_absent():
+def test_unknown_is_not_absent(repo):
     """
     Rule 2.7: Unknown is not absent.
     If an object is outside the camera/search coverage, it must NOT automatically become REMOVED.
     """
-    repo = InMemoryRepository()
     engine = WorldStateEngine(repository=repo)
 
     t0 = datetime(2026, 9, 30, 11, 0, 0, tzinfo=timezone.utc)
@@ -236,16 +231,20 @@ def test_unknown_is_not_absent():
     # cable_4 must still exist in the world state and must NOT be marked REMOVED
     cable = repo.get_entity("cable_4")
     assert cable is not None
-    assert cable.status != EpistemicStatus.UNKNOWN or cable.status != "REMOVED"
+    # Location claim is retained with its original evidential status — not dropped,
+    # not downgraded, and no removal event was emitted.
     assert cable.current_state["location"] == "bench_3"
+    assert cable.attribute_statuses["location"] == EpistemicStatus.OBSERVED
+    cable_events = [e.event_type for e in repo.get_events_for_entity("cable_4")]
+    assert cable_events == [EventType.OBJECT_ADDED]
+    assert EventType.OBJECT_REMOVED_OR_UNOBSERVED not in cable_events
 
 
-def test_contradiction_retention():
+def test_contradiction_retention(repo):
     """
     Rule 2.8: Contradictions are retained.
     When conflicting evidence appears, state is marked CONTRADICTED and both evidence items retained.
     """
-    repo = InMemoryRepository()
     engine = WorldStateEngine(repository=repo)
 
     t0 = datetime(2026, 9, 30, 12, 0, 0, tzinfo=timezone.utc)
@@ -286,16 +285,19 @@ def test_contradiction_retention():
     )
 
     assert conflict_event.event_type == EventType.EVIDENCE_CONFLICT
+    m17 = repo.get_entity("m17")
     assert m17.attribute_statuses["configuration"] == EpistemicStatus.CONTRADICTED
     assert m17.status == EpistemicStatus.CONTRADICTED
     assert conflicting_evidence.id in m17.evidence_refs
+    # Both claims are retained in history: the registry value and the visual value.
+    values = {sv.value for sv in repo.get_state_versions_for_entity("m17", "configuration")}
+    assert values == {"R6", "R7"}
 
 
-def test_freshness_invalidation():
+def test_freshness_invalidation(repo):
     """
     Rule 2.6: Freshness is contextual. High volatility attributes expire quickly.
     """
-    repo = InMemoryRepository()
     engine = WorldStateEngine(repository=repo)
 
     t0 = datetime(2026, 9, 30, 14, 0, 0, tzinfo=timezone.utc)

@@ -25,5 +25,17 @@ pip install -r backend/requirements.txt
 
 ### Running Tests
 ```bash
-pytest backend/tests/
+.venv/bin/pytest
 ```
+
+### Running the API
+```bash
+.venv/bin/uvicorn backend.app.main:app --reload
+```
+State is stored in `./orbit.db` (SQLite) by default; set `ORBIT_DATABASE_URL`
+(e.g. `postgresql+psycopg://…`) to use PostgreSQL. Migrations run automatically on
+start; to run them by hand: `.venv/bin/alembic upgrade head`.
+
+### Documentation
+`ORBIT_PROJECT_INIT.md` (spec) · `ARCHITECTURE.md` · `DECISIONS.md` · `ROADMAP.md` ·
+`PROJECT_STATUS.md` · `docs/experiments/BENCHMARK_PROTOCOL.md`

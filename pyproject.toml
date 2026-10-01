@@ -1,0 +1,19 @@
+[project]
+name = "orbit"
+version = "0.1.0"
+description = "ORBIT — Persistent, evidence-aware world model agent for physical workspaces"
+requires-python = ">=3.9"
+dependencies = [
+    "pydantic>=2.0.0,<3",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "sqlalchemy>=2.0,<2.1",
+    "alembic>=1.13",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.4.0", "httpx>=0.24.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["."]
