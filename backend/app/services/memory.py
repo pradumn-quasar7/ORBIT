@@ -53,8 +53,21 @@ class MemoryService:
             identity_status=entity.identity_status,
             status=aggregate_status(c.status for c in assessed.values()),
             attributes=assessed,
-            relations=[r for r in self.relations.active_relations(entity.id, as_of) if r.source_entity == entity.id],
+            relations=[
+                self._relation_at(r, as_of)
+                for r in self.relations.active_relations(entity.id, as_of)
+                if r.source_entity == entity.id
+            ],
         )
+
+    def _relation_at(self, relation, as_of: datetime):
+        refs = []
+        for ref in relation.evidence_refs:
+            ev = self.repo.get_evidence(ref)
+            if ev is None or ev.timestamp <= as_of:
+                refs.append(ref)
+        relation.evidence_refs = refs
+        return relation
 
     def world_snapshot(self, as_of: datetime, entity_ids: Optional[List[str]] = None) -> WorldSnapshot:
         """B_t — the structured belief state at ``as_of``."""

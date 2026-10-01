@@ -22,6 +22,7 @@ from backend.app.domain.status import aggregate_status
 from backend.app.domain.types import ClaimDisposition, EpistemicStatus, FreshnessState
 from backend.app.repositories.base import Repository
 from backend.app.services.freshness import FreshnessPolicyRegistry
+from backend.app.services.grading import status_from_supports
 
 SUPPORTABLE = frozenset({EpistemicStatus.OBSERVED, EpistemicStatus.VERIFIED})
 
@@ -53,6 +54,26 @@ class ClaimEvaluator:
                 return c
         return None
 
+    # ------------------------------------------------- as-of evidence (no leakage)
+    @staticmethod
+    def evidence_at(version: StateVersion, as_of: datetime) -> List[str]:
+        """Evidence that supported the version *by* ``as_of`` — never later evidence."""
+        refs = [s.evidence_id for s in version.support if s.at <= as_of]
+        return refs if version.support else list(version.supported_by)
+
+    def status_at(self, version: StateVersion, as_of: datetime) -> EpistemicStatus:
+        """Evidential grade the version had at ``as_of``: later corroboration does not
+        upgrade a past belief."""
+        supports = [s for s in version.support if s.at <= as_of]
+        if not supports or len(supports) == len(version.support):
+            return version.status
+
+        def authority(eid: str) -> float:
+            ev = self.repo.get_evidence(eid)
+            return ev.authority if ev else 1.0
+
+        return status_from_supports(supports, authority)
+
     def derive(
         self, version: StateVersion, entity: Optional[Entity], as_of: datetime, conflicted: bool
     ) -> Tuple[EpistemicStatus, FreshnessAssessment]:
@@ -62,7 +83,7 @@ class ClaimEvaluator:
             return EpistemicStatus.CONTRADICTED, fresh
         if fresh.state in (FreshnessState.STALE, FreshnessState.INVALIDATED):
             return EpistemicStatus.STALE, fresh
-        return version.status, fresh
+        return self.status_at(version, as_of), fresh
 
     # -------------------------------------------------------------- assessment
     def assess_attribute(self, entity_id: str, attribute: str, as_of: datetime) -> ClaimAssessment:
@@ -101,7 +122,7 @@ class ClaimEvaluator:
                 status=EpistemicStatus.CONTRADICTED,
                 supportable=False,
                 freshness=fresh,
-                evidence_refs=sorted({e for v in sides for e in v.supported_by}),
+                evidence_refs=sorted({e for v in sides for e in self.evidence_at(v, as_of)}),
                 conflict_id=conflict.id,
                 conflicts=[self._side(v, entity, as_of) for v in sides],
                 reason="sources disagree: " + " vs ".join(repr(v.value) for v in sides),
@@ -130,7 +151,7 @@ class ClaimEvaluator:
             status=status,
             supportable=supportable,
             freshness=fresh,
-            evidence_refs=list(version.supported_by),
+            evidence_refs=self.evidence_at(version, as_of),
             reason=reason,
             recommended_action=action,
         )
@@ -155,7 +176,7 @@ class ClaimEvaluator:
             version_id=version.id,
             value=version.value,
             status=status,
-            sources=sorted({s.source for s in version.support}),
-            evidence_refs=list(version.supported_by),
+            sources=sorted({s.source for s in version.support if s.at <= as_of}),
+            evidence_refs=self.evidence_at(version, as_of),
             last_supported_at=fresh.last_supported_at,
         )

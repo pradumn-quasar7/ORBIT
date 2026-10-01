@@ -24,6 +24,7 @@ from backend.app.domain.types import (
     SourceType,
     StepStatus,
     TaskStatus,
+    VariationKind,
     VolatilityClass,
 )
 
@@ -681,3 +682,74 @@ class OutcomeRecord(BaseModel):
     evidence_refs: List[str] = Field(default_factory=list)
     performed_by: Optional[str] = None
     recorded_at: UTCDateTime
+
+
+# -------------------------------------------------- replay and counterfactuals
+class ReplayFrame(BaseModel):
+    at: UTCDateTime
+    events: List[Event]
+    changes: List[WorldChange]  # belief change since the previous frame
+
+
+class Variation(StrictInput):
+    kind: VariationKind
+    entity_id: Optional[str] = None
+    attribute: Optional[str] = None
+    value: Any = None
+    relation_type: Optional[str] = None
+    target: Optional[str] = None
+    present: bool = True
+    minutes: float = 0.0
+    description: Optional[str] = None
+
+
+class SandboxInfo(BaseModel):
+    id: str
+    label: Optional[str] = None
+    forked_from: UTCDateTime  # instant of the source world
+    now: UTCDateTime  # sandbox clock
+    variations: List[Dict[str, Any]] = Field(default_factory=list)
+    counts: Dict[str, int] = Field(default_factory=dict)
+
+
+class DecisionComparison(BaseModel):
+    kind: str  # resume | query | perception
+    subject: str
+    baseline: Dict[str, Any]
+    counterfactual: Dict[str, Any]
+    changed: bool
+
+
+class CounterfactualReport(BaseModel):
+    """Static replay (the stored world) vs the same world under a what-if premise."""
+
+    forked_from: UTCDateTime
+    baseline_at: UTCDateTime
+    counterfactual_at: UTCDateTime
+    variations: List[Variation]
+    effects: List[WorldChange]  # what the premise changed in belief, incl. propagation
+    decisions: List[DecisionComparison]
+    decision_changed: bool
+
+
+class SensitivityItem(BaseModel):
+    entity_id: str
+    attribute: str
+    expected: Any = None
+    probe: str  # violated | unverified
+    current_status: EpistemicStatus
+    baseline_next: Optional[str] = None
+    counterfactual_next: Optional[str] = None
+    decision_changed: bool
+    blocked_steps: List[str] = Field(default_factory=list)
+
+
+class SensitivityReport(BaseModel):
+    """Which facts, if wrong, would change what ORBIT tells you to do next?"""
+
+    task_id: str
+    as_of: UTCDateTime
+    baseline_next: Optional[str] = None
+    items: List[SensitivityItem]
+    critical: List[str]  # "entity.attribute" whose failure changes the decision
+    recommended_checks: List[ObservationRequest]

@@ -44,4 +44,7 @@ tests, updated `PROJECT_STATUS.md` / `DECISIONS.md`, and a merge to `main`.
 - [x] **Phase 9 — ORBIT-BENCH + ablations** (step 20)
   - Scenario runner, metrics, ablation matrix, run metadata.
 
-- [ ] **Later** — AR client (step 18), VR replay/counterfactuals (step 19), wearable clients, pilot study.
+- [x] **Phase 10 — Replay and counterfactual sandbox** (step 19 backend)
+  - World projection at any instant, replay frames, isolated what-if sandboxes, decision comparison, sensitivity analysis, Experiment H.
+
+- [ ] **Later** — AR client (step 18), VR rendering of replay/counterfactuals (step 19 front-end), wearable clients, pilot study.

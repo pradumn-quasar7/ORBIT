@@ -13,7 +13,9 @@ from backend.app.services.actions import ActionSafetyService
 from backend.app.services.active_perception import ActivePerceptionPlanner
 from backend.app.services.hypotheses import HypothesisService
 from backend.app.services.memory import MemoryService
+from backend.app.services.counterfactual import SandboxRegistry
 from backend.app.services.query_agent import QueryAgent
+from backend.app.services.replay import ReplayService
 from backend.app.services.relations import RelationService
 from backend.app.services.evidence_policy import EvidencePolicy
 from backend.app.services.freshness import FreshnessPolicyRegistry
@@ -53,11 +55,19 @@ class OrbitServices:
     agent: QueryAgent
     perception: ActivePerceptionPlanner
     actions: ActionSafetyService
+    replay: ReplayService
+    sandboxes: SandboxRegistry
 
     config: OrbitConfig = OrbitConfig()
 
     @classmethod
-    def build(cls, repo: Repository, clock: Optional[Clock] = None, config: Optional[OrbitConfig] = None) -> "OrbitServices":
+    def build(
+        cls,
+        repo: Repository,
+        clock: Optional[Clock] = None,
+        config: Optional[OrbitConfig] = None,
+        sandbox: bool = False,
+    ) -> "OrbitServices":
         clock = clock or SystemClock()
         config = config or OrbitConfig()
         anchors = AnchorRegistry(repo)
@@ -69,6 +79,7 @@ class OrbitServices:
             relations=relations,
             freshness=freshness,
             policy=EvidencePolicy(freshness, detect_contradictions=config.detect_contradictions),
+            sandbox=sandbox,
         )
         memory = MemoryService(repo, engine.claims, relations, anchors)
         tasks = TaskService(repo, engine)
@@ -91,6 +102,8 @@ class OrbitServices:
             agent=QueryAgent(repo, engine, memory, diff, tasks, hypotheses, planner=perception, gate_evidence=config.gate_evidence),
             perception=perception,
             actions=actions,
+            replay=ReplayService(repo, diff),
+            sandboxes=SandboxRegistry(),
             config=config,
         )
 

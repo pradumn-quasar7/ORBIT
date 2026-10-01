@@ -39,6 +39,7 @@ SOURCE_ALIASES: Dict[str, SourceType] = {
     "procedure": SourceType.PROCEDURE,
     "system": SourceType.SYSTEM_EVENT,
     "inference": SourceType.INFERENCE,
+    "counterfactual": SourceType.SIMULATION,
 }
 _SOURCE_HINTS = (
     ("verif", SourceType.MANUAL_VERIFICATION),
@@ -64,6 +65,7 @@ CHANNEL_OF: Dict[SourceType, EvidenceChannel] = {
     SourceType.TOOL_OUTPUT: EvidenceChannel.RECORD,
     SourceType.USER_STATEMENT: EvidenceChannel.TESTIMONY,
     SourceType.INFERENCE: EvidenceChannel.INFERENCE,
+    SourceType.SIMULATION: EvidenceChannel.DIRECT,  # a premise stands in for direct ground truth
 }
 
 
@@ -100,7 +102,7 @@ def grade(source_type: SourceType, quality: float, authority: float) -> Epistemi
     if strength(quality, authority) < WEAK_STRENGTH:
         return EpistemicStatus.UNKNOWN
     if (
-        source_type in (SourceType.MANUAL_VERIFICATION, SourceType.EXTERNAL_RECORD)
+        source_type in (SourceType.MANUAL_VERIFICATION, SourceType.EXTERNAL_RECORD, SourceType.SIMULATION)
         and authority >= VERIFIED_AUTHORITY
         and quality >= 0.5
     ):
@@ -109,7 +111,12 @@ def grade(source_type: SourceType, quality: float, authority: float) -> Epistemi
 
 
 def is_verification(source_type: SourceType, quality: float, authority: float) -> bool:
-    return source_type == SourceType.MANUAL_VERIFICATION and authority >= VERIFIED_AUTHORITY and quality >= 0.5
+    # A counterfactual premise is, by definition, how the sandbox world *is*.
+    return (
+        source_type in (SourceType.MANUAL_VERIFICATION, SourceType.SIMULATION)
+        and authority >= VERIFIED_AUTHORITY
+        and quality >= 0.5
+    )
 
 
 def canonical_hash(payload: Any) -> str:

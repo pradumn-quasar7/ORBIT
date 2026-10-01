@@ -71,8 +71,13 @@ backend/app/
     actions.py            action safety boundary + outcome memory
     perception_gateway.py frame ingestion, retention, redaction
     dashboard.py          inspection read model
-  evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner)
-  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect)
+    grading.py            status of a version from its supports (shared)
+    projection.py         world as known at T (id-preserving copy)
+    sandbox.py            fork a world into an isolated sandbox
+    counterfactual.py     what-if premises, decision comparison, sensitivity analysis
+    replay.py             frame-by-frame history
+  evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner), counterfactual_eval.py (Experiment H)
+  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual)
   main.py          create_app(repository, clock) factory; lazy module-level `app`
 database/          Alembic migrations 0001–0007, migrate.py
 experiments/       scenarios/catalog.py, runners/run_bench.py, results/
