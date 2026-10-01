@@ -100,3 +100,13 @@
 ## ADR-018 — Absence requires validated search coverage of the last known location
 - **Status**: Accepted (Phase 4)
 - **Decision**: `SearchService.record_search` stores negative memory (`SearchCoverage`: region, coverage fraction, visibility, confidence, targets found / confirmed absent / inconclusive). A target is CONFIRMED_ABSENT only if it was searched for, its last known location lies inside the region, and `SearchPolicy` validates coverage (≥ 90 %, confidence ≥ 0.7, lighting not poor, occlusion ≤ 0.2). Confirmed absence closes the location claim (whereabouts UNKNOWN, reason retained) and emits OBJECT_REMOVED_OR_UNOBSERVED; nothing else changes belief. Ablations: `SearchPolicy(enabled=False)` and `WorldDiffService(treat_unobserved_as_removed=True)`.
+
+## ADR-019 — Resume protocol and evidence-gated step readiness
+- **Status**: Accepted (Phase 5)
+- **Decision**: `TaskService.resume` implements spec §11 literally: (1) checkpoint = `last_verified_at` (else last interruption, else creation); (2) world diff since the checkpoint filtered to entities the task's conditions reference; (3) completed steps whose postconditions are now VIOLATED or CONTRADICTED become `NEEDS_REVERIFICATION`; (4) readiness = every *transitive* prerequisite step complete with still-SATISFIED postconditions, every precondition SATISFIED by fresh evidence of at least `min_status`, and the procedure revision unchanged; (5)–(6) every UNSUPPORTED condition yields one deduplicated `ObservationRequest` with an attribute-specific instruction; (7) the next step is a re-verification if one is ready, else the lowest-ordered ready step, else none. Stale-but-not-contradicted outcomes keep the step COMPLETED but block dependents. A changed procedure revision blocks all pending steps until `acknowledge_revision` (a human decision). `start_step` uses the same readiness check; `complete_step` refuses completions contradicted by world evidence and upgrades completion to VERIFIED when postconditions are verified.
+- **Consequences**: A resume can never present a step with unsupported prerequisites (unsafe-continuation rate = 0 by construction, asserted in tests). Multi-user handoff is the same protocol with a different actor.
+
+## ADR-020 — Evidence-bearing input models forbid unknown fields
+- **Status**: Accepted (Phase 5)
+- **Context**: A test passed `quality=` to an `ObservedEntity`; Pydantic ignored it silently, so the "weak" evidence was recorded at full strength.
+- **Decision**: `Observation`, `ObservedEntity`, `ObservedRelation` and `StateCondition` use `extra="forbid"`.

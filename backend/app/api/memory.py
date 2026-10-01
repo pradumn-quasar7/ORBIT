@@ -13,6 +13,7 @@ from backend.app.domain.models import (
     CausalHypothesis,
     Event,
     LocationAnswer,
+    ResumePlan,
     SessionSummary,
     Task,
     TaskStateView,
@@ -177,6 +178,35 @@ def complete_step(task_id: str, step_id: str, body: StepComplete, svc: OrbitServ
 def interrupt_task(task_id: str, body: TaskInterrupt, svc: OrbitServices = Depends(get_services)):
     try:
         return svc.tasks.interrupt_task(task_id, body.at or svc.clock.now(), body.reason, body.actor)
+    except TaskError as exc:
+        _task_error(exc)
+
+
+class TaskResume(BaseModel):
+    actor: Optional[str] = None
+    at: Optional[UTCDateTime] = None
+
+
+class RevisionAck(BaseModel):
+    revision: str
+    actor: Optional[str] = None
+    at: Optional[UTCDateTime] = None
+
+
+@router.post("/tasks/{task_id}/resume", response_model=ResumePlan)
+def resume_task(task_id: str, body: TaskResume, svc: OrbitServices = Depends(get_services)):
+    """Spec §11 resume protocol: verified state → changes → invalidation → checks →
+    observation requests → next supported step (or none)."""
+    try:
+        return svc.tasks.resume(task_id, body.at or svc.clock.now(), body.actor)
+    except TaskError as exc:
+        _task_error(exc)
+
+
+@router.post("/tasks/{task_id}/procedure/acknowledge", response_model=Task)
+def acknowledge_revision(task_id: str, body: RevisionAck, svc: OrbitServices = Depends(get_services)):
+    try:
+        return svc.tasks.acknowledge_revision(task_id, body.revision, body.at or svc.clock.now(), body.actor)
     except TaskError as exc:
         _task_error(exc)
 

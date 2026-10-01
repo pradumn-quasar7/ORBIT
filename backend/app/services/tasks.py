@@ -1,19 +1,40 @@
-"""Procedural memory: tasks are first-class state, never just conversation (spec §11).
+"""Task continuity: tasks are first-class state, never just conversation (spec §11).
 
 Every progress change is an evidence-backed ``TASK_PROGRESS_CHANGED`` event, so the
-task state at any past instant can be replayed. Dependency/precondition reasoning
-and the resume protocol build on this in Phase 5.
+task state at any past instant can be replayed. Readiness is checked against the
+evidence gate: a step is ready only when every transitive prerequisite step is
+complete with a still-supported outcome, every precondition is SATISFIED by fresh
+evidence of the required status, and the governing procedure revision is unchanged.
+``resume`` implements the spec §11 protocol.
 """
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from backend.app.domain.models import Event, Interruption, StateCondition, Task, TaskStateView, TaskStep, generate_id
-from backend.app.domain.types import EpistemicStatus, EventType, SourceType, StepStatus, TaskStatus
+from backend.app.domain.models import (
+    ConditionCheck,
+    Event,
+    Interruption,
+    ObservationRequest,
+    ResumePlan,
+    StateCondition,
+    StepAssessment,
+    Task,
+    TaskStateView,
+    TaskStep,
+    generate_id,
+)
+from backend.app.domain.types import ConditionState, EpistemicStatus, EventType, SourceType, StepStatus, TaskStatus
 from backend.app.repositories.base import Repository
+from backend.app.services.conditions import ConditionEvaluator
 from backend.app.services.evidence_policy import grade, infer_source_type, is_verification
+from backend.app.services.memory import MemoryService
+from backend.app.services.world_diff import WorldDiffService
 from backend.app.services.world_state_engine import WorldStateEngine
+
+PROCEDURE_ATTRIBUTE = "procedure_revision"
+DONE = (StepStatus.COMPLETED, StepStatus.SKIPPED)
 
 
 class TaskError(ValueError):
@@ -28,8 +49,13 @@ class StepNotReadyError(TaskError):
     pass
 
 
+class PostconditionViolatedError(TaskError):
+    pass
+
+
 class StepSpec(BaseModel):
     id: Optional[str] = None
+    step_order: Optional[int] = None  # defaults to position; set to keep a procedure's own numbering
     description: str
     dependencies: List[str] = Field(default_factory=list)
     preconditions: List[StateCondition] = Field(default_factory=list)
@@ -40,6 +66,9 @@ class TaskService:
     def __init__(self, repository: Repository, engine: WorldStateEngine):
         self.repo = repository
         self.engine = engine
+        self.conditions = ConditionEvaluator(repository, engine.claims)
+        memory = MemoryService(repository, engine.claims, engine.relations, engine.anchors)
+        self._diff = WorldDiffService(repository, memory)
 
     # -------------------------------------------------------------- creation
     def create_task(
@@ -59,7 +88,7 @@ class TaskService:
             TaskStep(
                 id=spec.id or generate_id("step"),
                 task_id=task_id,
-                step_order=i + 1,
+                step_order=spec.step_order if spec.step_order is not None else i + 1,
                 description=spec.description,
                 dependencies=list(spec.dependencies),
                 preconditions=list(spec.preconditions),
@@ -67,6 +96,8 @@ class TaskService:
             )
             for i, spec in enumerate(steps)
         ]
+        if len({s.step_order for s in built}) != len(built):
+            raise TaskError("duplicate step_order")
         self._validate_graph(built)
         task = Task(
             id=task_id,
@@ -112,10 +143,11 @@ class TaskService:
     # -------------------------------------------------------------- progress
     def start_step(self, task_id: str, step_id: str, at: datetime, actor: Optional[str] = None) -> Task:
         task, step = self._require_step(task_id, step_id)
-        unmet = self.unmet_dependencies(task, step)
-        if unmet:
-            raise StepNotReadyError(f"step {step_id} waits on {unmet}")
+        assessment = self.assess_step(task, step, at)
+        if not assessment.ready:
+            raise StepNotReadyError(f"step {step_id} is not ready: " + "; ".join(assessment.blockers))
         with self.repo.transaction():
+            step.blocked_reason = None
             self._set_step(task, step, StepStatus.IN_PROGRESS, at, [], f"started by {actor or 'unknown'}")
             step.started_at = step.started_at or at
             self._set_task(task, TaskStatus.IN_PROGRESS, at)
@@ -140,6 +172,14 @@ class TaskService:
         unmet = self.unmet_dependencies(task, step)
         if unmet:
             raise StepNotReadyError(f"step {step_id} waits on {unmet}")
+        post = [self.conditions.check(c, at) for c in step.postconditions]
+        violated = [c for c in post if c.state == ConditionState.VIOLATED]
+        if violated:
+            raise PostconditionViolatedError(
+                f"step {step_id} reported complete but evidence contradicts it: " + "; ".join(
+                    f"{c.condition.entity_id}.{c.condition.attribute}: {c.reason}" for c in violated
+                )
+            )
         stype = source_type or infer_source_type(source)
         with self.repo.transaction():
             evidence = self.engine.record_evidence(
@@ -153,6 +193,8 @@ class TaskService:
                 content={"kind": "step_completion", "task_id": task_id, "step_id": step_id, "note": note},
             )
             completion = EpistemicStatus.VERIFIED if is_verification(stype, quality, authority) else grade(stype, quality, authority)
+            if post and all(c.state == ConditionState.SATISFIED and c.status == EpistemicStatus.VERIFIED for c in post):
+                completion = EpistemicStatus.VERIFIED  # outcome verified by world evidence (spec §16)
             step.completion_status = completion
             step.completed_at = at
             step.completed_by = actor
@@ -206,7 +248,221 @@ class TaskService:
     @staticmethod
     def unmet_dependencies(task: Task, step: TaskStep) -> List[str]:
         by_id = {s.id: s for s in task.steps}
-        return [d for d in step.dependencies if by_id[d].status not in (StepStatus.COMPLETED, StepStatus.SKIPPED)]
+        return [d for d in step.dependencies if by_id[d].status not in DONE]
+
+    # -------------------------------------------------------------- readiness
+    @staticmethod
+    def ancestors(task: Task, step: TaskStep) -> List[TaskStep]:
+        by_id = {s.id: s for s in task.steps}
+        seen, stack = set(), list(step.dependencies)
+        while stack:
+            sid = stack.pop()
+            if sid not in seen:
+                seen.add(sid)
+                stack.extend(by_id[sid].dependencies)
+        return sorted((by_id[s] for s in seen), key=lambda s: s.step_order)
+
+    def revision_check(self, task: Task, as_of: datetime) -> Optional[ConditionCheck]:
+        if not task.procedure_entity_id:
+            return None
+        return self.conditions.check(
+            StateCondition(
+                entity_id=task.procedure_entity_id,
+                attribute=PROCEDURE_ATTRIBUTE,
+                expected=task.procedure_revision,
+                description="task was planned against this procedure revision",
+            ),
+            as_of,
+        )
+
+    def assess_step(self, task: Task, step: TaskStep, as_of: datetime, revision: Optional[ConditionCheck] = None) -> StepAssessment:
+        revision = revision if revision is not None else self.revision_check(task, as_of)
+        pre = [self.conditions.check(c, as_of) for c in step.preconditions]
+        post = [self.conditions.check(c, as_of) for c in step.postconditions] if step.status in DONE else []
+        blockers: List[str] = []
+        if step.status not in DONE:
+            if revision is not None and revision.state != ConditionState.SATISFIED:
+                blockers.append(f"procedure revision: {revision.reason}")
+            for anc in self.ancestors(task, step):
+                label = f"step {anc.step_order} ({anc.description})"
+                if anc.status == StepStatus.NEEDS_REVERIFICATION:
+                    blockers.append(f"{label} must be re-verified")
+                elif anc.status not in DONE:
+                    blockers.append(f"waits on {label}")
+                else:
+                    for chk in (self.conditions.check(c, as_of) for c in anc.postconditions):
+                        if chk.state != ConditionState.SATISFIED:
+                            blockers.append(
+                                f"{label} outcome not supported: {chk.condition.entity_id}.{chk.condition.attribute} {chk.reason}"
+                            )
+            for chk in pre:
+                if chk.state != ConditionState.SATISFIED:
+                    blockers.append(f"precondition {chk.condition.entity_id}.{chk.condition.attribute}: {chk.reason}")
+        completion = step.completion_status
+        if step.status in DONE and any(c.state != ConditionState.SATISFIED for c in post):
+            completion = EpistemicStatus.STALE
+        return StepAssessment(
+            step_id=step.id,
+            step_order=step.step_order,
+            description=step.description,
+            status=step.status,
+            completion_status=completion,
+            ready=step.status not in DONE and not blockers,
+            blockers=blockers,
+            preconditions=pre,
+            postconditions=post,
+        )
+
+    # ---------------------------------------------------------------- resume
+    def resume(self, task_id: str, at: datetime, actor: Optional[str] = None) -> ResumePlan:
+        """Spec §11: (1) load last verified state, (2) load world changes since, (3)
+        invalidate affected steps, (4) check dependencies and prerequisites, (5) identify
+        unresolved evidence, (6) request targeted observations, (7) only then present
+        the next supported step."""
+        task = self._require_task(task_id)
+        # (1) last verified state
+        checkpoint = task.last_verified_at or (task.interruptions[-1].at if task.interruptions else task.created_at)
+        # (2) relevant world changes since the checkpoint
+        involved = {c.entity_id for s in task.steps for c in s.preconditions + s.postconditions}
+        if task.procedure_entity_id:
+            involved.add(task.procedure_entity_id)
+        changes = [
+            c for c in self._diff.diff(checkpoint, at, include_tasks=False, save=False).changes if c.entity_id in involved
+        ]
+
+        with self.repo.transaction():
+            # (3) completed steps whose outcome the world now contradicts
+            invalidated: List[str] = []
+            for step in task.steps:
+                if step.status != StepStatus.COMPLETED or not step.postconditions:
+                    continue
+                broken = [
+                    chk
+                    for chk in (self.conditions.check(c, at) for c in step.postconditions)
+                    if chk.state == ConditionState.VIOLATED or chk.status == EpistemicStatus.CONTRADICTED
+                ]
+                if broken:
+                    step.invalidated_reason = "; ".join(
+                        f"{b.condition.entity_id}.{b.condition.attribute}: {b.reason}" for b in broken
+                    )
+                    step.completion_status = EpistemicStatus.STALE
+                    self._set_step(task, step, StepStatus.NEEDS_REVERIFICATION, at, [], f"outcome invalidated — {step.invalidated_reason}")
+                    invalidated.append(step.id)
+
+            # (4) dependencies, prerequisites, procedure revision
+            revision = self.revision_check(task, at)
+            assessments = [self.assess_step(task, s, at, revision) for s in task.steps]
+            blocked: List[str] = []
+            for step, a in zip(task.steps, assessments):
+                if step.status in (StepStatus.PENDING, StepStatus.BLOCKED):
+                    new = StepStatus.BLOCKED if a.blockers else StepStatus.PENDING
+                    step.blocked_reason = "; ".join(a.blockers) or None
+                    if new != step.status:
+                        self._set_step(task, step, new, at, [], step.blocked_reason or "prerequisites satisfied")
+                        a.status = new
+                if a.blockers:
+                    blocked.append(step.id)
+
+            # (5) unresolved evidence and (6) targeted observation requests
+            unresolved: List[ConditionCheck] = []
+            requests: Dict[tuple, ObservationRequest] = {}
+
+            def need(check: ConditionCheck, step_id: Optional[str]) -> None:
+                if check.state != ConditionState.UNSUPPORTED:
+                    return
+                key = (check.condition.entity_id, check.condition.attribute)
+                if key not in requests:
+                    unresolved.append(check)
+                    requests[key] = self.conditions.request_for(check)
+                if step_id and step_id not in requests[key].for_steps:
+                    requests[key].for_steps.append(step_id)
+
+            if revision is not None:
+                need(revision, None)
+            for step, a in zip(task.steps, assessments):
+                if step.status in DONE:
+                    continue
+                for chk in a.preconditions:
+                    need(chk, step.id)
+                for anc in self.ancestors(task, step):
+                    if anc.status in DONE:
+                        for chk in (self.conditions.check(c, at) for c in anc.postconditions):
+                            need(chk, step.id)
+
+            # (7) only now: the next supported step (re-verification first)
+            frontier = [a for a in assessments if a.ready]
+            redo = [a for a in frontier if a.status == StepStatus.NEEDS_REVERIFICATION]
+            next_step = (redo or frontier or [None])[0]
+            can_continue = next_step is not None
+
+            all_done = all(s.status in DONE for s in task.steps)
+            if all_done:
+                self._set_task(task, TaskStatus.COMPLETED, at)
+            elif can_continue:
+                self._set_task(task, TaskStatus.IN_PROGRESS, at, f"resumed by {actor or 'unknown'}")
+                if task.interruptions and task.interruptions[-1].resumed_at is None:
+                    task.interruptions[-1].resumed_at = at
+                    task.interruptions[-1].resumed_by = actor
+            else:
+                self._set_task(task, TaskStatus.BLOCKED, at, "resume blocked: evidence or prerequisites missing")
+            self.repo.save_task(task)
+
+        rev_info = None
+        if revision is not None:
+            rev_info = {
+                "planned": task.procedure_revision,
+                "current": revision.observed_value,
+                "state": revision.state.value,
+                "status": revision.status.value,
+            }
+        return ResumePlan(
+            task_id=task.id,
+            as_of=at,
+            checkpoint=checkpoint,
+            resumed_by=actor,
+            world_changes=changes,
+            invalidated_steps=invalidated,
+            blocked_steps=blocked,
+            unresolved=unresolved,
+            requested_observations=list(requests.values()),
+            procedure_revision=rev_info,
+            steps=assessments,
+            next_step=next_step,
+            can_continue=can_continue,
+            task_status=task.status,
+            message=self._resume_message(task, checkpoint, changes, invalidated, next_step, list(requests.values()), all_done),
+        )
+
+    @staticmethod
+    def _resume_message(task, checkpoint, changes, invalidated, next_step, requests, all_done) -> str:
+        parts = [f"Task '{task.goal}': last verified state {checkpoint.isoformat()}; {len(changes)} relevant change(s) since."]
+        by_id = {s.id: s for s in task.steps}
+        for sid in invalidated:
+            parts.append(f"Step {by_id[sid].step_order} must be re-verified ({by_id[sid].invalidated_reason}).")
+        if all_done:
+            parts.append("All steps complete.")
+        elif next_step is not None:
+            verb = "Re-verify" if next_step.status == StepStatus.NEEDS_REVERIFICATION else "Next supported step"
+            parts.append(f"{verb}: step {next_step.step_order} — {next_step.description}.")
+        else:
+            parts.append("Cannot continue yet: no step is supported by current evidence.")
+        for r in requests:
+            parts.append(f"Requested observation: {r.instruction}")
+        return " ".join(parts)
+
+    def acknowledge_revision(self, task_id: str, revision: str, at: datetime, actor: Optional[str] = None) -> Task:
+        """A person reviews the task against a new procedure revision (human authority)."""
+        task = self._require_task(task_id)
+        with self.repo.transaction():
+            before = task.procedure_revision
+            task.procedure_revision = revision
+            task.updated_at = max(task.updated_at, at)
+            self._event(
+                task, at, {"procedure_revision": before}, {"procedure_revision": revision}, [],
+                f"Procedure revision {before} → {revision} acknowledged by {actor or 'unknown'}",
+            )
+            self.repo.save_task(task)
+        return task
 
     # --------------------------------------------------------------- helpers
     def _require_task(self, task_id: str) -> Task:
