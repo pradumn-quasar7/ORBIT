@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app.domain.models import (
     Anchor,
+    CausalHypothesis,
     ClaimDependency,
     Conflict,
     Entity,
@@ -213,6 +214,20 @@ class SqlRepository(Repository):
 
     def get_events_for_entity(self, entity_id: str) -> List[Event]:
         return self._list(t.events, Event, [t.events.c.timestamp], t.events.c.entity_id == entity_id)
+
+    def get_events_for_task(self, task_id: str) -> List[Event]:
+        return self._list(t.events, Event, [t.events.c.timestamp], t.events.c.task_id == task_id)
+
+    # --------------------------------------------------------- causal hypotheses
+    def save_hypothesis(self, hypothesis: CausalHypothesis) -> CausalHypothesis:
+        self._upsert(t.causal_hypotheses, hypothesis)
+        return hypothesis
+
+    def get_hypothesis(self, hypothesis_id: str) -> Optional[CausalHypothesis]:
+        return self._get_one(t.causal_hypotheses, CausalHypothesis, hypothesis_id)
+
+    def list_hypotheses(self) -> List[CausalHypothesis]:
+        return self._list(t.causal_hypotheses, CausalHypothesis, [t.causal_hypotheses.c.created_at])
 
     # ----------------------------------------------------------------- relations
     def save_relation(self, relation: Relation) -> Relation:

@@ -132,6 +132,7 @@ events = Table(
     Column("event_type", String(64), nullable=False, index=True),
     Column("entity_id", String(128), index=True),
     Column("relation_id", String(128)),
+    Column("task_id", String(128), index=True),
     Column("before_state", JSON),
     Column("after_state", JSON),
     Column("evidence_refs", JSON, nullable=False),
@@ -159,6 +160,11 @@ tasks = Table(
     _seq(),
     Column("goal", Text, nullable=False),
     Column("status", String(32), nullable=False),
+    Column("assigned_to", String(128)),
+    Column("procedure_entity_id", String(128)),
+    Column("procedure_revision", String(128)),
+    Column("interruptions", JSON, nullable=False, server_default="[]"),
+    Column("last_verified_at", UTCDateTimeType),
     Column("created_at", UTCDateTimeType, nullable=False),
     Column("updated_at", UTCDateTimeType, nullable=False),
 )
@@ -172,11 +178,16 @@ task_steps = Table(
     Column("step_order", Integer, nullable=False),
     Column("description", Text, nullable=False),
     Column("status", String(32), nullable=False),
+    Column("completion_status", String(32), nullable=False, server_default="UNKNOWN"),
     Column("dependencies", JSON, nullable=False),
     Column("preconditions", JSON, nullable=False),
+    Column("postconditions", JSON, nullable=False, server_default="[]"),
     Column("evidence_refs", JSON, nullable=False),
     Column("blocked_reason", Text),
+    Column("started_at", UTCDateTimeType),
     Column("completed_at", UTCDateTimeType),
+    Column("completed_by", String(128)),
+    Column("invalidated_reason", Text),
 )
 
 world_diffs = Table(
@@ -254,4 +265,21 @@ claim_dependencies = Table(
     Column("depends_on_attribute", String(128), nullable=False),
     Column("reason", Text),
     Column("created_at", UTCDateTimeType, nullable=False),
+)
+
+causal_hypotheses = Table(
+    "causal_hypotheses",
+    metadata,
+    Column("id", String(128), primary_key=True),
+    _seq(),
+    Column("statement", Text, nullable=False),
+    Column("cause_event_id", String(128)),
+    Column("effect_event_id", String(128)),
+    Column("entity_ids", JSON, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("epistemic_status", String(32), nullable=False),
+    Column("evidence_refs", JSON, nullable=False),
+    Column("created_by", String(128)),
+    Column("created_at", UTCDateTimeType, nullable=False),
+    Column("updated_at", UTCDateTimeType, nullable=False),
 )

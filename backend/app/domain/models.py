@@ -9,9 +9,12 @@ from backend.app.domain.types import (
     EpistemicStatus,
     EventType,
     FreshnessState,
+    HypothesisStatus,
     IdentityStatus,
     ResolutionMethod,
     SourceType,
+    StepStatus,
+    TaskStatus,
     VolatilityClass,
 )
 
@@ -120,6 +123,7 @@ class Event(BaseModel):
     event_type: EventType
     entity_id: Optional[str] = None
     relation_id: Optional[str] = None
+    task_id: Optional[str] = None
     before_state: Optional[Dict[str, Any]] = None
     after_state: Optional[Dict[str, Any]] = None
     evidence_refs: List[str] = Field(default_factory=list)
@@ -229,24 +233,70 @@ class Session(BaseModel):
 
 
 # ----------------------------------------------------------------------- tasks
+class StateCondition(BaseModel):
+    """A claim about the world a step requires (precondition) or establishes
+    (postcondition), e.g. ``valve_v2.state == "closed"`` at least OBSERVED."""
+
+    entity_id: str
+    attribute: str
+    expected: Any = None
+    operator: str = "eq"  # eq | ne | in | exists
+    min_status: EpistemicStatus = EpistemicStatus.OBSERVED  # OBSERVED or VERIFIED
+    description: Optional[str] = None
+
+
+class Interruption(BaseModel):
+    at: UTCDateTime
+    reason: Optional[str] = None
+    actor: Optional[str] = None
+    resumed_at: Optional[UTCDateTime] = None
+    resumed_by: Optional[str] = None
+
+
 class TaskStep(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("step"))
     task_id: str
     step_order: int
     description: str
-    status: EpistemicStatus = EpistemicStatus.UNKNOWN  # VERIFIED, BLOCKED, etc.
-    dependencies: List[str] = Field(default_factory=list)
-    preconditions: Dict[str, Any] = Field(default_factory=dict)
+    status: StepStatus = StepStatus.PENDING
+    completion_status: EpistemicStatus = EpistemicStatus.UNKNOWN
+    dependencies: List[str] = Field(default_factory=list)  # step ids that must be COMPLETED first
+    preconditions: List[StateCondition] = Field(default_factory=list)
+    postconditions: List[StateCondition] = Field(default_factory=list)
     evidence_refs: List[str] = Field(default_factory=list)
     blocked_reason: Optional[str] = None
+    started_at: Optional[UTCDateTime] = None
     completed_at: Optional[UTCDateTime] = None
+    completed_by: Optional[str] = None
+    invalidated_reason: Optional[str] = None
 
 
 class Task(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("task"))
     goal: str
-    status: str = "IN_PROGRESS"  # PENDING, IN_PROGRESS, COMPLETED, BLOCKED
+    status: TaskStatus = TaskStatus.PENDING
     steps: List[TaskStep] = Field(default_factory=list)
+    assigned_to: Optional[str] = None
+    procedure_entity_id: Optional[str] = None  # entity whose `procedure_revision` governs the task
+    procedure_revision: Optional[str] = None  # revision the task was planned against
+    interruptions: List[Interruption] = Field(default_factory=list)
+    last_verified_at: Optional[UTCDateTime] = None  # latest instant the task state was verified
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
+
+
+class CausalHypothesis(BaseModel):
+    """Causal hypothesis memory (spec §2.9, §7): never a fact without causal evidence."""
+
+    id: str = Field(default_factory=lambda: generate_id("hyp"))
+    statement: str
+    cause_event_id: Optional[str] = None
+    effect_event_id: Optional[str] = None
+    entity_ids: List[str] = Field(default_factory=list)
+    status: HypothesisStatus = HypothesisStatus.HYPOTHESIS
+    epistemic_status: EpistemicStatus = EpistemicStatus.INFERRED
+    evidence_refs: List[str] = Field(default_factory=list)
+    created_by: Optional[str] = None
     created_at: UTCDateTime
     updated_at: UTCDateTime
 
@@ -326,3 +376,51 @@ class EntityAssessment(BaseModel):
     status: EpistemicStatus
     identity_status: IdentityStatus
     attributes: Dict[str, ClaimAssessment]
+
+
+# ----------------------------------------------------------- memory read models
+class EntitySnapshot(BaseModel):
+    entity_id: str
+    type: str
+    name: Optional[str] = None
+    identity_status: IdentityStatus
+    status: EpistemicStatus
+    attributes: Dict[str, ClaimAssessment]
+    relations: List[Relation] = Field(default_factory=list)
+
+
+class WorldSnapshot(BaseModel):
+    """B_t: ORBIT's belief about the world at ``as_of``, each claim with its evidence gate."""
+
+    as_of: UTCDateTime
+    entities: Dict[str, EntitySnapshot]
+
+
+class LocationAnswer(BaseModel):
+    entity_id: str
+    as_of: UTCDateTime
+    location: ClaimAssessment
+    anchor_lineage: List[str] = Field(default_factory=list)
+    supported_by_relations: List[Relation] = Field(default_factory=list)  # on / inside
+
+
+class AnchorContent(BaseModel):
+    entity_id: str
+    location: Any
+    via: str  # "location" | "relation:on" | ...
+    assessment: ClaimAssessment
+
+
+class SessionSummary(BaseModel):
+    session: Session
+    observation_ids: List[str]
+    entities_observed: List[str]
+    event_counts: Dict[str, int]
+    events: List[Event]
+
+
+class TaskStateView(BaseModel):
+    task_id: str
+    as_of: UTCDateTime
+    status: TaskStatus
+    steps: Dict[str, StepStatus]

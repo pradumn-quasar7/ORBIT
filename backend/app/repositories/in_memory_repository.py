@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from backend.app.domain.models import (
     Anchor,
+    CausalHypothesis,
     ClaimDependency,
     Conflict,
     Entity,
@@ -36,6 +37,7 @@ _STORES = (
     "sessions",
     "conflicts",
     "dependencies",
+    "hypotheses",
 )
 
 
@@ -60,6 +62,7 @@ class InMemoryRepository(Repository):
         self.sessions: Dict[str, Session] = {}
         self.conflicts: Dict[str, Conflict] = {}
         self.dependencies: Dict[str, ClaimDependency] = {}
+        self.hypotheses: Dict[str, CausalHypothesis] = {}
         self._depth = 0
 
     @contextmanager
@@ -173,6 +176,19 @@ class InMemoryRepository(Repository):
 
     def get_events_for_entity(self, entity_id: str) -> List[Event]:
         return [e for e in self.list_events() if e.entity_id == entity_id]
+
+    def get_events_for_task(self, task_id: str) -> List[Event]:
+        return [e for e in self.list_events() if e.task_id == task_id]
+
+    # Causal hypotheses
+    def save_hypothesis(self, hypothesis: CausalHypothesis) -> CausalHypothesis:
+        return self._put(self.hypotheses, hypothesis)
+
+    def get_hypothesis(self, hypothesis_id: str) -> Optional[CausalHypothesis]:
+        return self._get(self.hypotheses, hypothesis_id)
+
+    def list_hypotheses(self) -> List[CausalHypothesis]:
+        return sorted((_copy(h) for h in self.hypotheses.values()), key=lambda h: h.created_at)
 
     # Relations
     def save_relation(self, relation: Relation) -> Relation:

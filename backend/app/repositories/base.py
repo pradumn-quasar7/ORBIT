@@ -10,6 +10,7 @@ from typing import Iterator, List, Optional
 
 from backend.app.domain.models import (
     Anchor,
+    CausalHypothesis,
     ClaimDependency,
     Conflict,
     Entity,
@@ -101,6 +102,19 @@ class Repository(ABC):
 
     @abstractmethod
     def get_events_for_entity(self, entity_id: str) -> List[Event]: ...
+
+    @abstractmethod
+    def get_events_for_task(self, task_id: str) -> List[Event]: ...
+
+    # Causal hypotheses
+    @abstractmethod
+    def save_hypothesis(self, hypothesis: CausalHypothesis) -> CausalHypothesis: ...
+
+    @abstractmethod
+    def get_hypothesis(self, hypothesis_id: str) -> Optional[CausalHypothesis]: ...
+
+    @abstractmethod
+    def list_hypotheses(self) -> List[CausalHypothesis]: ...
 
     # Relations
     @abstractmethod
