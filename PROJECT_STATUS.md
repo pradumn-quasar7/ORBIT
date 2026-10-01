@@ -1,7 +1,7 @@
 # ORBIT Project Status
 
 ## Current Phase
-Phase 2 — Evidence engine (COMPLETE). Next: Phase 3 — Memory core.
+Phase 3 — Memory core (COMPLETE). Next: Phase 4 — World diff.
 
 ## Phase Log
 
@@ -47,22 +47,35 @@ Phase 2 — Evidence engine (COMPLETE). Next: Phase 3 — Memory core.
 - Migration `0003` (schema + data backfill of source types and support). ADR-011…013.
 - Tests: `test_evidence_engine.py` (31 cases × 2 backends) incl. exit-criterion table, weak/misleading/out-of-order evidence, conflict lifecycle, transitive cycle-safe propagation, tamper detection, ablations, migration backfill.
 
+### Phase 3 — Memory core (§48 step 9)
+**Planned**
+- Temporal (as-of snapshots, timelines), spatial (locate, anchor contents), episodic (session summaries), procedural (task/step persistence and replay), causal-hypothesis memory.
+- Exit: history and task state are queryable.
+
+**Implemented**
+- Domain: `StateCondition`, `Interruption`, reworked `TaskStep`/`Task`, `CausalHypothesis`; `TaskStatus`, `StepStatus`, `HypothesisStatus`; `Event.task_id`; read models `WorldSnapshot`, `EntitySnapshot`, `LocationAnswer`, `AnchorContent`, `SessionSummary`, `TaskStateView`.
+- `services/memory.py` (`world_snapshot`, `timeline`, `locate`, `contents`, `session_summary`, `previous_session`), `services/tasks.py` (graph validation, evidence-backed start/complete/interrupt, as-of replay), `services/hypotheses.py`.
+- API: `GET /world/snapshot`, `GET /entities/{id}/timeline`, `GET /entities/{id}/location`, `GET /anchors/{id}/contents`, `GET /sessions/{id}/summary`, `POST/GET /tasks`, `GET /tasks/{id}`, `/state`, `/history`, `POST /tasks/{id}/steps/{step}/start|complete`, `POST /tasks/{id}/interrupt`, `POST/GET /hypotheses`, `POST /hypotheses/{id}/evidence`.
+- Migration `0004` (+ step-status data conversion). ADR-014…016. Tests: `test_memory_core.py`.
+
 ## Known Issues / Limitations (to be addressed in named phases)
 - World diff is an event-log filter, not a snapshot diff (Phase 4).
 - Ambiguous entities cannot yet be merged into their true identity after verification (future work).
 
 ## Tests
-- `.venv/bin/pytest` → 135 passed.
+- `.venv/bin/pytest` → 158 passed.
 
 ## Recent Architecture Decisions
 - ADR-005 Repository boundary + SQL store · ADR-006 UTC time · ADR-007 §48 phase order · ADR-008 status classification
 - ADR-009 Conservative re-identification · ADR-010 Relation semantics
 - ADR-011 Evidence policy · ADR-012 Read-time freshness · ADR-013 Invalidation propagation
+- ADR-014 Memory as read model · ADR-015 Step progress vs completion evidence · ADR-016 Causal hypotheses
 
 ## Research Experiments Enabled
 - Experiment A (persistent identity): re-ID decisions are auditable per observation.
 - Experiment C (stale-memory resistance): freshness gate + ablation switch.
 - Conflict handling ablation: `detect_contradictions=False` (last writer wins).
+- Experiment E (evidence and causality): causal hypotheses gated on causal-test evidence.
 - Experiment B-0 protocol defined (not yet runnable end-to-end).
 
 ## Last Updated

@@ -75,3 +75,18 @@
 - **Status**: Accepted (Phase 2)
 - **Decision**: Claims are invalidated by interventions, changes or contradictions of claims they depend on. Dependencies are explicit `ClaimDependency` records (cross-entity) or `FreshnessPolicy.invalidation_triggers` (same entity, e.g. `calibration` ← `location`/`configuration`/`firmware`). Propagation is transitive with a visited-set cycle guard and emits `STATE_INVALIDATED` events. An intervention also closes open conflicts on the affected attributes.
 - **Consequences**: Task steps (Phase 5) can depend on claims through the same mechanism.
+
+## ADR-014 — Memory is a read model over structured state, not a separate store
+- **Status**: Accepted (Phase 3)
+- **Decision**: Temporal, spatial and episodic memory (`MemoryService`) are queries over versions, relations, events and sessions, each passed through the evidence gate *as of* the requested instant. A `WorldSnapshot` is the concrete B_t used by the diff (Phase 4) and the query agent (Phase 6). Spatial recall includes stale positions but labels them, so a caller cannot mistake memory for current fact.
+- **Consequences**: No second copy of state to drift; the vector index (Phase 6) will index these records, not replace them.
+
+## ADR-015 — Task progress and completion evidence are separate dimensions
+- **Status**: Accepted (Phase 3)
+- **Context**: `TaskStep.status` held an `EpistemicStatus`, conflating "is it done?" with "how do we know?".
+- **Decision**: `StepStatus` (PENDING / IN_PROGRESS / COMPLETED / BLOCKED / NEEDS_REVERIFICATION / SKIPPED) tracks progress; `completion_status` holds the evidential grade of the completion (a person saying "done" is OBSERVED; VERIFIED needs verification or an authoritative record). Steps carry structured `preconditions` and `postconditions` (`StateCondition`). Every change emits a `TASK_PROGRESS_CHANGED` event with `task_id`, so task state is replayable. Migration 0004 converts old rows.
+
+## ADR-016 — Causal hypotheses change only on qualifying causal-test evidence
+- **Status**: Accepted (Phase 3)
+- **Decision**: Hypotheses are created INFERRED/HYPOTHESIS; a cause after its effect is rejected. Evidence of `kind="causal_test"` from `TOOL_OUTPUT` or `MANUAL_VERIFICATION` with authority ≥ 0.9 may mark it SUPPORTED/REFUTED; all other evidence (co-occurrence, observations, statements) is retained as context only.
+- **Consequences**: Enables the "unsupported causal claim rate" metric (Experiment E).

@@ -96,3 +96,30 @@ class FreshnessState(str, Enum):
     STALE = "STALE"  # TTL exceeded
     INVALIDATED = "INVALIDATED"  # explicitly invalidated (intervention, dependency, revision)
     NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
+class TaskStatus(str, Enum):
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    INTERRUPTED = "INTERRUPTED"
+    BLOCKED = "BLOCKED"
+    COMPLETED = "COMPLETED"
+    ABANDONED = "ABANDONED"
+
+
+class StepStatus(str, Enum):
+    """Progress of a step. How well its completion is supported is a separate
+    epistemic status (``TaskStep.completion_status``)."""
+
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    BLOCKED = "BLOCKED"
+    NEEDS_REVERIFICATION = "NEEDS_REVERIFICATION"  # was completed; its outcome was invalidated
+    SKIPPED = "SKIPPED"
+
+
+class HypothesisStatus(str, Enum):
+    HYPOTHESIS = "HYPOTHESIS"
+    SUPPORTED = "SUPPORTED"
+    REFUTED = "REFUTED"
