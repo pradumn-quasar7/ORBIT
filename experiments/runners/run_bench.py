@@ -34,7 +34,7 @@ def _migration_head() -> str:
 
 def metadata() -> dict:
     """Spec §22.10: scenario seed/configuration/model/memory version for every run."""
-    dirty = bool(_git("status", "--porcelain"))
+    dirty = bool(_git("status", "--porcelain", "--untracked-files=no"))
     return {
         "run_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "git_commit": _git("rev-parse", "--short", "HEAD") + ("+dirty" if dirty else ""),
