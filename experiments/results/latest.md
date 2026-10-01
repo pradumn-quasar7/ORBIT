@@ -1,7 +1,7 @@
 # ORBIT-BENCH results
 
-- **run_at**: `2026-10-01T12:01:53+00:00`
-- **git_commit**: `268b537`
+- **run_at**: `2026-10-01T21:22:12+00:00`
+- **git_commit**: `63c05ff+dirty`
 - **schema_revision**: `0007`
 - **scenario_catalog**: `v0.1`
 - **scenarios**: `12`
@@ -65,10 +65,25 @@
 
 | Variant | observation_ms_p50 | observation_ms_p95 | query_ms_p50 | query_ms_p95 |
 |---|---|---|---|---|
-| orbit | 0.60 | 1.27 | 0.32 | 0.40 |
-| no_freshness | 0.57 | 1.07 | 0.25 | 0.33 |
-| last_writer_wins | 0.55 | 1.12 | 0.25 | 0.30 |
-| unobserved_removed | 0.55 | 1.17 | 0.27 | 0.29 |
-| no_evidence_gate | 0.63 | 1.19 | 0.30 | 0.35 |
-| event_log_diff | 0.60 | 1.14 | 0.30 | 0.46 |
-| naive_resume | 0.55 | 1.08 | 0.25 | 0.30 |
+| orbit | 0.58 | 1.25 | 0.33 | 0.39 |
+| no_freshness | 0.58 | 1.15 | 0.26 | 0.32 |
+| last_writer_wins | 0.58 | 1.09 | 0.27 | 0.31 |
+| unobserved_removed | 0.58 | 1.14 | 0.26 | 0.31 |
+| no_evidence_gate | 0.61 | 1.16 | 0.29 | 0.82 |
+| event_log_diff | 0.59 | 1.10 | 0.26 | 0.32 |
+| naive_resume | 0.57 | 1.12 | 0.27 | 0.31 |
+
+## Experiment H — counterfactual decisions vs static replay
+
+| Future during interruption | Safe next step | ORBIT on return | Static replay | Counterfactual |
+|---|---|---|---|---|
+| nothing changes | s7 | s7 | s7 | s7 |
+| valve reopened | s5 | s5 | s7 | s5 |
+| spare pumps swapped | wait/verify | wait/verify | s7 | wait/verify |
+| label reads CP-150 | wait/verify | wait/verify | s7 | wait/verify |
+| procedure revised | wait/verify | wait/verify | s7 | wait/verify |
+
+- Decision quality: static replay **0.20**, counterfactual **1.00**
+- Unsafe pre-commitments ↓: static replay **0.80**, counterfactual **0.00**
+- Decision-critical claims found by sensitivity analysis: pump_old.installed, sop.procedure_revision, valve.state, pump_new.model_number
+- Caveat: futures are hand-specified; this measures contingency planning in a controlled world.
