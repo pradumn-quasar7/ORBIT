@@ -1,7 +1,7 @@
 # ORBIT Project Status
 
 ## Current Phase
-Phase 6 — Grounded query agent (COMPLETE). Next: Phase 7 — Active perception + action safety.
+Phase 7 — Active perception + action safety (COMPLETE). Next: Phase 8 — Perception adapter + web inspection UI.
 
 ## Phase Log
 
@@ -92,11 +92,21 @@ Phase 6 — Grounded query agent (COMPLETE). Next: Phase 7 — Active perception
 - API: `POST /queries`, `GET /memory/search`. ADR-021, ADR-022.
 - Tests: `test_query_agent.py` — contract checked on every response; stale → abstain + "Point the camera near bench_3…"; contradiction surfaced, never resolved; ambiguity → clarifying question; ablation without evidence gate answers stale memory.
 
+### Phase 7 — Active perception + action safety (§48 step 15, §16)
+**Planned**
+- Targeted observation planning with a replaceable heuristic information-gain policy and baselines; observe → verify → authorize → act → verify → record for consequential actions.
+
+**Implemented**
+- Domain: `ObservationActionType`, `ObservationCost`, `UncertainClaim`, `PlannedObservation`, `PerceptionPlan`; `PrincipalKind`, `Scope`, `Principal`, `ActionStatus`, `Authorization`, `ActionRequest`, `OutcomeResult`, `OutcomeRecord`; event `ACTION_STATUS_CHANGED`.
+- `services/active_perception.py` (planner, marginal-gain greedy `InformationGainPolicy`, `FixedPolicy`, `RandomPolicy`, request ranking), `services/actions.py` (`ActionSafetyService`, built-in `orbit-agent` principal without authorize/actuate).
+- API: `POST /active-perception/plan`, `POST/GET /principals`, `POST/GET /actions`, `GET /actions/{id}`, `POST /actions/{id}/recheck|authorize|performed|verify-outcome|execute(403)`, `GET /outcomes`. Migration `0006`. ADR-023, ADR-024.
+- **Result (Experiment F, Phase 7 scene):** 3 looks remove 2.89/3.10 uncertainty (information gain) vs 1.93 (fixed) vs 1.67–2.89 (random seeds 0–9).
+
 ## Known Issues / Limitations (to be addressed in named phases)
 - Ambiguous entities cannot yet be merged into their true identity after verification (future work).
 
 ## Tests
-- `.venv/bin/pytest` → 280 passed.
+- `.venv/bin/pytest` → 312 passed.
 
 ## Recent Architecture Decisions
 - ADR-005 Repository boundary + SQL store · ADR-006 UTC time · ADR-007 §48 phase order · ADR-008 status classification
@@ -106,6 +116,7 @@ Phase 6 — Grounded query agent (COMPLETE). Next: Phase 7 — Active perception
 - ADR-017 Snapshot world diff · ADR-018 Coverage-validated absence
 - ADR-019 Resume protocol · ADR-020 Strict evidence inputs
 - ADR-021 Deterministic replaceable providers · ADR-022 Grounded response contract
+- ADR-023 Marginal information-gain perception · ADR-024 Action safety boundary
 
 ## Research Experiments Enabled
 - Experiment A (persistent identity): re-ID decisions are auditable per observation.
@@ -113,6 +124,7 @@ Phase 6 — Grounded query agent (COMPLETE). Next: Phase 7 — Active perception
 - Evidence-gate ablation (`gate_evidence=False`) and vector recall vs structured state.
 - Conflict handling ablation: `detect_contradictions=False` (last writer wins).
 - Experiment D (task resumption): resume plans expose blocked/invalidated steps and requests.
+- Experiment F (active perception): information-gain vs fixed vs random policies.
 - Experiment E (evidence and causality): causal hypotheses gated on causal-test evidence.
 - Experiment B-0 (world diff) runnable as a test with precision/recall; negative-search ablations available.
 

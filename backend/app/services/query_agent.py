@@ -53,6 +53,7 @@ class QueryAgent:
         embedding: Optional[EmbeddingProvider] = None,
         retrieval: Optional[RetrievalProvider] = None,
         gate_evidence: bool = True,
+        planner=None,
     ):
         self.repo = repository
         self.engine = engine
@@ -66,6 +67,7 @@ class QueryAgent:
         self.retriever = HybridRetriever(repository, self.retrieval)
         # gate_evidence=False is the "LLM-only / ungated answer" ablation (spec §28).
         self.gate_evidence = gate_evidence
+        self.planner = planner  # ActivePerceptionPlanner: ranks requested observations
 
     # ----------------------------------------------------------------- entry
     def vocabulary(self) -> Vocabulary:
@@ -104,6 +106,8 @@ class QueryAgent:
             "retrieval": self.retrieval.name,
             "evidence_gate": "on" if self.gate_evidence else "off",
         }
+        if self.planner is not None and response.requested_observations:
+            response.requested_observations = self.planner.rank_requests(response.requested_observations)
         if response.requested_observations and response.requested_observation is None:
             response.requested_observation = response.requested_observations[0]
         return response

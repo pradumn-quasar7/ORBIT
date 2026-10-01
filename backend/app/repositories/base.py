@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from typing import Iterator, List, Optional
 
 from backend.app.domain.models import (
+    ActionRequest,
     Anchor,
     CausalHypothesis,
     ClaimDependency,
@@ -17,6 +18,8 @@ from backend.app.domain.models import (
     Event,
     Evidence,
     Observation,
+    OutcomeRecord,
+    Principal,
     Relation,
     SearchCoverage,
     Session,
@@ -170,3 +173,29 @@ class Repository(ABC):
 
     @abstractmethod
     def list_search_coverage(self) -> List[SearchCoverage]: ...
+
+    # Principals (who may reason / recommend / authorize / actuate)
+    @abstractmethod
+    def save_principal(self, principal: Principal) -> Principal: ...
+
+    @abstractmethod
+    def get_principal(self, principal_id: str) -> Optional[Principal]: ...
+
+    @abstractmethod
+    def list_principals(self) -> List[Principal]: ...
+
+    # Actions and outcome memory
+    @abstractmethod
+    def save_action(self, action: ActionRequest) -> ActionRequest: ...
+
+    @abstractmethod
+    def get_action(self, action_id: str) -> Optional[ActionRequest]: ...
+
+    @abstractmethod
+    def list_actions(self) -> List[ActionRequest]: ...
+
+    @abstractmethod
+    def save_outcome(self, outcome: OutcomeRecord) -> OutcomeRecord: ...
+
+    @abstractmethod
+    def list_outcomes(self, action_id: Optional[str] = None) -> List[OutcomeRecord]: ...
