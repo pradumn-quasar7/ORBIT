@@ -22,8 +22,8 @@ ORBIT maintains an evidence-aware, temporally evolving representation of physica
 
 ### Development Workflow
 1. Read current status and active phase in `PROJECT_STATUS.md`.
-2. Inspect tests: run `.venv/bin/pytest`.
+2. Inspect tests: run `.venv/bin/pytest` (and `.venv/bin/python experiments/runners/run_bench.py` for research metrics).
 3. Plan change, implement domain logic and services.
 4. Add comprehensive unit and integration tests.
-5. Update `PROJECT_STATUS.md` and `DECISIONS.md`.
+5. Update `PROJECT_STATUS.md` (Planned / Implemented per phase) and `DECISIONS.md`. Schema changes need an Alembic migration (`test_migrations_match_schema` enforces it).
 6. Make a clean git commit with conventional commit format (e.g. `feat(world-state): ...`).

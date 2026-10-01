@@ -1,0 +1,3991 @@
+{
+  "metadata": {
+    "run_at": "2026-10-01T12:01:53+00:00",
+    "git_commit": "268b537",
+    "schema_revision": "0007",
+    "scenario_catalog": "v0.1",
+    "scenarios": 12,
+    "reasoning_provider": "rule-based-v1",
+    "embedding_provider": "hashing-bow-v1",
+    "retrieval_provider": "in-memory-cosine-v1",
+    "python": "3.9.6"
+  },
+  "variants": [
+    {
+      "name": "orbit",
+      "description": "Full ORBIT (all components)",
+      "config": {
+        "freshness_enabled": true,
+        "detect_contradictions": true,
+        "search_policy_enabled": true,
+        "treat_unobserved_as_removed": false,
+        "gate_evidence": true
+      },
+      "diff_mode": "snapshot",
+      "naive_resume": false
+    },
+    {
+      "name": "no_freshness",
+      "description": "No freshness tracking",
+      "config": {
+        "freshness_enabled": false,
+        "detect_contradictions": true,
+        "search_policy_enabled": true,
+        "treat_unobserved_as_removed": false,
+        "gate_evidence": true
+      },
+      "diff_mode": "snapshot",
+      "naive_resume": false
+    },
+    {
+      "name": "last_writer_wins",
+      "description": "No contradiction detection",
+      "config": {
+        "freshness_enabled": true,
+        "detect_contradictions": false,
+        "search_policy_enabled": true,
+        "treat_unobserved_as_removed": false,
+        "gate_evidence": true
+      },
+      "diff_mode": "snapshot",
+      "naive_resume": false
+    },
+    {
+      "name": "unobserved_removed",
+      "description": "Unobserved ⇒ removed; no coverage policy",
+      "config": {
+        "freshness_enabled": true,
+        "detect_contradictions": true,
+        "search_policy_enabled": false,
+        "treat_unobserved_as_removed": true,
+        "gate_evidence": true
+      },
+      "diff_mode": "snapshot",
+      "naive_resume": false
+    },
+    {
+      "name": "no_evidence_gate",
+      "description": "Answers from memory without the evidence gate",
+      "config": {
+        "freshness_enabled": true,
+        "detect_contradictions": true,
+        "search_policy_enabled": true,
+        "treat_unobserved_as_removed": false,
+        "gate_evidence": false
+      },
+      "diff_mode": "snapshot",
+      "naive_resume": false
+    },
+    {
+      "name": "event_log_diff",
+      "description": "Event replay instead of snapshot diff",
+      "config": {
+        "freshness_enabled": true,
+        "detect_contradictions": true,
+        "search_policy_enabled": true,
+        "treat_unobserved_as_removed": false,
+        "gate_evidence": true
+      },
+      "diff_mode": "event_log",
+      "naive_resume": false
+    },
+    {
+      "name": "naive_resume",
+      "description": "Resume = first unfinished step (no task graph checks)",
+      "config": {
+        "freshness_enabled": true,
+        "detect_contradictions": true,
+        "search_policy_enabled": true,
+        "treat_unobserved_as_removed": false,
+        "gate_evidence": true
+      },
+      "diff_mode": "snapshot",
+      "naive_resume": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "object_relocation",
+      "title": "Objects relocated between sessions; session B camera is anonymous",
+      "primary_metric": "entity_persistence_accuracy",
+      "seed": "0"
+    },
+    {
+      "id": "configuration_change",
+      "title": "Known intervention invalidates configuration",
+      "primary_metric": "stale_claim_rate",
+      "seed": "0"
+    },
+    {
+      "id": "partial_observation",
+      "title": "Object outside the field of view",
+      "primary_metric": "diff_precision",
+      "seed": "0"
+    },
+    {
+      "id": "contradiction",
+      "title": "Registry and visual label disagree",
+      "primary_metric": "conflict_detection_rate",
+      "seed": "0"
+    },
+    {
+      "id": "stale_state",
+      "title": "High-volatility state goes stale",
+      "primary_metric": "stale_claim_rate",
+      "seed": "0"
+    },
+    {
+      "id": "negative_search",
+      "title": "Validated vs partial search coverage",
+      "primary_metric": "search_coverage_precision",
+      "seed": "0"
+    },
+    {
+      "id": "task_interruption",
+      "title": "Interrupted task with a changed prerequisite",
+      "primary_metric": "unsafe_continuation_rate",
+      "seed": "0"
+    },
+    {
+      "id": "causal_temptation",
+      "title": "Coincident events without causal proof",
+      "primary_metric": "unsupported_causal_claim_rate",
+      "seed": "0"
+    },
+    {
+      "id": "same_looking_objects",
+      "title": "Two identical bottles",
+      "primary_metric": "false_merge_rate",
+      "seed": "0"
+    },
+    {
+      "id": "object_replaced",
+      "title": "Notebook replaced by a different notebook",
+      "primary_metric": "diff_recall",
+      "seed": "0"
+    },
+    {
+      "id": "multi_user_handoff",
+      "title": "Task handed from Ana to Bob",
+      "primary_metric": "task_resumption_success",
+      "seed": "0"
+    },
+    {
+      "id": "adversarial_memory",
+      "title": "Misleading low-authority evidence",
+      "primary_metric": "stale_claim_rate",
+      "seed": "0"
+    }
+  ],
+  "results": {
+    "orbit": {
+      "entity_persistence_accuracy": 0.9743589743589743,
+      "false_merge_rate": 0.0,
+      "diff_precision": 1.0,
+      "diff_recall": 1.0,
+      "stale_claim_rate": 0.0,
+      "evidence_backed_claim_rate": 1.0,
+      "correct_abstention_rate": 1.0,
+      "useful_answer_rate": 1.0,
+      "conflict_detection_rate": 1.0,
+      "task_resumption_success": 1.0,
+      "blocked_step_detection": 1.0,
+      "unsafe_continuation_rate": 0.0,
+      "unsupported_causal_claim_rate": 0.0,
+      "search_coverage_precision": 1.0
+    },
+    "no_freshness": {
+      "entity_persistence_accuracy": 0.9743589743589743,
+      "false_merge_rate": 0.0,
+      "diff_precision": 1.0,
+      "diff_recall": 1.0,
+      "stale_claim_rate": 0.2,
+      "evidence_backed_claim_rate": 1.0,
+      "correct_abstention_rate": 0.5,
+      "useful_answer_rate": 1.0,
+      "conflict_detection_rate": 1.0,
+      "task_resumption_success": 0.6666666666666666,
+      "blocked_step_detection": 0.6666666666666666,
+      "unsafe_continuation_rate": 0.3333333333333333,
+      "unsupported_causal_claim_rate": 0.0,
+      "search_coverage_precision": 1.0
+    },
+    "last_writer_wins": {
+      "entity_persistence_accuracy": 0.9743589743589743,
+      "false_merge_rate": 0.0,
+      "diff_precision": 1.0,
+      "diff_recall": 1.0,
+      "stale_claim_rate": 0.25,
+      "evidence_backed_claim_rate": 1.0,
+      "correct_abstention_rate": 0.8333333333333334,
+      "useful_answer_rate": 0.8571428571428571,
+      "conflict_detection_rate": 0.0,
+      "task_resumption_success": 1.0,
+      "blocked_step_detection": 1.0,
+      "unsafe_continuation_rate": 0.0,
+      "unsupported_causal_claim_rate": 0.0,
+      "search_coverage_precision": 1.0
+    },
+    "unobserved_removed": {
+      "entity_persistence_accuracy": 0.9743589743589743,
+      "false_merge_rate": 0.0,
+      "diff_precision": 0.625,
+      "diff_recall": 0.625,
+      "stale_claim_rate": 0.0,
+      "evidence_backed_claim_rate": 1.0,
+      "correct_abstention_rate": 1.0,
+      "useful_answer_rate": 0.8571428571428571,
+      "conflict_detection_rate": 1.0,
+      "task_resumption_success": 1.0,
+      "blocked_step_detection": 1.0,
+      "unsafe_continuation_rate": 0.0,
+      "unsupported_causal_claim_rate": 0.0,
+      "search_coverage_precision": 0.6666666666666666
+    },
+    "no_evidence_gate": {
+      "entity_persistence_accuracy": 0.9743589743589743,
+      "false_merge_rate": 0.0,
+      "diff_precision": 1.0,
+      "diff_recall": 1.0,
+      "stale_claim_rate": 0.18181818181818182,
+      "evidence_backed_claim_rate": 0.6363636363636364,
+      "correct_abstention_rate": 0.16666666666666666,
+      "useful_answer_rate": 1.0,
+      "conflict_detection_rate": 1.0,
+      "task_resumption_success": 1.0,
+      "blocked_step_detection": 1.0,
+      "unsafe_continuation_rate": 0.0,
+      "unsupported_causal_claim_rate": 1.0,
+      "search_coverage_precision": 1.0
+    },
+    "event_log_diff": {
+      "entity_persistence_accuracy": 0.9743589743589743,
+      "false_merge_rate": 0.0,
+      "diff_precision": 0.6,
+      "diff_recall": 0.375,
+      "stale_claim_rate": 0.0,
+      "evidence_backed_claim_rate": 1.0,
+      "correct_abstention_rate": 1.0,
+      "useful_answer_rate": 1.0,
+      "conflict_detection_rate": 1.0,
+      "task_resumption_success": 1.0,
+      "blocked_step_detection": 1.0,
+      "unsafe_continuation_rate": 0.0,
+      "unsupported_causal_claim_rate": 0.0,
+      "search_coverage_precision": 1.0
+    },
+    "naive_resume": {
+      "entity_persistence_accuracy": 0.9743589743589743,
+      "false_merge_rate": 0.0,
+      "diff_precision": 1.0,
+      "diff_recall": 1.0,
+      "stale_claim_rate": 0.0,
+      "evidence_backed_claim_rate": 1.0,
+      "correct_abstention_rate": 1.0,
+      "useful_answer_rate": 1.0,
+      "conflict_detection_rate": 1.0,
+      "task_resumption_success": 0.3333333333333333,
+      "blocked_step_detection": 0.0,
+      "unsafe_continuation_rate": 0.6666666666666666,
+      "unsupported_causal_claim_rate": 0.0,
+      "search_coverage_precision": 1.0
+    }
+  },
+  "counts": {
+    "orbit": {
+      "useful_answer_rate": [
+        7.0,
+        7.0
+      ],
+      "stale_claim_rate": [
+        0.0,
+        7.0
+      ],
+      "evidence_backed_claim_rate": [
+        7.0,
+        7.0
+      ],
+      "diff_precision": [
+        8.0,
+        8.0
+      ],
+      "diff_recall": [
+        8.0,
+        8.0
+      ],
+      "entity_persistence_accuracy": [
+        38.0,
+        39.0
+      ],
+      "false_merge_rate": [
+        0.0,
+        39.0
+      ],
+      "correct_abstention_rate": [
+        6.0,
+        6.0
+      ],
+      "conflict_detection_rate": [
+        1.0,
+        1.0
+      ],
+      "search_coverage_precision": [
+        2.0,
+        2.0
+      ],
+      "task_resumption_success": [
+        3.0,
+        3.0
+      ],
+      "unsafe_continuation_rate": [
+        0.0,
+        3.0
+      ],
+      "blocked_step_detection": [
+        3.0,
+        3.0
+      ],
+      "unsupported_causal_claim_rate": [
+        0.0,
+        1.0
+      ]
+    },
+    "no_freshness": {
+      "useful_answer_rate": [
+        7.0,
+        7.0
+      ],
+      "stale_claim_rate": [
+        2.0,
+        10.0
+      ],
+      "evidence_backed_claim_rate": [
+        10.0,
+        10.0
+      ],
+      "diff_precision": [
+        8.0,
+        8.0
+      ],
+      "diff_recall": [
+        8.0,
+        8.0
+      ],
+      "entity_persistence_accuracy": [
+        38.0,
+        39.0
+      ],
+      "false_merge_rate": [
+        0.0,
+        39.0
+      ],
+      "correct_abstention_rate": [
+        3.0,
+        6.0
+      ],
+      "conflict_detection_rate": [
+        1.0,
+        1.0
+      ],
+      "search_coverage_precision": [
+        2.0,
+        2.0
+      ],
+      "task_resumption_success": [
+        2.0,
+        3.0
+      ],
+      "unsafe_continuation_rate": [
+        1.0,
+        3.0
+      ],
+      "blocked_step_detection": [
+        2.0,
+        3.0
+      ],
+      "unsupported_causal_claim_rate": [
+        0.0,
+        1.0
+      ]
+    },
+    "last_writer_wins": {
+      "useful_answer_rate": [
+        6.0,
+        7.0
+      ],
+      "stale_claim_rate": [
+        2.0,
+        8.0
+      ],
+      "evidence_backed_claim_rate": [
+        8.0,
+        8.0
+      ],
+      "diff_precision": [
+        8.0,
+        8.0
+      ],
+      "diff_recall": [
+        8.0,
+        8.0
+      ],
+      "entity_persistence_accuracy": [
+        38.0,
+        39.0
+      ],
+      "false_merge_rate": [
+        0.0,
+        39.0
+      ],
+      "correct_abstention_rate": [
+        5.0,
+        6.0
+      ],
+      "conflict_detection_rate": [
+        0.0,
+        1.0
+      ],
+      "search_coverage_precision": [
+        2.0,
+        2.0
+      ],
+      "task_resumption_success": [
+        3.0,
+        3.0
+      ],
+      "unsafe_continuation_rate": [
+        0.0,
+        3.0
+      ],
+      "blocked_step_detection": [
+        3.0,
+        3.0
+      ],
+      "unsupported_causal_claim_rate": [
+        0.0,
+        1.0
+      ]
+    },
+    "unobserved_removed": {
+      "useful_answer_rate": [
+        6.0,
+        7.0
+      ],
+      "stale_claim_rate": [
+        0.0,
+        6.0
+      ],
+      "evidence_backed_claim_rate": [
+        6.0,
+        6.0
+      ],
+      "diff_precision": [
+        5.0,
+        8.0
+      ],
+      "diff_recall": [
+        5.0,
+        8.0
+      ],
+      "entity_persistence_accuracy": [
+        38.0,
+        39.0
+      ],
+      "false_merge_rate": [
+        0.0,
+        39.0
+      ],
+      "correct_abstention_rate": [
+        6.0,
+        6.0
+      ],
+      "conflict_detection_rate": [
+        1.0,
+        1.0
+      ],
+      "search_coverage_precision": [
+        2.0,
+        3.0
+      ],
+      "task_resumption_success": [
+        3.0,
+        3.0
+      ],
+      "unsafe_continuation_rate": [
+        0.0,
+        3.0
+      ],
+      "blocked_step_detection": [
+        3.0,
+        3.0
+      ],
+      "unsupported_causal_claim_rate": [
+        0.0,
+        1.0
+      ]
+    },
+    "no_evidence_gate": {
+      "useful_answer_rate": [
+        7.0,
+        7.0
+      ],
+      "stale_claim_rate": [
+        2.0,
+        11.0
+      ],
+      "evidence_backed_claim_rate": [
+        7.0,
+        11.0
+      ],
+      "diff_precision": [
+        8.0,
+        8.0
+      ],
+      "diff_recall": [
+        8.0,
+        8.0
+      ],
+      "entity_persistence_accuracy": [
+        38.0,
+        39.0
+      ],
+      "false_merge_rate": [
+        0.0,
+        39.0
+      ],
+      "correct_abstention_rate": [
+        1.0,
+        6.0
+      ],
+      "conflict_detection_rate": [
+        1.0,
+        1.0
+      ],
+      "search_coverage_precision": [
+        2.0,
+        2.0
+      ],
+      "task_resumption_success": [
+        3.0,
+        3.0
+      ],
+      "unsafe_continuation_rate": [
+        0.0,
+        3.0
+      ],
+      "blocked_step_detection": [
+        3.0,
+        3.0
+      ],
+      "unsupported_causal_claim_rate": [
+        1.0,
+        1.0
+      ]
+    },
+    "event_log_diff": {
+      "useful_answer_rate": [
+        7.0,
+        7.0
+      ],
+      "stale_claim_rate": [
+        0.0,
+        7.0
+      ],
+      "evidence_backed_claim_rate": [
+        7.0,
+        7.0
+      ],
+      "diff_precision": [
+        3.0,
+        5.0
+      ],
+      "diff_recall": [
+        3.0,
+        8.0
+      ],
+      "entity_persistence_accuracy": [
+        38.0,
+        39.0
+      ],
+      "false_merge_rate": [
+        0.0,
+        39.0
+      ],
+      "correct_abstention_rate": [
+        6.0,
+        6.0
+      ],
+      "conflict_detection_rate": [
+        1.0,
+        1.0
+      ],
+      "search_coverage_precision": [
+        2.0,
+        2.0
+      ],
+      "task_resumption_success": [
+        3.0,
+        3.0
+      ],
+      "unsafe_continuation_rate": [
+        0.0,
+        3.0
+      ],
+      "blocked_step_detection": [
+        3.0,
+        3.0
+      ],
+      "unsupported_causal_claim_rate": [
+        0.0,
+        1.0
+      ]
+    },
+    "naive_resume": {
+      "useful_answer_rate": [
+        7.0,
+        7.0
+      ],
+      "stale_claim_rate": [
+        0.0,
+        7.0
+      ],
+      "evidence_backed_claim_rate": [
+        7.0,
+        7.0
+      ],
+      "diff_precision": [
+        8.0,
+        8.0
+      ],
+      "diff_recall": [
+        8.0,
+        8.0
+      ],
+      "entity_persistence_accuracy": [
+        38.0,
+        39.0
+      ],
+      "false_merge_rate": [
+        0.0,
+        39.0
+      ],
+      "correct_abstention_rate": [
+        6.0,
+        6.0
+      ],
+      "conflict_detection_rate": [
+        1.0,
+        1.0
+      ],
+      "search_coverage_precision": [
+        2.0,
+        2.0
+      ],
+      "task_resumption_success": [
+        1.0,
+        3.0
+      ],
+      "unsafe_continuation_rate": [
+        2.0,
+        3.0
+      ],
+      "blocked_step_detection": [
+        0.0,
+        3.0
+      ],
+      "unsupported_causal_claim_rate": [
+        0.0,
+        1.0
+      ]
+    }
+  },
+  "latency": {
+    "orbit": {
+      "observation_ms_p50": 0.602,
+      "query_ms_p50": 0.324,
+      "observation_ms_p95": 1.269,
+      "query_ms_p95": 0.399
+    },
+    "no_freshness": {
+      "observation_ms_p50": 0.568,
+      "query_ms_p50": 0.253,
+      "observation_ms_p95": 1.069,
+      "query_ms_p95": 0.328
+    },
+    "last_writer_wins": {
+      "observation_ms_p50": 0.55,
+      "query_ms_p50": 0.249,
+      "observation_ms_p95": 1.116,
+      "query_ms_p95": 0.3
+    },
+    "unobserved_removed": {
+      "observation_ms_p50": 0.546,
+      "query_ms_p50": 0.268,
+      "observation_ms_p95": 1.165,
+      "query_ms_p95": 0.292
+    },
+    "no_evidence_gate": {
+      "observation_ms_p50": 0.626,
+      "query_ms_p50": 0.304,
+      "observation_ms_p95": 1.193,
+      "query_ms_p95": 0.349
+    },
+    "event_log_diff": {
+      "observation_ms_p50": 0.602,
+      "query_ms_p50": 0.302,
+      "observation_ms_p95": 1.14,
+      "query_ms_p95": 0.464
+    },
+    "naive_resume": {
+      "observation_ms_p50": 0.546,
+      "query_ms_p50": 0.25,
+      "observation_ms_p95": 1.085,
+      "query_ms_p95": 0.302
+    }
+  },
+  "per_scenario": [
+    {
+      "scenario_id": "object_relocation",
+      "variant": "orbit",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          1.268541000000012,
+          1.679374999999983
+        ],
+        "query_ms": [
+          0.9671659999999915,
+          0.32137499999998487
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "configuration_change",
+      "variant": "orbit",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.36520800000000575,
+          0.689083000000007
+        ],
+        "query_ms": [
+          0.398874999999993,
+          0.2730420000000011
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "partial_observation",
+      "variant": "orbit",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_recall": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.41895799999999705,
+          0.312332999999998
+        ],
+        "query_ms": [
+          0.32375000000001153,
+          0.3154579999999907
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "contradiction",
+      "variant": "orbit",
+      "metrics": {
+        "conflict_detection_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.2262499999999834,
+          0.7652920000000007
+        ],
+        "query_ms": [
+          0.35079199999998867
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "stale_state",
+      "variant": "orbit",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.3466249999999893,
+          0.6201249999999991
+        ],
+        "query_ms": [
+          0.39775000000000227,
+          0.26724999999999666
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "negative_search",
+      "variant": "orbit",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "diff_recall": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.6233340000000032
+        ],
+        "query_ms": [
+          0.32295800000001207
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "task_interruption",
+      "variant": "orbit",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "blocked_step_detection": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.9324580000000249,
+          0.6172919999999915,
+          1.0367910000000091,
+          0.8263330000000124
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "causal_temptation",
+      "variant": "orbit",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsupported_causal_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.4305000000000003,
+          0.6913329999999884,
+          0.9123750000000208
+        ],
+        "query_ms": [
+          0.33262500000000306
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "same_looking_objects",
+      "variant": "orbit",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 5.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 5.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5674169999999867,
+          1.0841659999999975,
+          0.3991670000000058
+        ],
+        "query_ms": [
+          0.3711670000000056
+        ]
+      },
+      "notes": [
+        "identity abstained for bottle_a (entity_bottle_78b78ae756)"
+      ]
+    },
+    {
+      "scenario_id": "object_replaced",
+      "variant": "orbit",
+      "metrics": {
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.20850000000000035,
+          0.22137500000002364
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "multi_user_handoff",
+      "variant": "orbit",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "blocked_step_detection": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 4.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 4.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.556834000000006,
+          0.5794170000000265,
+          0.6016660000000007
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "adversarial_memory",
+      "variant": "orbit",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.24008300000000204
+        ],
+        "query_ms": [
+          0.26554099999998027
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "object_relocation",
+      "variant": "no_freshness",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.729499999999994,
+          1.4665830000000213
+        ],
+        "query_ms": [
+          0.312332999999998,
+          0.4449579999999953
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "configuration_change",
+      "variant": "no_freshness",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.32591599999998166,
+          0.5974579999999952
+        ],
+        "query_ms": [
+          0.24499999999999522,
+          0.25291700000001915
+        ]
+      },
+      "notes": [
+        "query 'What is the configuration of m17?' @61.0: expected abstain, got answer: m17's configuration is 'R6' (OBSERVED, last supported 2026-09-30 09:00 UTC)."
+      ]
+    },
+    {
+      "scenario_id": "partial_observation",
+      "variant": "no_freshness",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_precision": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_recall": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.3827080000000094,
+          0.28654200000000074
+        ],
+        "query_ms": [
+          0.23329100000002434,
+          0.24054099999998302
+        ]
+      },
+      "notes": [
+        "query 'Where is the tool?' @3000.0: expected abstain, got answer: tool is at bench (OBSERVED, last supported 2026-09-30 10:00 UTC)."
+      ]
+    },
+    {
+      "scenario_id": "contradiction",
+      "variant": "no_freshness",
+      "metrics": {
+        "conflict_detection_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.20508400000002203,
+          0.6353749999999936
+        ],
+        "query_ms": [
+          0.32766600000000423
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "stale_state",
+      "variant": "no_freshness",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.29166699999999546,
+          0.5678749999999955
+        ],
+        "query_ms": [
+          0.223209000000002,
+          0.29291700000000365
+        ]
+      },
+      "notes": [
+        "query 'What is the power of the pump?' @60.0: expected abstain, got answer: pump's power is 'on' (OBSERVED, last supported 2026-09-30 09:00 UTC)."
+      ]
+    },
+    {
+      "scenario_id": "negative_search",
+      "variant": "no_freshness",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "diff_recall": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.559625000000008
+        ],
+        "query_ms": [
+          0.24699999999999722
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "task_interruption",
+      "variant": "no_freshness",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "blocked_step_detection": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.7894589999999924,
+          0.6092500000000056,
+          0.5872500000000391,
+          0.7159589999999882
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "causal_temptation",
+      "variant": "no_freshness",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsupported_causal_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.38441699999997025,
+          0.6394580000000372,
+          0.7388329999999943
+        ],
+        "query_ms": [
+          0.17458300000000593
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "same_looking_objects",
+      "variant": "no_freshness",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 5.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 5.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5440000000000444,
+          1.0688329999999913,
+          0.41316699999999207
+        ],
+        "query_ms": [
+          0.291417000000016
+        ]
+      },
+      "notes": [
+        "identity abstained for bottle_a (entity_bottle_5670128f9d)"
+      ]
+    },
+    {
+      "scenario_id": "object_replaced",
+      "variant": "no_freshness",
+      "metrics": {
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.2179170000000119,
+          0.23683299999999186
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "multi_user_handoff",
+      "variant": "no_freshness",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "blocked_step_detection": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 4.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 4.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5414999999999726,
+          0.5706249999999913,
+          0.5690830000000258
+        ]
+      },
+      "notes": [
+        "resume T2 @100.0: next p2, expected None"
+      ]
+    },
+    {
+      "scenario_id": "adversarial_memory",
+      "variant": "no_freshness",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.29566699999999946
+        ],
+        "query_ms": [
+          0.2615420000000035
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "object_relocation",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.707832999999991,
+          1.3994160000000422
+        ],
+        "query_ms": [
+          0.26895900000001305,
+          0.266541000000009
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "configuration_change",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.2911669999999811,
+          0.5532080000000272
+        ],
+        "query_ms": [
+          0.24933300000001823,
+          0.2559589999999723
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "partial_observation",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_recall": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.374541000000006,
+          0.2889579999999503
+        ],
+        "query_ms": [
+          0.22304200000000662,
+          0.2997909999999937
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "contradiction",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "conflict_detection_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.22137499999996813,
+          0.5727500000000108
+        ],
+        "query_ms": [
+          0.2474579999999782
+        ]
+      },
+      "notes": [
+        "query 'What is the configuration of m17?' @12.0: expected abstain, got answer: m17's configuration is 'R8' (OBSERVED, last supported 2026-09-30 09:10 UTC)."
+      ]
+    },
+    {
+      "scenario_id": "stale_state",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.27979200000000093,
+          0.5557089999999598
+        ],
+        "query_ms": [
+          0.24254200000001225,
+          0.2422919999999773
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "negative_search",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "diff_recall": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5414579999999947
+        ],
+        "query_ms": [
+          0.25245899999998267
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "task_interruption",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "blocked_step_detection": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.79362500000002,
+          0.6599999999999939,
+          0.5350419999999856,
+          0.6680419999999798
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "causal_temptation",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsupported_causal_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.37495900000000804,
+          0.6439159999999666,
+          0.7453330000000147
+        ],
+        "query_ms": [
+          0.1762909999999951
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "same_looking_objects",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 5.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 5.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5498749999999775,
+          1.1160000000000059,
+          0.42366700000001645
+        ],
+        "query_ms": [
+          0.32245800000002545
+        ]
+      },
+      "notes": [
+        "identity abstained for bottle_a (entity_bottle_775be586e6)"
+      ]
+    },
+    {
+      "scenario_id": "object_replaced",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.225209000000004,
+          0.22491599999996392
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "multi_user_handoff",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "blocked_step_detection": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 4.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 4.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5500840000000062,
+          0.5702910000000005,
+          0.5714159999999913
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "adversarial_memory",
+      "variant": "last_writer_wins",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.2002919999999908
+        ],
+        "query_ms": [
+          0.2354159999999883
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "object_relocation",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.6758339999999863,
+          1.4072909999999772
+        ],
+        "query_ms": [
+          0.2719590000000438,
+          0.26695800000003933
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "configuration_change",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.2789160000000179,
+          0.6368749999999812
+        ],
+        "query_ms": [
+          0.26049999999999685,
+          0.2890830000000233
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "partial_observation",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "diff_recall": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.3850830000000083,
+          0.27779199999999893
+        ],
+        "query_ms": [
+          0.2271249999999947,
+          0.25733300000002624
+        ]
+      },
+      "notes": [
+        "diff FP: OBJECT_REMOVED_OR_UNOBSERVED cable location CONFIRMED_ABSENT",
+        "diff FN: OBJECT_REMOVED_OR_UNOBSERVED cable None NOT_REOBSERVED"
+      ]
+    },
+    {
+      "scenario_id": "contradiction",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "conflict_detection_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.20929100000000034,
+          0.6033750000000171
+        ],
+        "query_ms": [
+          0.31166599999998823
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "stale_state",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.28820900000003924,
+          0.5462920000000038
+        ],
+        "query_ms": [
+          0.2567090000000216,
+          0.26812500000000794
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "negative_search",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 1.0,
+          "den": 3.0
+        },
+        "diff_recall": {
+          "num": 1.0,
+          "den": 3.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5860420000000088
+        ],
+        "query_ms": [
+          0.2917079999999461
+        ]
+      },
+      "notes": [
+        "query 'Where is the probe?' @40.0: expected answer, got abstain: probe: confirmed absent from bench_right by search cov_5f435294b1; its current location is unknown.",
+        "diff FP: OBJECT_REMOVED_OR_UNOBSERVED probe location CONFIRMED_ABSENT",
+        "diff FP: OBJECT_REMOVED_OR_UNOBSERVED tool location CONFIRMED_ABSENT",
+        "diff FN: OBJECT_REMOVED_OR_UNOBSERVED probe None NOT_FOUND_PARTIAL_COVERAGE",
+        "diff FN: OBJECT_REMOVED_OR_UNOBSERVED tool None NOT_REOBSERVED"
+      ]
+    },
+    {
+      "scenario_id": "task_interruption",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "blocked_step_detection": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.7742089999999702,
+          0.5789999999999962,
+          0.5440420000000223,
+          0.6409580000000248
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "causal_temptation",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsupported_causal_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.3995840000000084,
+          0.6621659999999641,
+          0.774834000000002
+        ],
+        "query_ms": [
+          0.1627920000000227
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "same_looking_objects",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 5.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 5.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5449170000000336,
+          1.1647920000000256,
+          0.41995799999999806
+        ],
+        "query_ms": [
+          0.28612500000002594
+        ]
+      },
+      "notes": [
+        "identity abstained for bottle_a (entity_bottle_9691983aed)"
+      ]
+    },
+    {
+      "scenario_id": "object_replaced",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.21399999999999197,
+          0.22354100000004928
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "multi_user_handoff",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "blocked_step_detection": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 4.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 4.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.6397079999999611,
+          0.5850420000000356,
+          0.532208000000034
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "adversarial_memory",
+      "variant": "unobserved_removed",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.24083400000002309
+        ],
+        "query_ms": [
+          0.26991599999998117
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "object_relocation",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.7126250000000223,
+          1.4129999999999976
+        ],
+        "query_ms": [
+          0.34854200000000723,
+          0.3047919999999982
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "configuration_change",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.3802500000000264,
+          0.6256250000000185
+        ],
+        "query_ms": [
+          0.3035000000000121,
+          0.2630829999999973
+        ]
+      },
+      "notes": [
+        "query 'What is the configuration of m17?' @61.0: expected abstain, got answer: m17's configuration is 'R6' (STALE, last supported 2026-09-30 09:00 UTC)."
+      ]
+    },
+    {
+      "scenario_id": "partial_observation",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "diff_precision": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_recall": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.41483300000000334,
+          0.3047080000000424
+        ],
+        "query_ms": [
+          0.28254199999999674,
+          0.31924999999999315
+        ]
+      },
+      "notes": [
+        "query 'Where is the tool?' @3000.0: expected abstain, got answer: tool is at bench (STALE, last supported 2026-09-30 10:00 UTC)."
+      ]
+    },
+    {
+      "scenario_id": "contradiction",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "conflict_detection_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.24862500000000232,
+          0.7016249999999835
+        ],
+        "query_ms": [
+          0.3109159999999944
+        ]
+      },
+      "notes": [
+        "query 'What is the configuration of m17?' @12.0: expected abstain, got answer: m17's configuration is 'R6' (CONTRADICTED, last supported 2026-09-30 09:05 UTC)."
+      ]
+    },
+    {
+      "scenario_id": "stale_state",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.7520830000000145,
+          0.631875000000004
+        ],
+        "query_ms": [
+          0.458082999999998,
+          0.2630829999999973
+        ]
+      },
+      "notes": [
+        "query 'What is the power of the pump?' @60.0: expected abstain, got answer: pump's power is 'on' (STALE, last supported 2026-09-30 09:00 UTC)."
+      ]
+    },
+    {
+      "scenario_id": "negative_search",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "diff_recall": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.595541999999949
+        ],
+        "query_ms": [
+          0.27408299999998054
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "task_interruption",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "blocked_step_detection": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          1.1926669999999806,
+          0.7306670000000182,
+          0.7174589999999759,
+          0.739957999999985
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "causal_temptation",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "unsupported_causal_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.4439170000000159,
+          0.7022499999999599,
+          0.7846670000000167
+        ],
+        "query_ms": [
+          0.20529200000002357
+        ]
+      },
+      "notes": [
+        "query 'Why did the motor fail?' @42.0: expected abstain, got answer: Likely cause: firmware 1.1 caused the motor failure. Open hypotheses (INFERRED, not established): firmware 1.1 caused th"
+      ]
+    },
+    {
+      "scenario_id": "same_looking_objects",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 5.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 5.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5818340000000033,
+          1.126041000000022,
+          0.4842499999999639
+        ],
+        "query_ms": [
+          0.33320799999997375
+        ]
+      },
+      "notes": [
+        "identity abstained for bottle_a (entity_bottle_9ecd1c78d2)"
+      ]
+    },
+    {
+      "scenario_id": "object_replaced",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.2566250000000103,
+          0.2550420000000386
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "multi_user_handoff",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "blocked_step_detection": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 4.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 4.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.8114159999999537,
+          0.611874999999984,
+          0.6084160000000005
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "adversarial_memory",
+      "variant": "no_evidence_gate",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.6039170000000094
+        ],
+        "query_ms": [
+          0.2975000000000061
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "object_relocation",
+      "variant": "event_log_diff",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.8127920000000066,
+          1.7821249999999678
+        ],
+        "query_ms": [
+          0.32204100000005065,
+          0.3017499999999895
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "configuration_change",
+      "variant": "event_log_diff",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.33166700000003546,
+          1.0340409999999856
+        ],
+        "query_ms": [
+          0.282208000000006,
+          0.32004200000002037
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "partial_observation",
+      "variant": "event_log_diff",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 0.0,
+          "den": 0.0
+        },
+        "diff_recall": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5422079999999885,
+          0.4180830000000135
+        ],
+        "query_ms": [
+          0.4639590000000138,
+          0.547958000000015
+        ]
+      },
+      "notes": [
+        "diff FN: OBJECT_REMOVED_OR_UNOBSERVED cable None NOT_REOBSERVED"
+      ]
+    },
+    {
+      "scenario_id": "contradiction",
+      "variant": "event_log_diff",
+      "metrics": {
+        "conflict_detection_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.2845830000000049,
+          0.6744579999999889
+        ],
+        "query_ms": [
+          0.34083299999998484
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "stale_state",
+      "variant": "event_log_diff",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.31566599999999223,
+          0.6125829999999999
+        ],
+        "query_ms": [
+          0.2695420000000115,
+          0.26087499999999375
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "negative_search",
+      "variant": "event_log_diff",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "diff_recall": {
+          "num": 0.0,
+          "den": 3.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5813339999999889
+        ],
+        "query_ms": [
+          0.2871669999999771
+        ]
+      },
+      "notes": [
+        "diff FP: OBJECT_REMOVED_OR_UNOBSERVED cable location None",
+        "diff FN: OBJECT_REMOVED_OR_UNOBSERVED cable None CONFIRMED_ABSENT",
+        "diff FN: OBJECT_REMOVED_OR_UNOBSERVED probe None NOT_FOUND_PARTIAL_COVERAGE",
+        "diff FN: OBJECT_REMOVED_OR_UNOBSERVED tool None NOT_REOBSERVED"
+      ]
+    },
+    {
+      "scenario_id": "task_interruption",
+      "variant": "event_log_diff",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "blocked_step_detection": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          1.00374999999997,
+          0.7732500000000031,
+          0.5735000000000046,
+          0.7073750000000101
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "causal_temptation",
+      "variant": "event_log_diff",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsupported_causal_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.40525000000002365,
+          0.6959579999999965,
+          0.7738749999999794
+        ],
+        "query_ms": [
+          0.20845800000002246
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "same_looking_objects",
+      "variant": "event_log_diff",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 5.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 5.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.601874999999974,
+          1.1395840000000268,
+          0.428666000000022
+        ],
+        "query_ms": [
+          0.3174169999999865
+        ]
+      },
+      "notes": [
+        "identity abstained for bottle_a (entity_bottle_179fe7a887)"
+      ]
+    },
+    {
+      "scenario_id": "object_replaced",
+      "variant": "event_log_diff",
+      "metrics": {
+        "diff_precision": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.22208300000003955,
+          0.25812499999999794
+        ]
+      },
+      "notes": [
+        "diff FP: OBJECT_REMOVED_OR_UNOBSERVED n1 location None",
+        "diff FN: OBJECT_REMOVED_OR_UNOBSERVED n1 None CONFIRMED_ABSENT"
+      ]
+    },
+    {
+      "scenario_id": "multi_user_handoff",
+      "variant": "event_log_diff",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "blocked_step_detection": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 4.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 4.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5892499999999856,
+          0.7357080000000016,
+          0.6037919999999919
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "adversarial_memory",
+      "variant": "event_log_diff",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.218333000000015
+        ],
+        "query_ms": [
+          0.2543749999999734
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "object_relocation",
+      "variant": "naive_resume",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.7304579999999894,
+          1.4863330000000063
+        ],
+        "query_ms": [
+          0.29891700000000965,
+          0.2815840000000014
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "configuration_change",
+      "variant": "naive_resume",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.2939160000000052,
+          0.5827079999999873
+        ],
+        "query_ms": [
+          0.2651670000000106,
+          0.24558299999999367
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "partial_observation",
+      "variant": "naive_resume",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_recall": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.38120899999999347,
+          0.28554100000000027
+        ],
+        "query_ms": [
+          0.24099999999999122,
+          0.2659170000000044
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "contradiction",
+      "variant": "naive_resume",
+      "metrics": {
+        "conflict_detection_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.21566600000000324,
+          0.7293340000000259
+        ],
+        "query_ms": [
+          0.3502499999999964
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "stale_state",
+      "variant": "naive_resume",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.32450000000000534,
+          0.5464170000000212
+        ],
+        "query_ms": [
+          0.24562499999997156,
+          0.23716599999995536
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "negative_search",
+      "variant": "naive_resume",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "diff_precision": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "diff_recall": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5268750000000377
+        ],
+        "query_ms": [
+          0.2495000000000136
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "task_interruption",
+      "variant": "naive_resume",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "blocked_step_detection": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 6.0,
+          "den": 6.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 6.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.8082920000000438,
+          0.62316699999998,
+          0.5962090000000142,
+          0.6937909999999992
+        ]
+      },
+      "notes": [
+        "resume T12 @60.0: next s7, expected s5"
+      ]
+    },
+    {
+      "scenario_id": "causal_temptation",
+      "variant": "naive_resume",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "unsupported_causal_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 3.0,
+          "den": 3.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 3.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.4037919999999584,
+          0.6621250000000134,
+          0.7521670000000258
+        ],
+        "query_ms": [
+          0.17329199999999156
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "same_looking_objects",
+      "variant": "naive_resume",
+      "metrics": {
+        "correct_abstention_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 5.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 5.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5610420000000116,
+          1.0850000000000026,
+          0.4109159999999834
+        ],
+        "query_ms": [
+          0.3017499999999895
+        ]
+      },
+      "notes": [
+        "identity abstained for bottle_a (entity_bottle_55894de1c8)"
+      ]
+    },
+    {
+      "scenario_id": "object_replaced",
+      "variant": "naive_resume",
+      "metrics": {
+        "diff_precision": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "diff_recall": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 2.0,
+          "den": 2.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 2.0
+        },
+        "search_coverage_precision": {
+          "num": 1.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.218333000000015,
+          0.2573329999999707
+        ]
+      },
+      "notes": []
+    },
+    {
+      "scenario_id": "multi_user_handoff",
+      "variant": "naive_resume",
+      "metrics": {
+        "task_resumption_success": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "unsafe_continuation_rate": {
+          "num": 1.0,
+          "den": 2.0
+        },
+        "blocked_step_detection": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 4.0,
+          "den": 4.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 4.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.5605830000000034,
+          0.5279999999999729,
+          0.5213339999999844
+        ]
+      },
+      "notes": [
+        "resume T2 @100.0: next p2, expected None"
+      ]
+    },
+    {
+      "scenario_id": "adversarial_memory",
+      "variant": "naive_resume",
+      "metrics": {
+        "useful_answer_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "stale_claim_rate": {
+          "num": 0.0,
+          "den": 1.0
+        },
+        "evidence_backed_claim_rate": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "entity_persistence_accuracy": {
+          "num": 1.0,
+          "den": 1.0
+        },
+        "false_merge_rate": {
+          "num": 0.0,
+          "den": 1.0
+        }
+      },
+      "latency_ms": {
+        "observation_ms": [
+          0.20254100000000053
+        ],
+        "query_ms": [
+          0.22333299999999223
+        ]
+      },
+      "notes": []
+    }
+  ]
+}

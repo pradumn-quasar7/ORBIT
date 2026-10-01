@@ -43,6 +43,13 @@ ORBIT_DATABASE_URL=sqlite:///./orbit_demo.db .venv/bin/uvicorn backend.app.main:
 ```
 Then open http://localhost:8765/ui/ and ask "What changed?" or "Continue.".
 
+### Benchmark (ORBIT-BENCH)
+```bash
+.venv/bin/python experiments/runners/run_bench.py
+```
+Runs 12 ground-truth scenarios against ORBIT and six single-component ablations and
+writes `experiments/results/latest.md`.
+
 ### Documentation
 `ORBIT_PROJECT_INIT.md` (spec) · `ARCHITECTURE.md` · `DECISIONS.md` · `ROADMAP.md` ·
 `PROJECT_STATUS.md` · `docs/experiments/BENCHMARK_PROTOCOL.md`

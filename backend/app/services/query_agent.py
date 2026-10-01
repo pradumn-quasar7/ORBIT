@@ -420,6 +420,8 @@ class QueryAgent:
         if not supported:
             notes.append("Establishing a cause needs a causal test (e.g. a controlled rollback or diagnostic).")
         answer = ("Supported by causal-test evidence: " + "; ".join(h.statement for h in supported) + ".") if supported else None
+        if answer is None and not self.gate_evidence and open_:
+            answer = f"Likely cause: {open_[0].statement}."  # ablation: hypothesis stated as fact
         return self._respond(intent, at, " ".join(([answer] if answer else []) + notes), answer, claims=claims)
 
     def _unknown(self, intent: QueryIntent, at: datetime) -> GroundedResponse:

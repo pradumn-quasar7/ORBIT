@@ -1,7 +1,13 @@
-# ORBIT-BENCH Protocol (Draft v0.1)
+# ORBIT-BENCH Protocol (v0.1)
 
-Status: **draft** — Phase 0 deliverable (spec §35). Concrete runners land in Phase 9;
-scenario-level checks land with each phase that enables them.
+Status: **implemented** (Phase 9). Scenarios: `experiments/scenarios/catalog.py`;
+runner: `backend/app/evaluation/bench.py`; CLI: `experiments/runners/run_bench.py`;
+latest results: `experiments/results/latest.md`. Experiment B-0 below is also an
+automated test (`test_world_diff.py::test_experiment_b0_controlled_desk_scene`).
+
+```bash
+.venv/bin/python experiments/runners/run_bench.py
+```
 
 ## 1. The first experiment
 
@@ -77,3 +83,23 @@ metric degrades predictably.
 Every run records: scenario id + seed, ORBIT git commit, schema migration revision,
 engine configuration (enabled components), provider identifiers (perception,
 reasoning, embedding), and wall-clock timings.
+
+## 6. v0.1 catalog
+
+| Scenario | Spec §26 row / §37 failure mode | Primary metric |
+|---|---|---|
+| object_relocation | Object relocation, viewpoint change | entity persistence accuracy |
+| configuration_change | Configuration change | stale-claim rate |
+| partial_observation | Partial observation / object absent from camera | diff precision |
+| contradiction | Contradiction / conflicting visual + digital evidence | conflict detection rate |
+| stale_state | Stale state | stale-claim rate |
+| negative_search | Negative search | search coverage precision |
+| task_interruption | Task interruption / changed prerequisite | unsafe continuation rate |
+| causal_temptation | Causal temptation / unsupported causal inference | unsupported causal claim rate |
+| same_looking_objects | Same-looking objects | false merge rate |
+| object_replaced | Object replaced | diff recall |
+| multi_user_handoff | Multi-user handoff | task resumption success |
+| adversarial_memory | Adversarial memory / misleading low-authority evidence | stale-claim rate |
+
+Known gaps for v0.2: counterfactual replay (Experiment H), AR utility (G), latency on
+real perception, and larger randomised scene generators for statistical power.

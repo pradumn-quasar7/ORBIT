@@ -46,20 +46,56 @@ $$B_t = \text{Update}(B_{t-1}, O_t, \text{context}, \text{evidence}, \text{time}
 
 ```
 backend/app/
-  core/           time (UTCDateTime), clock, composition root (OrbitServices)
-  domain/         Pydantic models, enums, deterministic status rules
-  repositories/   Repository ABC; InMemoryRepository; sql/ (tables + SqlRepository)
-  services/       world_state_engine (and, per phase, registry/evidence/memory/diff/tasks/…)
-  api/            FastAPI routers; dependencies resolve OrbitServices from app.state
-  main.py         create_app(repository, clock) factory; lazy module-level `app`
-database/
-  migrations/     Alembic env + versions (schema source of change)
-  migrate.py      upgrade_to_head(url) used by the app on start
-docs/experiments/ BENCHMARK_PROTOCOL.md
+  core/            time (UTCDateTime), clock, OrbitConfig + composition root (OrbitServices)
+  domain/          Pydantic models, enums, weakest-link status aggregation
+  repositories/    Repository ABC; InMemoryRepository; sql/ (tables + SqlRepository)
+  providers/       replaceable boundaries: embedding, retrieval, reasoning, perception
+  services/
+    spatial.py            anchor hierarchy
+    entity_registry.py    re-identification
+    relations.py          relation intervals
+    world_state_engine.py observation/claim/intervention orchestration
+    evidence_policy.py    source typing, grading, integrity, decision table
+    freshness.py          attribute-level freshness policies
+    claims.py             evidence gate (ClaimEvaluator)
+    belief.py             decision execution, conflicts, invalidation propagation, absence
+    memory.py             temporal / spatial / episodic recall
+    tasks.py              task graph, readiness, resume protocol
+    conditions.py         pre/postcondition checks, observation instructions
+    hypotheses.py         causal hypothesis memory
+    search.py             negative search memory + coverage policy
+    world_diff.py         Diff(B_a, B_b) + event-log baseline
+    hybrid_retrieval.py   semantic recall over structured records
+    query_agent.py        grounded query agent (spec §15 contract)
+    active_perception.py  information-gain observation planning
+    actions.py            action safety boundary + outcome memory
+    perception_gateway.py frame ingestion, retention, redaction
+    dashboard.py          inspection read model
+  evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner)
+  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect)
+  main.py          create_app(repository, clock) factory; lazy module-level `app`
+database/          Alembic migrations 0001–0007, migrate.py
+experiments/       scenarios/catalog.py, runners/run_bench.py, results/
+frontend/          static inspection dashboard served at /ui/
+scripts/           seed_demo.py (flagship scenario)
 ```
 
 Dependency direction: `api → services → repositories → domain`, with `core` usable
-everywhere. Services never import FastAPI; domain never imports services.
+everywhere and `providers` behind interfaces. Services never import FastAPI; the
+domain never imports services.
+
+### Belief update path
+
+```
+Observation / claim / intervention
+  → evidence record (typed source, strength, sha256 integrity)
+  → EntityRegistry.resolve (identity)
+  → per-attribute Claim → EvidencePolicy.decide (pure)
+  → BeliefUpdater (versions, conflicts, invalidation propagation, events)
+  → materialised entity view
+Read side: ClaimEvaluator (freshness + conflicts + invalidation at any as_of)
+  → MemoryService / WorldDiffService / TaskService / QueryAgent / ActivePerceptionPlanner
+```
 
 ## 3. Core Domain Abstractions
 
