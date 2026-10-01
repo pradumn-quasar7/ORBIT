@@ -9,12 +9,14 @@ from contextlib import contextmanager
 from typing import Iterator, List, Optional
 
 from backend.app.domain.models import (
+    Anchor,
     Entity,
     Event,
     Evidence,
     Observation,
     Relation,
     SearchCoverage,
+    Session,
     StateVersion,
     Task,
     WorldDiff,
@@ -46,6 +48,9 @@ class Repository(ABC):
 
     @abstractmethod
     def list_observations(self) -> List[Observation]: ...
+
+    @abstractmethod
+    def list_observations_for_session(self, session_id: str) -> List[Observation]: ...
 
     # Evidence
     @abstractmethod
@@ -82,6 +87,30 @@ class Repository(ABC):
 
     @abstractmethod
     def list_relations(self) -> List[Relation]: ...
+
+    @abstractmethod
+    def get_relations_for_entity(self, entity_id: str) -> List[Relation]:
+        """Relations where the entity is source or target, ordered by valid_from."""
+
+    # Anchors
+    @abstractmethod
+    def save_anchor(self, anchor: Anchor) -> Anchor: ...
+
+    @abstractmethod
+    def get_anchor(self, anchor_id: str) -> Optional[Anchor]: ...
+
+    @abstractmethod
+    def list_anchors(self) -> List[Anchor]: ...
+
+    # Sessions
+    @abstractmethod
+    def save_session(self, session: Session) -> Session: ...
+
+    @abstractmethod
+    def get_session(self, session_id: str) -> Optional[Session]: ...
+
+    @abstractmethod
+    def list_sessions(self) -> List[Session]: ...
 
     # Tasks (steps are stored with their task and returned ordered by step_order)
     @abstractmethod

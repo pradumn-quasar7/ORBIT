@@ -3,7 +3,13 @@ from pydantic import BaseModel, Field
 import uuid
 
 from backend.app.core.time import UTCDateTime
-from backend.app.domain.types import EpistemicStatus, EventType, VolatilityClass
+from backend.app.domain.types import (
+    EpistemicStatus,
+    EventType,
+    IdentityStatus,
+    ResolutionMethod,
+    VolatilityClass,
+)
 
 def generate_id(prefix: str = "id") -> str:
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
@@ -76,18 +82,42 @@ class Entity(BaseModel):
     evidence_refs: List[str] = Field(default_factory=list)
     history_refs: List[str] = Field(default_factory=list)
     permissions: Dict[str, Any] = Field(default_factory=dict)
+    identity_status: IdentityStatus = IdentityStatus.ESTABLISHED
+    identity_candidates: List[str] = Field(default_factory=list)
     created_at: UTCDateTime
     updated_at: UTCDateTime
+
+class ObservedRelation(BaseModel):
+    relation_type: str  # on, inside, connected_to, adjacent_to, ...
+    target: str  # entity id (or candidate id within the same observation) or anchor id
+    present: bool = True  # False = relation observed NOT to hold (e.g. cable seen unplugged)
+
 
 class ObservedEntity(BaseModel):
     candidate_entity_id: Optional[str] = None
     type: str
     name: Optional[str] = None
+    # Strong identity markers (serial_number, asset_tag, ...). A mismatch means a
+    # different physical object, never an attribute change.
+    identifiers: Dict[str, str] = Field(default_factory=dict)
     attributes: Dict[str, Any] = Field(default_factory=dict)
+    relations: List[ObservedRelation] = Field(default_factory=list)
     location: Optional[str] = None
     anchor: Optional[str] = None
     geometry: Optional[Geometry] = None
     confidence: float = 1.0
+
+class EntityResolution(BaseModel):
+    """Audit record of which entity a detection was assigned to, and why."""
+
+    observed_index: int
+    candidate_entity_id: Optional[str] = None
+    entity_id: str
+    method: ResolutionMethod
+    confidence: float
+    candidates: List[str] = Field(default_factory=list)
+    reason: str = ""
+
 
 class Observation(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("obs"))
@@ -100,6 +130,25 @@ class Observation(BaseModel):
     quality: float = 1.0
     authority: float = 1.0
     provenance: Dict[str, Any] = Field(default_factory=dict)
+    resolutions: List[EntityResolution] = Field(default_factory=list)  # filled by the engine
+
+class Anchor(BaseModel):
+    """A spatial reference frame (room, bench, shelf region). Anchors form a tree."""
+
+    id: str
+    name: Optional[str] = None
+    anchor_type: str = "region"  # room, surface, region, fixture
+    parent_id: Optional[str] = None
+    frame: Dict[str, Any] = Field(default_factory=dict)  # coordinate-frame description
+    created_at: UTCDateTime
+
+class Session(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("ses"))
+    label: Optional[str] = None
+    actor: Optional[str] = None
+    started_at: UTCDateTime
+    ended_at: Optional[UTCDateTime] = None
+    last_observation_at: Optional[UTCDateTime] = None
 
 class TaskStep(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("step"))
