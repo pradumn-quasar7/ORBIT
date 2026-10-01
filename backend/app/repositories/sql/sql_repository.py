@@ -14,12 +14,14 @@ from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.pool import StaticPool
 
 from backend.app.domain.models import (
+    Anchor,
     Entity,
     Event,
     Evidence,
     Observation,
     Relation,
     SearchCoverage,
+    Session,
     StateVersion,
     Task,
     TaskStep,
@@ -136,6 +138,11 @@ class SqlRepository(Repository):
     def list_observations(self) -> List[Observation]:
         return self._list(t.observations, Observation, [t.observations.c.timestamp])
 
+    def list_observations_for_session(self, session_id: str) -> List[Observation]:
+        return self._list(
+            t.observations, Observation, [t.observations.c.timestamp], t.observations.c.session_id == session_id
+        )
+
     # ------------------------------------------------------------------ evidence
     def save_evidence(self, evidence: Evidence) -> Evidence:
         self._upsert(t.evidence, evidence)
@@ -178,6 +185,32 @@ class SqlRepository(Repository):
 
     def list_relations(self) -> List[Relation]:
         return self._list(t.relations, Relation, [t.relations.c.valid_from])
+
+    def get_relations_for_entity(self, entity_id: str) -> List[Relation]:
+        cond = (t.relations.c.source_entity == entity_id) | (t.relations.c.target_entity == entity_id)
+        return self._list(t.relations, Relation, [t.relations.c.valid_from], cond)
+
+    # ------------------------------------------------------------------- anchors
+    def save_anchor(self, anchor: Anchor) -> Anchor:
+        self._upsert(t.anchors, anchor)
+        return anchor
+
+    def get_anchor(self, anchor_id: str) -> Optional[Anchor]:
+        return self._get_one(t.anchors, Anchor, anchor_id)
+
+    def list_anchors(self) -> List[Anchor]:
+        return self._list(t.anchors, Anchor, [])
+
+    # ------------------------------------------------------------------ sessions
+    def save_session(self, session: Session) -> Session:
+        self._upsert(t.sessions, session)
+        return session
+
+    def get_session(self, session_id: str) -> Optional[Session]:
+        return self._get_one(t.sessions, Session, session_id)
+
+    def list_sessions(self) -> List[Session]:
+        return self._list(t.sessions, Session, [t.sessions.c.started_at])
 
     # --------------------------------------------------------------------- tasks
     def save_task(self, task: Task) -> Task:

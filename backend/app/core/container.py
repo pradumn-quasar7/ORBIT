@@ -9,6 +9,8 @@ from typing import Optional
 
 from backend.app.core.clock import Clock, SystemClock
 from backend.app.repositories.base import Repository
+from backend.app.services.relations import RelationService
+from backend.app.services.spatial import AnchorRegistry
 from backend.app.services.world_state_engine import WorldStateEngine
 
 DEFAULT_DATABASE_URL = "sqlite:///./orbit.db"
@@ -18,12 +20,17 @@ DEFAULT_DATABASE_URL = "sqlite:///./orbit.db"
 class OrbitServices:
     repo: Repository
     clock: Clock
+    anchors: AnchorRegistry
+    relations: RelationService
     engine: WorldStateEngine
 
     @classmethod
     def build(cls, repo: Repository, clock: Optional[Clock] = None) -> "OrbitServices":
         clock = clock or SystemClock()
-        return cls(repo=repo, clock=clock, engine=WorldStateEngine(repository=repo))
+        anchors = AnchorRegistry(repo)
+        relations = RelationService(repo)
+        engine = WorldStateEngine(repository=repo, anchors=anchors, relations=relations)
+        return cls(repo=repo, clock=clock, anchors=anchors, relations=relations, engine=engine)
 
 
 def default_repository() -> Repository:

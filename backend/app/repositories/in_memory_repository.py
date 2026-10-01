@@ -4,12 +4,14 @@ from typing import Dict, Iterator, List, Optional, TypeVar
 from pydantic import BaseModel
 
 from backend.app.domain.models import (
+    Anchor,
     Entity,
     Event,
     Evidence,
     Observation,
     Relation,
     SearchCoverage,
+    Session,
     StateVersion,
     Task,
     WorldDiff,
@@ -28,6 +30,8 @@ _STORES = (
     "tasks",
     "world_diffs",
     "search_coverages",
+    "anchors",
+    "sessions",
 )
 
 
@@ -48,6 +52,8 @@ class InMemoryRepository(Repository):
         self.tasks: Dict[str, Task] = {}
         self.world_diffs: Dict[str, WorldDiff] = {}
         self.search_coverages: Dict[str, SearchCoverage] = {}
+        self.anchors: Dict[str, Anchor] = {}
+        self.sessions: Dict[str, Session] = {}
         self._depth = 0
 
     @contextmanager
@@ -95,6 +101,9 @@ class InMemoryRepository(Repository):
     def list_observations(self) -> List[Observation]:
         return sorted((_copy(o) for o in self.observations.values()), key=lambda o: o.timestamp)
 
+    def list_observations_for_session(self, session_id: str) -> List[Observation]:
+        return [o for o in self.list_observations() if o.session_id == session_id]
+
     # Evidence
     def save_evidence(self, evidence: Evidence) -> Evidence:
         return self._put(self.evidence, evidence)
@@ -135,6 +144,29 @@ class InMemoryRepository(Repository):
 
     def list_relations(self) -> List[Relation]:
         return sorted((_copy(r) for r in self.relations.values()), key=lambda r: r.valid_from)
+
+    def get_relations_for_entity(self, entity_id: str) -> List[Relation]:
+        return [r for r in self.list_relations() if entity_id in (r.source_entity, r.target_entity)]
+
+    # Anchors
+    def save_anchor(self, anchor: Anchor) -> Anchor:
+        return self._put(self.anchors, anchor)
+
+    def get_anchor(self, anchor_id: str) -> Optional[Anchor]:
+        return self._get(self.anchors, anchor_id)
+
+    def list_anchors(self) -> List[Anchor]:
+        return [_copy(a) for a in self.anchors.values()]
+
+    # Sessions
+    def save_session(self, session: Session) -> Session:
+        return self._put(self.sessions, session)
+
+    def get_session(self, session_id: str) -> Optional[Session]:
+        return self._get(self.sessions, session_id)
+
+    def list_sessions(self) -> List[Session]:
+        return sorted((_copy(s) for s in self.sessions.values()), key=lambda s: s.started_at)
 
     # Tasks
     def save_task(self, task: Task) -> Task:

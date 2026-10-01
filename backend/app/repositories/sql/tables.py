@@ -61,6 +61,8 @@ entities = Table(
     Column("evidence_refs", JSON, nullable=False),
     Column("history_refs", JSON, nullable=False),
     Column("permissions", JSON, nullable=False),
+    Column("identity_status", String(32), nullable=False, server_default="ESTABLISHED"),
+    Column("identity_candidates", JSON, nullable=False, server_default="[]"),
     Column("created_at", UTCDateTimeType, nullable=False),
     Column("updated_at", UTCDateTimeType, nullable=False),
 )
@@ -79,6 +81,7 @@ observations = Table(
     Column("quality", Float, nullable=False),
     Column("authority", Float, nullable=False),
     Column("provenance", JSON, nullable=False),
+    Column("resolutions", JSON, nullable=False, server_default="[]"),
 )
 
 evidence = Table(
@@ -190,4 +193,28 @@ search_coverage = Table(
     Column("result", String(64), nullable=False),
     Column("confidence", Float, nullable=False),
     Column("evidence_refs", JSON, nullable=False),
+)
+
+anchors = Table(
+    "anchors",
+    metadata,
+    Column("id", String(128), primary_key=True),
+    _seq(),
+    Column("name", String(256)),
+    Column("anchor_type", String(64), nullable=False),
+    Column("parent_id", String(128), index=True),
+    Column("frame", JSON, nullable=False),
+    Column("created_at", UTCDateTimeType, nullable=False),
+)
+
+sessions = Table(
+    "sessions",
+    metadata,
+    Column("id", String(128), primary_key=True),
+    _seq(),
+    Column("label", String(256)),
+    Column("actor", String(128)),
+    Column("started_at", UTCDateTimeType, nullable=False, index=True),
+    Column("ended_at", UTCDateTimeType),
+    Column("last_observation_at", UTCDateTimeType),
 )

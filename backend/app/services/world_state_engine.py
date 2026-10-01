@@ -1,22 +1,27 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from backend.app.domain.models import (
     Entity,
+    EntityResolution,
     Event,
     Evidence,
     FreshnessPolicy,
     Observation,
     ObservedEntity,
+    Session,
     StateVersion,
     WorldChange,
     WorldDiff,
     generate_id,
 )
 from backend.app.domain.status import aggregate_status, classify_source_status
-from backend.app.domain.types import EpistemicStatus, EventType, VolatilityClass
+from backend.app.domain.types import EpistemicStatus, EventType, ResolutionMethod, VolatilityClass
 from backend.app.repositories.base import Repository
 from backend.app.repositories.in_memory_repository import InMemoryRepository
+from backend.app.services.entity_registry import EntityRegistry, Resolution
+from backend.app.services.relations import RelationService
+from backend.app.services.spatial import AnchorRegistry
 
 LOCATION = "location"
 
@@ -38,8 +43,17 @@ def default_freshness_policies() -> Dict[str, FreshnessPolicy]:
 
 
 class WorldStateEngine:
-    def __init__(self, repository: Optional[Repository] = None):
+    def __init__(
+        self,
+        repository: Optional[Repository] = None,
+        anchors: Optional[AnchorRegistry] = None,
+        registry: Optional[EntityRegistry] = None,
+        relations: Optional[RelationService] = None,
+    ):
         self.repo: Repository = repository or InMemoryRepository()
+        self.anchors = anchors or AnchorRegistry(self.repo)
+        self.registry = registry or EntityRegistry(self.repo, self.anchors)
+        self.relations = relations or RelationService(self.repo)
 
     # ------------------------------------------------------------------ evidence
     def record_evidence(
@@ -78,19 +92,65 @@ class WorldStateEngine:
                 provenance=observation.provenance,
             )
             status = classify_source_status(observation.source, observation.authority)
+            self._touch_session(observation)
 
             events: List[Event] = []
-            for observed in observation.observed_entities:
-                existing = (
-                    self.repo.get_entity(observed.candidate_entity_id)
-                    if observed.candidate_entity_id
-                    else None
-                )
-                if existing is None:
-                    events.append(self._create_entity(observed, observation, evidence, status))
+            matched: Set[str] = set()
+            resolved_ids: Dict[str, str] = {}
+            resolutions: List[EntityResolution] = []
+            for idx, observed in enumerate(observation.observed_entities):
+                res = self.registry.resolve(observed, exclude=matched)
+                if res.is_match:
+                    entity = self.repo.get_entity(res.entity_id)  # type: ignore[arg-type]
+                    assert entity is not None
+                    events.extend(self._update_entity(entity, observed, observation, evidence, status))
+                    entity_id = entity.id
                 else:
-                    events.extend(self._update_entity(existing, observed, observation, evidence, status))
+                    entity_id, new_events = self._create_entity(observed, observation, evidence, status, res)
+                    events.extend(new_events)
+                matched.add(entity_id)
+                if observed.candidate_entity_id:
+                    resolved_ids.setdefault(observed.candidate_entity_id, entity_id)
+                resolutions.append(
+                    EntityResolution(
+                        observed_index=idx,
+                        candidate_entity_id=observed.candidate_entity_id,
+                        entity_id=entity_id,
+                        method=res.method,
+                        confidence=res.confidence,
+                        candidates=res.candidates,
+                        reason=res.reason,
+                    )
+                )
+
+            # Relations last, so targets can refer to detections in the same observation.
+            for observed, resolution in zip(observation.observed_entities, resolutions):
+                for rel in observed.relations:
+                    events.extend(
+                        self.relations.apply(
+                            source=resolution.entity_id,
+                            relation_type=rel.relation_type,
+                            target=resolved_ids.get(rel.target, rel.target),
+                            present=rel.present,
+                            at=observation.timestamp,
+                            evidence_id=evidence.id,
+                            status=status,
+                        )
+                    )
+
+            observation.resolutions = resolutions
+            self.repo.save_observation(observation)
             return events
+
+    def _touch_session(self, observation: Observation) -> None:
+        if not observation.session_id:
+            return
+        session = self.repo.get_session(observation.session_id) or Session(
+            id=observation.session_id, started_at=observation.timestamp
+        )
+        if session.last_observation_at is None or observation.timestamp > session.last_observation_at:
+            session.last_observation_at = observation.timestamp
+        self.repo.save_session(session)
 
     def register_entity(self, observed: ObservedEntity, observation: Observation) -> Entity:
         """Explicit registration still goes through evidence (ADR-001): it is recorded as
@@ -98,8 +158,10 @@ class WorldStateEngine:
         if observed.candidate_entity_id and self.repo.get_entity(observed.candidate_entity_id):
             raise ValueError(f"Entity {observed.candidate_entity_id} already exists")
         observation.observed_entities = [observed]
-        events = self.record_observation(observation)
-        entity = self.repo.get_entity(events[0].entity_id)  # type: ignore[arg-type]
+        self.record_observation(observation)
+        stored = self.repo.get_observation(observation.id)
+        assert stored is not None
+        entity = self.repo.get_entity(stored.resolutions[0].entity_id)
         assert entity is not None
         return entity
 
@@ -109,8 +171,9 @@ class WorldStateEngine:
         observation: Observation,
         evidence: Evidence,
         status: EpistemicStatus,
-    ) -> Event:
-        entity_id = observed.candidate_entity_id or generate_id(f"entity_{observed.type}")
+        resolution: Resolution,
+    ) -> Tuple[str, List[Event]]:
+        entity_id = resolution.entity_id or generate_id(f"entity_{observed.type}")
         current_state: Dict[str, Any] = {}
         if observed.location:
             current_state[LOCATION] = observed.location
@@ -121,6 +184,7 @@ class WorldStateEngine:
             id=entity_id,
             type=observed.type,
             name=observed.name or observed.type,
+            canonical_attributes=dict(observed.identifiers),
             geometry=observed.geometry,
             anchor=observed.anchor or observed.location,
             current_state=current_state,
@@ -129,6 +193,8 @@ class WorldStateEngine:
             observed_at=observation.timestamp,
             freshness_policies=default_freshness_policies(),
             evidence_refs=[evidence.id],
+            identity_status=resolution.identity_status,
+            identity_candidates=list(resolution.candidates),
             created_at=observation.timestamp,
             updated_at=observation.timestamp,
         )
@@ -145,16 +211,38 @@ class WorldStateEngine:
             entity.history_refs.append(sv.id)
         self.repo.save_entity(entity)
 
-        event = Event(
-            timestamp=observation.timestamp,
-            event_type=EventType.OBJECT_ADDED,
-            entity_id=entity.id,
-            before_state=None,
-            after_state=dict(current_state),
-            evidence_refs=[evidence.id],
-            description=f"Entity {entity.id} ({entity.name}) added to world state.",
-        )
-        return self.repo.save_event(event)
+        events = [
+            self.repo.save_event(
+                Event(
+                    timestamp=observation.timestamp,
+                    event_type=EventType.OBJECT_ADDED,
+                    entity_id=entity.id,
+                    before_state=None,
+                    after_state=dict(current_state),
+                    evidence_refs=[evidence.id],
+                    description=f"Entity {entity.id} ({entity.name}) added to world state.",
+                )
+            )
+        ]
+        identity_event = {
+            ResolutionMethod.NEW_AMBIGUOUS: EventType.IDENTITY_AMBIGUOUS,
+            ResolutionMethod.NEW_IDENTITY_CONFLICT: EventType.IDENTITY_CONFLICT,
+        }.get(resolution.method)
+        if identity_event is not None:
+            events.append(
+                self.repo.save_event(
+                    Event(
+                        timestamp=observation.timestamp,
+                        event_type=identity_event,
+                        entity_id=entity.id,
+                        before_state={"candidates": list(resolution.candidates)},
+                        after_state={"identity_status": resolution.identity_status.value},
+                        evidence_refs=[evidence.id],
+                        description=f"Identity of {entity.id} unresolved: {resolution.reason}.",
+                    )
+                )
+            )
+        return entity.id, events
 
     def _update_entity(
         self,
@@ -168,6 +256,10 @@ class WorldStateEngine:
         entity.updated_at = observation.timestamp
         if evidence.id not in entity.evidence_refs:
             entity.evidence_refs.append(evidence.id)
+        for key, value in observed.identifiers.items():
+            entity.canonical_attributes.setdefault(key, value)  # resolution guarantees no conflict
+        if observed.geometry is not None:
+            entity.geometry = observed.geometry
 
         claims: Dict[str, Any] = {}
         if observed.location:
