@@ -13,6 +13,7 @@ from backend.app.domain.types import (
     FreshnessState,
     HypothesisStatus,
     IdentityStatus,
+    QueryKind,
     ResolutionMethod,
     SearchResult,
     SourceType,
@@ -516,3 +517,62 @@ class ResumePlan(BaseModel):
     can_continue: bool
     task_status: TaskStatus
     message: str
+
+
+# ------------------------------------------------------------- grounded queries
+class QueryIntent(BaseModel):
+    kind: QueryKind
+    raw: str
+    entity_ids: List[str] = Field(default_factory=list)
+    ambiguous: Dict[str, List[str]] = Field(default_factory=dict)  # mention -> candidate ids
+    anchor_id: Optional[str] = None
+    attribute: Optional[str] = None
+    as_of: Optional[UTCDateTime] = None  # point-in-time question ("where was X at 10:15")
+    since: Optional[UTCDateTime] = None  # window start ("what changed since …", "yesterday")
+    until: Optional[UTCDateTime] = None
+    task_id: Optional[str] = None
+
+
+class GroundedClaim(BaseModel):
+    """One claim in a response, with the evidence gate's verdict (spec §15)."""
+
+    claim: str
+    entity_id: Optional[str] = None
+    attribute: Optional[str] = None
+    value: Any = None
+    status: EpistemicStatus
+    supportable: bool
+    freshness: Optional[FreshnessAssessment] = None
+    evidence_refs: List[str] = Field(default_factory=list)
+
+
+class RetrievalHit(BaseModel):
+    """Semantic recall result. The score is a recall aid, never evidence of truth."""
+
+    doc_id: str
+    kind: str
+    ref_id: str
+    text: str
+    score: float
+    entity_ids: List[str] = Field(default_factory=list)
+    timestamp: Optional[UTCDateTime] = None
+
+
+class GroundedResponse(BaseModel):
+    """Spec §15 response contract. `answer` is set only when supported by evidence;
+    otherwise ORBIT abstains and says what it would need to observe."""
+
+    query: str
+    as_of: UTCDateTime
+    intent: QueryIntent
+    answer: Optional[str] = None
+    summary: str
+    abstained: bool
+    claims: List[GroundedClaim] = Field(default_factory=list)
+    conflicts: List[ConflictSide] = Field(default_factory=list)
+    requested_observation: Optional[ObservationRequest] = None
+    requested_observations: List[ObservationRequest] = Field(default_factory=list)
+    changes: List[WorldChange] = Field(default_factory=list)
+    resume_plan: Optional[ResumePlan] = None
+    retrieval: List[RetrievalHit] = Field(default_factory=list)
+    providers: Dict[str, str] = Field(default_factory=dict)

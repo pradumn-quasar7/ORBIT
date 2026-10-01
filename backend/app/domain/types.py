@@ -143,3 +143,14 @@ class ConditionState(str, Enum):
     SATISFIED = "SATISFIED"  # supported by sufficient, fresh evidence and holds
     VIOLATED = "VIOLATED"  # supported by evidence and does NOT hold
     UNSUPPORTED = "UNSUPPORTED"  # evidence stale, unknown, contradicted or below required status
+
+
+class QueryKind(str, Enum):
+    WHERE_IS = "WHERE_IS"
+    ATTRIBUTE = "ATTRIBUTE"
+    CONTENTS = "CONTENTS"
+    WHAT_CHANGED = "WHAT_CHANGED"
+    CONTINUE = "CONTINUE"
+    WHAT_HAPPENED = "WHAT_HAPPENED"
+    WHY = "WHY"
+    UNKNOWN = "UNKNOWN"

@@ -1,7 +1,7 @@
 # ORBIT Project Status
 
 ## Current Phase
-Phase 5 — Task continuity (COMPLETE). Next: Phase 6 — Grounded query agent.
+Phase 6 — Grounded query agent (COMPLETE). Next: Phase 7 — Active perception + action safety.
 
 ## Phase Log
 
@@ -81,11 +81,22 @@ Phase 5 — Task continuity (COMPLETE). Next: Phase 6 — Grounded query agent.
 - API: `POST /tasks/{id}/resume`, `POST /tasks/{id}/procedure/acknowledge`. ADR-019, ADR-020.
 - Tests: `test_task_continuity.py` — spec §11 T12 scenario: no-change resume, reopened valve invalidates step 5, stale outcome blocks + requests observation, unverified model number ("move closer so I can read the model number"), contradicted precondition, procedure revision, multi-user handoff, branching DAG; every plan checked for unsafe continuation.
 
+### Phase 6 — Grounded query agent + hybrid retrieval (§48 steps 13–14)
+**Planned**
+- Replaceable embedding/retrieval/reasoning providers; hybrid retrieval; grounded query agent implementing the §5.2 loop and §15 response contract.
+
+**Implemented**
+- `providers/` (`base.py`, `embedding.py`, `retrieval.py`, `reasoning.py`), `services/hybrid_retrieval.py`, `services/query_agent.py`.
+- Domain: `QueryKind`, `QueryIntent`, `GroundedClaim`, `RetrievalHit`, `GroundedResponse`.
+- Supported questions: where is / where was at T, attribute value, contents of an anchor, what changed (since last session / since T), continue, what happened (yesterday), why.
+- API: `POST /queries`, `GET /memory/search`. ADR-021, ADR-022.
+- Tests: `test_query_agent.py` — contract checked on every response; stale → abstain + "Point the camera near bench_3…"; contradiction surfaced, never resolved; ambiguity → clarifying question; ablation without evidence gate answers stale memory.
+
 ## Known Issues / Limitations (to be addressed in named phases)
 - Ambiguous entities cannot yet be merged into their true identity after verification (future work).
 
 ## Tests
-- `.venv/bin/pytest` → 227 passed.
+- `.venv/bin/pytest` → 280 passed.
 
 ## Recent Architecture Decisions
 - ADR-005 Repository boundary + SQL store · ADR-006 UTC time · ADR-007 §48 phase order · ADR-008 status classification
@@ -94,10 +105,12 @@ Phase 5 — Task continuity (COMPLETE). Next: Phase 6 — Grounded query agent.
 - ADR-014 Memory as read model · ADR-015 Step progress vs completion evidence · ADR-016 Causal hypotheses
 - ADR-017 Snapshot world diff · ADR-018 Coverage-validated absence
 - ADR-019 Resume protocol · ADR-020 Strict evidence inputs
+- ADR-021 Deterministic replaceable providers · ADR-022 Grounded response contract
 
 ## Research Experiments Enabled
 - Experiment A (persistent identity): re-ID decisions are auditable per observation.
 - Experiment C (stale-memory resistance): freshness gate + ablation switch.
+- Evidence-gate ablation (`gate_evidence=False`) and vector recall vs structured state.
 - Conflict handling ablation: `detect_contradictions=False` (last writer wins).
 - Experiment D (task resumption): resume plans expose blocked/invalidated steps and requests.
 - Experiment E (evidence and causality): causal hypotheses gated on causal-test evidence.

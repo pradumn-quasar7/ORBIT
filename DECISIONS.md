@@ -110,3 +110,12 @@
 - **Status**: Accepted (Phase 5)
 - **Context**: A test passed `quality=` to an `ObservedEntity`; Pydantic ignored it silently, so the "weak" evidence was recorded at full strength.
 - **Decision**: `Observation`, `ObservedEntity`, `ObservedRelation` and `StateCondition` use `extra="forbid"`.
+
+## ADR-021 — Deterministic default providers behind replaceable boundaries
+- **Status**: Accepted (Phase 6); refines ADR-002
+- **Decision**: `providers/base.py` defines `EmbeddingProvider`, `RetrievalProvider` and `ReasoningProvider`. Defaults: `HashingEmbeddingProvider` (signed feature hashing over unigrams+bigrams with a stable digest — Python's `hash` is salted per process), `InMemoryVectorIndex` (cosine), `RuleBasedReasoningProvider` (intent + entity/anchor/attribute/time resolution against a vocabulary built from structured state). Every response records the provider names for reproducibility (spec §22.9).
+- **Consequences**: The whole agent runs offline and deterministically; an LLM reasoning provider or pgvector retrieval can be swapped in without touching world state, evidence, diff or tasks. No LLM is in the loop today.
+
+## ADR-022 — Grounded response contract: answer only what the evidence gate supports
+- **Status**: Accepted (Phase 6)
+- **Decision**: `QueryAgent.answer` returns `GroundedResponse` (spec §15): `answer` is non-null only when the underlying claims are supportable; otherwise `abstained=true`, a `summary` explains the last known value and why it cannot be asserted (stale, contradicted, confirmed absent, inferred, insufficient), conflicts are listed with all sides, and a targeted `requested_observation` is attached. Ambiguous mentions get a clarifying question, never a guess. "What changed?" defaults to the previous session; "Continue." runs the resume protocol; "Why?" never asserts causation without causal-test evidence. Semantic recall (`HybridRetriever`) only nominates records, which are re-read from structured state; similarity scores are exposed as recall aids. `gate_evidence=False` is the ungated (LLM-only-style) ablation.

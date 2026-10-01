@@ -11,6 +11,7 @@ from backend.app.core.clock import Clock, SystemClock
 from backend.app.repositories.base import Repository
 from backend.app.services.hypotheses import HypothesisService
 from backend.app.services.memory import MemoryService
+from backend.app.services.query_agent import QueryAgent
 from backend.app.services.relations import RelationService
 from backend.app.services.search import SearchService
 from backend.app.services.spatial import AnchorRegistry
@@ -33,6 +34,7 @@ class OrbitServices:
     hypotheses: HypothesisService
     search: SearchService
     diff: WorldDiffService
+    agent: QueryAgent
 
     @classmethod
     def build(cls, repo: Repository, clock: Optional[Clock] = None) -> "OrbitServices":
@@ -42,6 +44,8 @@ class OrbitServices:
         engine = WorldStateEngine(repository=repo, anchors=anchors, relations=relations)
         memory = MemoryService(repo, engine.claims, relations, anchors)
         tasks = TaskService(repo, engine)
+        hypotheses = HypothesisService(repo, engine)
+        diff = WorldDiffService(repo, memory, tasks)
         return cls(
             repo=repo,
             clock=clock,
@@ -50,9 +54,10 @@ class OrbitServices:
             engine=engine,
             memory=memory,
             tasks=tasks,
-            hypotheses=HypothesisService(repo, engine),
+            hypotheses=hypotheses,
             search=SearchService(repo, engine),
-            diff=WorldDiffService(repo, memory, tasks),
+            diff=diff,
+            agent=QueryAgent(repo, engine, memory, diff, tasks, hypotheses),
         )
 
 
