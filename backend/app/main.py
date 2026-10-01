@@ -1,13 +1,17 @@
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
-from backend.app.api import actions, evidence, memory, queries, spatial, world
+from backend.app.api import actions, evidence, inspect, memory, queries, spatial, world
 from backend.app.core.clock import Clock
 from backend.app.core.container import OrbitServices, default_repository
 from backend.app.repositories.base import Repository
 
 VERSION = "0.1.0"
+FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
 
 
 def create_app(repository: Optional[Repository] = None, clock: Optional[Clock] = None) -> FastAPI:
@@ -29,6 +33,15 @@ def create_app(repository: Optional[Repository] = None, clock: Optional[Clock] =
     app.include_router(memory.router)
     app.include_router(queries.router)
     app.include_router(actions.router)
+    app.include_router(inspect.router)
+
+    if FRONTEND.is_dir():
+        app.mount("/ui", StaticFiles(directory=FRONTEND, html=True), name="ui")
+
+        @app.get("/dashboard", include_in_schema=False)
+        def dashboard():
+            return RedirectResponse("/ui/")
+
     return app
 
 

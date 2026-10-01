@@ -129,3 +129,13 @@
 - **Status**: Accepted (Phase 7)
 - **Decision**: Consequential actions follow `ActionSafetyService`: propose (requires `recommend`) → prerequisites verified through the evidence gate (UNSUPPORTED ⇒ observation requests) → human authorization (requires `authorize`; prerequisites re-verified at that moment) → a human reports performing it (requires `actuate`) → outcome verified only with evidence *after* the action → `OutcomeRecord` (outcome memory: action, conditions, result, evidence). Principals are HUMAN or AGENT; agents can never hold `authorize`/`actuate`, and principals may be scoped to entities. Every transition emits an `ACTION_STATUS_CHANGED` audit event. There is no actuator interface; `execute_autonomously` (and `POST /actions/{id}/execute`) always refuses.
 - **Consequences**: Satisfies §36 Safety: no autonomous actuation, an explicit authorization boundary, auditable claims.
+
+## ADR-025 — Vendor-neutral perception adapters; hashes instead of pixels
+- **Status**: Accepted (Phase 8)
+- **Decision**: Devices emit `RawFrame`s; a `PerceptionProvider` returns an `Observation`. `DetectionPerceptionProvider` adapts any detector (label, normalised box, confidence, OCR text) — boxes map to anchors through a per-view calibrated `region_map`; OCR text yields strong identifiers (serial, asset tag) and attributes; detector track ids are deliberately *not* used as identities (ADR-009). `SimulatedPerceptionProvider` renders a ground-truth `SimulatedScene` with field of view, occlusion, seeded misses and optional anonymous detections, for ORBIT-BENCH. By default only the frame's content hash is stored (`retention_policy="hash_only"`); raw media is kept only with `retain_raw=True`. `PerceptionGateway.redact` removes the raw reference but keeps structured facts. Integrity v2 hashes a digest of the raw reference so redaction does not break verification (v1 records still verify).
+
+## ADR-026 — Zero-build static inspection dashboard
+- **Status**: Accepted (Phase 8); deviates from the §19 React/Next.js proposal
+- **Context**: §31 asks for a simple dashboard that exposes uncertainty; §19 calls the stack a proposal, and §44 warns against building more than the experiment needs.
+- **Decision**: `frontend/` holds a plain HTML/CSS/JS page served by FastAPI at `/ui/` (redirect from `/dashboard`), fed by one read model, `GET /inspect/summary`, plus `POST /queries`. All text is inserted via `textContent`. Every row shows epistemic status and freshness; confirmed-absent objects show no location, only the reason.
+- **Consequences**: No Node toolchain to install or maintain. A React client can replace it against the same endpoints if a richer UI is ever needed.
