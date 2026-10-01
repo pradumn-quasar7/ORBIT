@@ -268,6 +268,40 @@ class BeliefUpdater:
             events += self.invalidate(dep_entity, [dep_attr], at, reason, inflight=inflight, _visited=visited)
         return events
 
+    # ----------------------------------------------------------------- absence
+    def apply_absence(self, entity: Entity, region: str, at: datetime, evidence_id: str, coverage_id: str) -> List[Event]:
+        """Coverage-validated absence: close the location claim without inventing a new
+        location. Whereabouts become UNKNOWN; the closed claim records why."""
+        opens = self.open_versions(entity.id, LOCATION)
+        if not opens:
+            return []
+        reason = f"confirmed absent from {region} by search {coverage_id}"
+        before = entity.current_state.get(LOCATION)
+        for v in opens:
+            v.valid_to = at
+            v.invalidated_at = at
+            v.invalidation_reason = reason
+            self.repo.save_state_version(v)
+        conflict = self.open_conflict(entity.id, LOCATION)
+        if conflict is not None:
+            conflict.resolved_at = at
+            conflict.resolution_reason = reason
+            self.repo.save_conflict(conflict)
+        if evidence_id not in entity.evidence_refs:
+            entity.evidence_refs.append(evidence_id)
+        event = self.repo.save_event(
+            Event(
+                timestamp=at,
+                event_type=EventType.OBJECT_REMOVED_OR_UNOBSERVED,
+                entity_id=entity.id,
+                before_state={LOCATION: before},
+                after_state={LOCATION: None, "absence": "CONFIRMED_ABSENT", "region": region, "coverage_id": coverage_id},
+                evidence_refs=[evidence_id],
+                description=f"{entity.id} {reason}; current location unknown.",
+            )
+        )
+        return [event] + self.propagate(entity.id, LOCATION, at, f"dependency {entity.id}.location: {reason}", inflight=entity)
+
     # ------------------------------------------------------------ materialise
     def materialize(self, entity: Entity, as_of: datetime) -> None:
         """Refresh the entity's cached current_state / statuses from its versions."""
@@ -277,7 +311,7 @@ class BeliefUpdater:
             if assessment.last_known_value is None and assessment.status == EpistemicStatus.UNKNOWN and attr not in entity.current_state:
                 continue  # only unconfirmed claims exist; nothing is believed yet
             entity.attribute_statuses[attr] = assessment.status
-            entity.current_state[attr] = assessment.last_known_value
+            entity.current_state[attr] = assessment.last_known_value if assessment.has_current_claim else None
         entity.status = aggregate_status(entity.attribute_statuses.values())
 
     def force_conflict(self, entity: Entity, attr: str, claim: Claim) -> Event:

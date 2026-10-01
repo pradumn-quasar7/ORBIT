@@ -18,7 +18,6 @@ from backend.app.domain.models import (
     Observation,
     ObservedEntity,
     Session,
-    WorldChange,
     WorldDiff,
     generate_id,
 )
@@ -402,45 +401,16 @@ class WorldStateEngine:
         return statuses
 
     # ---------------------------------------------------------------- world diff
-    def compute_world_diff(
-        self,
-        baseline_timestamp: Optional[datetime],
-        target_timestamp: datetime,
-    ) -> WorldDiff:
-        """Events in (baseline, target]. Phase 4 replaces this with a snapshot diff."""
-        changes: List[WorldChange] = []
-        for evt in self.repo.list_events():
-            if baseline_timestamp is not None and evt.timestamp < baseline_timestamp:
-                continue
-            if evt.timestamp > target_timestamp:
-                continue
-            attr_name = LOCATION if evt.event_type == EventType.OBJECT_MOVED else None
-            before_val: Any = evt.before_state
-            after_val: Any = evt.after_state
-            if evt.before_state and len(evt.before_state) == 1:
-                attr_name = next(iter(evt.before_state))
-                before_val = evt.before_state[attr_name]
-            if evt.after_state and len(evt.after_state) == 1:
-                attr_name = attr_name or next(iter(evt.after_state))
-                after_val = evt.after_state[attr_name]
-            changes.append(
-                WorldChange(
-                    change_type=evt.event_type,
-                    entity_id=evt.entity_id or "unknown",
-                    attribute=attr_name,
-                    before=before_val,
-                    after=after_val,
-                    evidence_refs=evt.evidence_refs,
-                    timestamp=evt.timestamp,
-                )
-            )
-        diff = WorldDiff(
-            baseline_timestamp=baseline_timestamp,
-            target_timestamp=target_timestamp,
-            changes=changes,
-            created_at=target_timestamp,
-        )
-        return self.repo.save_world_diff(diff)
+    def compute_world_diff(self, baseline_timestamp: Optional[datetime], target_timestamp: datetime) -> WorldDiff:
+        """Snapshot diff Diff(B_baseline, B_target); see ``services/world_diff.py``."""
+        from backend.app.services.memory import MemoryService
+        from backend.app.services.world_diff import WorldDiffService
+
+        memory = MemoryService(self.repo, self.claims, self.relations, self.anchors)
+        service = WorldDiffService(self.repo, memory)
+        if baseline_timestamp is None:
+            return service.event_log_diff(None, target_timestamp)
+        return service.diff(baseline_timestamp, target_timestamp)
 
     def _require_entity(self, entity_id: str) -> Entity:
         entity = self.repo.get_entity(entity_id)

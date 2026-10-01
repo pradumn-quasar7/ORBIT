@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from backend.app.core.time import UTCDateTime
 from backend.app.domain.types import (
+    AbsenceStatus,
     ClaimDisposition,
     EpistemicStatus,
     EventType,
@@ -12,6 +13,7 @@ from backend.app.domain.types import (
     HypothesisStatus,
     IdentityStatus,
     ResolutionMethod,
+    SearchResult,
     SourceType,
     StepStatus,
     TaskStatus,
@@ -304,29 +306,54 @@ class CausalHypothesis(BaseModel):
 # ------------------------------------------------------------------- world diff
 class WorldChange(BaseModel):
     change_type: EventType
-    entity_id: str
-    attribute: Optional[str] = None
+    entity_id: str  # entity id, or task id for TASK_PROGRESS_CHANGED
+    attribute: Optional[str] = None  # attribute, relation type, or step id
     before: Any = None
     after: Any = None
+    status: Optional[EpistemicStatus] = None  # status of the "after" claim at the target time
+    absence: Optional[AbsenceStatus] = None
+    related_entity_ids: List[str] = Field(default_factory=list)
+    note: Optional[str] = None
     evidence_refs: List[str] = Field(default_factory=list)
     timestamp: UTCDateTime
 
 
+class DiffUncertainty(BaseModel):
+    """Not a change: a claim whose current value ORBIT cannot vouch for at the target time."""
+
+    entity_id: str
+    attribute: str
+    status: EpistemicStatus
+    reason: str
+    last_known_value: Any = None
+
+
 class WorldDiff(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("diff"))
+    mode: str = "snapshot"  # snapshot | event_log (ablation baseline)
     baseline_timestamp: Optional[UTCDateTime] = None
     target_timestamp: UTCDateTime
     changes: List[WorldChange] = Field(default_factory=list)
+    uncertain: List[DiffUncertainty] = Field(default_factory=list)
     created_at: UTCDateTime
 
 
 class SearchCoverage(BaseModel):
+    """Negative/search memory (spec §7): what was looked for, where, how well."""
+
     id: str = Field(default_factory=lambda: generate_id("cov"))
     region: str
     timestamp: UTCDateTime
-    visibility_conditions: Dict[str, Any] = Field(default_factory=dict)
-    searched_for: List[str] = Field(default_factory=list)
-    result: str  # FOUND, NOT_FOUND_IN_COVERAGE
+    source: str = "unknown"
+    session_id: Optional[str] = None
+    visibility_conditions: Dict[str, Any] = Field(default_factory=dict)  # lighting, occlusion, ...
+    coverage_fraction: float = 1.0  # share of the region actually inspected
+    searched_for: List[str] = Field(default_factory=list)  # entity ids or "type:<type>"
+    found: List[str] = Field(default_factory=list)
+    confirmed_absent: List[str] = Field(default_factory=list)
+    inconclusive: List[str] = Field(default_factory=list)
+    result: SearchResult = SearchResult.ALL_FOUND
+    policy: str = "coverage-v1"
     confidence: float = 1.0
     evidence_refs: List[str] = Field(default_factory=list)
 
@@ -364,6 +391,7 @@ class ClaimAssessment(BaseModel):
     supportable: bool
     freshness: Optional[FreshnessAssessment] = None
     evidence_refs: List[str] = Field(default_factory=list)
+    has_current_claim: bool = True  # False when no version is valid at as_of
     conflict_id: Optional[str] = None
     conflicts: List[ConflictSide] = Field(default_factory=list)
     reason: str = ""

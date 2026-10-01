@@ -69,13 +69,22 @@ class ClaimEvaluator:
         entity = self.repo.get_entity(entity_id)
         versions = self.versions_at(entity_id, attribute, as_of)
         if not versions:
+            closed = [
+                v
+                for v in self.repo.get_state_versions_for_entity(entity_id, attribute)
+                if v.disposition == ClaimDisposition.ACCEPTED and v.valid_to is not None and v.valid_to <= as_of
+            ]
+            last = max(closed, key=lambda v: v.valid_to) if closed else None
             return ClaimAssessment(
                 entity_id=entity_id,
                 attribute=attribute,
                 as_of=as_of,
+                last_known_value=last.value if last else None,
                 status=EpistemicStatus.UNKNOWN,
                 supportable=False,
-                reason="no claim on record for this time",
+                has_current_claim=False,
+                evidence_refs=list(last.supported_by) if last else [],
+                reason=(last.invalidation_reason if last and last.invalidation_reason else "no claim on record for this time"),
                 recommended_action="observe",
             )
 

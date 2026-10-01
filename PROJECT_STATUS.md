@@ -1,7 +1,7 @@
 # ORBIT Project Status
 
 ## Current Phase
-Phase 3 — Memory core (COMPLETE). Next: Phase 4 — World diff.
+Phase 4 — World diff (COMPLETE). Next: Phase 5 — Task continuity.
 
 ## Phase Log
 
@@ -58,25 +58,37 @@ Phase 3 — Memory core (COMPLETE). Next: Phase 4 — World diff.
 - API: `GET /world/snapshot`, `GET /entities/{id}/timeline`, `GET /entities/{id}/location`, `GET /anchors/{id}/contents`, `GET /sessions/{id}/summary`, `POST/GET /tasks`, `GET /tasks/{id}`, `/state`, `/history`, `POST /tasks/{id}/steps/{step}/start|complete`, `POST /tasks/{id}/interrupt`, `POST/GET /hypotheses`, `POST /hypotheses/{id}/evidence`.
 - Migration `0004` (+ step-status data conversion). ADR-014…016. Tests: `test_memory_core.py`.
 
+### Phase 4 — World diff (§48 step 10)
+**Planned**
+- Snapshot diff `Diff(B_a, B_b)` with typed changes; removed vs unobserved distinction via negative search memory; precision/recall evaluation.
+- Exit: known scene changes are measured with precision/recall.
+
+**Implemented**
+- Domain: `AbsenceStatus`, `SearchResult`, extended `SearchCoverage`, `WorldChange` (status, absence, notes, related ids), `DiffUncertainty`, `WorldDiff.mode/uncertain`, `ClaimAssessment.has_current_claim`.
+- `services/search.py` (`SearchPolicy`, `SearchService`), `BeliefUpdater.apply_absence`, `services/world_diff.py` (`diff`, `diff_since_session`, `event_log_diff` baseline), `evaluation/metrics.py` (`ExpectedChange`, one-to-one `diff_precision_recall`).
+- API: `POST /world/diff` (timestamps or `baseline_session_id`, `mode`), `POST /search`, `GET /search-coverage`.
+- Migration `0005`. ADR-017, ADR-018. Tests: `test_world_diff.py` incl. Experiment B-0.
+- **Result (Experiment B-0):** snapshot diff P = 1.00 / R = 1.00 (8 changes); event-log baseline P = 0.71 / R = 0.62.
+
 ## Known Issues / Limitations (to be addressed in named phases)
-- World diff is an event-log filter, not a snapshot diff (Phase 4).
 - Ambiguous entities cannot yet be merged into their true identity after verification (future work).
 
 ## Tests
-- `.venv/bin/pytest` → 158 passed.
+- `.venv/bin/pytest` → 201 passed.
 
 ## Recent Architecture Decisions
 - ADR-005 Repository boundary + SQL store · ADR-006 UTC time · ADR-007 §48 phase order · ADR-008 status classification
 - ADR-009 Conservative re-identification · ADR-010 Relation semantics
 - ADR-011 Evidence policy · ADR-012 Read-time freshness · ADR-013 Invalidation propagation
 - ADR-014 Memory as read model · ADR-015 Step progress vs completion evidence · ADR-016 Causal hypotheses
+- ADR-017 Snapshot world diff · ADR-018 Coverage-validated absence
 
 ## Research Experiments Enabled
 - Experiment A (persistent identity): re-ID decisions are auditable per observation.
 - Experiment C (stale-memory resistance): freshness gate + ablation switch.
 - Conflict handling ablation: `detect_contradictions=False` (last writer wins).
 - Experiment E (evidence and causality): causal hypotheses gated on causal-test evidence.
-- Experiment B-0 protocol defined (not yet runnable end-to-end).
+- Experiment B-0 (world diff) runnable as a test with precision/recall; negative-search ablations available.
 
 ## Last Updated
 - 2026-10-01

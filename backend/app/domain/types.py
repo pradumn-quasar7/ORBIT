@@ -123,3 +123,17 @@ class HypothesisStatus(str, Enum):
     HYPOTHESIS = "HYPOTHESIS"
     SUPPORTED = "SUPPORTED"
     REFUTED = "REFUTED"
+
+
+class AbsenceStatus(str, Enum):
+    """Unknown ≠ absent (rule 2.7): how strongly do we know an object is gone?"""
+
+    CONFIRMED_ABSENT = "CONFIRMED_ABSENT"  # searched for, validated coverage of its last location
+    NOT_FOUND_PARTIAL_COVERAGE = "NOT_FOUND_PARTIAL_COVERAGE"  # searched, coverage insufficient
+    NOT_REOBSERVED = "NOT_REOBSERVED"  # simply not seen since the baseline
+
+
+class SearchResult(str, Enum):
+    ALL_FOUND = "ALL_FOUND"
+    NOT_FOUND_IN_COVERAGE = "NOT_FOUND_IN_COVERAGE"  # at least one target confirmed absent
+    INCONCLUSIVE = "INCONCLUSIVE"  # targets missing but coverage did not validate absence
