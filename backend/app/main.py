@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import FastAPI
 
-from backend.app.api import evidence, memory, spatial, world
+from backend.app.api import evidence, memory, queries, spatial, world
 from backend.app.core.clock import Clock
 from backend.app.core.container import OrbitServices, default_repository
 from backend.app.repositories.base import Repository
@@ -27,6 +27,7 @@ def create_app(repository: Optional[Repository] = None, clock: Optional[Clock] =
     app.include_router(spatial.router)
     app.include_router(evidence.router)
     app.include_router(memory.router)
+    app.include_router(queries.router)
     return app
 
 
