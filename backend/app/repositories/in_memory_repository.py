@@ -5,6 +5,8 @@ from pydantic import BaseModel
 
 from backend.app.domain.models import (
     Anchor,
+    ClaimDependency,
+    Conflict,
     Entity,
     Event,
     Evidence,
@@ -32,6 +34,8 @@ _STORES = (
     "search_coverages",
     "anchors",
     "sessions",
+    "conflicts",
+    "dependencies",
 )
 
 
@@ -54,6 +58,8 @@ class InMemoryRepository(Repository):
         self.search_coverages: Dict[str, SearchCoverage] = {}
         self.anchors: Dict[str, Anchor] = {}
         self.sessions: Dict[str, Session] = {}
+        self.conflicts: Dict[str, Conflict] = {}
+        self.dependencies: Dict[str, ClaimDependency] = {}
         self._depth = 0
 
     @contextmanager
@@ -127,6 +133,36 @@ class InMemoryRepository(Repository):
             if sv.entity_id == entity_id and (attribute is None or sv.attribute == attribute)
         ]
         return sorted(results, key=lambda x: x.valid_from)
+
+    # Conflicts
+    def save_conflict(self, conflict: Conflict) -> Conflict:
+        return self._put(self.conflicts, conflict)
+
+    def get_conflict(self, conflict_id: str) -> Optional[Conflict]:
+        return self._get(self.conflicts, conflict_id)
+
+    def list_conflicts(self, entity_id: Optional[str] = None, attribute: Optional[str] = None) -> List[Conflict]:
+        found = [
+            _copy(c)
+            for c in self.conflicts.values()
+            if (entity_id is None or c.entity_id == entity_id) and (attribute is None or c.attribute == attribute)
+        ]
+        return sorted(found, key=lambda c: c.opened_at)
+
+    # Claim dependencies
+    def save_dependency(self, dependency: ClaimDependency) -> ClaimDependency:
+        return self._put(self.dependencies, dependency)
+
+    def list_dependencies(
+        self, depends_on_entity_id: Optional[str] = None, depends_on_attribute: Optional[str] = None
+    ) -> List[ClaimDependency]:
+        found = [
+            _copy(d)
+            for d in self.dependencies.values()
+            if (depends_on_entity_id is None or d.depends_on_entity_id == depends_on_entity_id)
+            and (depends_on_attribute is None or d.depends_on_attribute == depends_on_attribute)
+        ]
+        return sorted(found, key=lambda d: d.created_at)
 
     # Events
     def save_event(self, event: Event) -> Event:

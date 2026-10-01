@@ -3,20 +3,6 @@ from typing import Iterable
 
 from backend.app.domain.types import EpistemicStatus
 
-# Sources whose records count as authoritative (rule 2.3: VERIFIED = strong or
-# authoritative evidence). Everything else is direct perception at best (OBSERVED).
-AUTHORITATIVE_SOURCES = frozenset(
-    {"digital_registry", "manual_verification", "authoritative_record"}
-)
-VERIFIED_AUTHORITY_THRESHOLD = 0.9
-
-
-def classify_source_status(source: str, authority: float) -> EpistemicStatus:
-    if source in AUTHORITATIVE_SOURCES and authority >= VERIFIED_AUTHORITY_THRESHOLD:
-        return EpistemicStatus.VERIFIED
-    return EpistemicStatus.OBSERVED
-
-
 def aggregate_status(statuses: Iterable[EpistemicStatus]) -> EpistemicStatus:
     """Entity-level status is the weakest link of its attribute statuses.
 

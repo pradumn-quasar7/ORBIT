@@ -58,3 +58,20 @@
 - **Status**: Accepted (Phase 1)
 - **Decision**: Relations carry validity intervals. `on`/`inside`/`held_by` are exclusive (a new target closes the old interval); others accumulate; `connected_to`/`adjacent_to` are symmetric. A relation ends only on an explicit `present=False` observation — not seeing a connection is not evidence of disconnection (§2.7). Relation targets in an observation are mapped through that observation's identity resolutions.
 - **Consequences**: `RELATION_CHANGED` events carry `{type: before}` → `{type: after}` and feed the world diff.
+
+## ADR-011 — Deterministic evidence policy (supersede / corroborate / contradict / unconfirmed)
+- **Status**: Accepted (Phase 2)
+- **Context**: The Phase 0 engine overwrote state on any differing value, so a registry/label disagreement silently became a "state change" (violating §2.8), and weak or misleading evidence could replace strong evidence (§37).
+- **Decision**: Every claim (from an observation, record, person or inference) passes through `EvidencePolicy.decide`, a pure function. Evidence has a `SourceType` mapped to a *channel* (DIRECT, RECORD, TESTIMONY, INFERENCE) and a strength = quality × authority × detection confidence. Rules, in order: no current claim → NEW; older than current support → UNCONFIRMED; manual verification → RESOLVE/CORROBORATE/SUPERSEDE; strength < 0.35 → UNCONFIRMED (or weak corroboration); inference never overrides an observation; same value → CORROBORATE; all current claims stale/invalidated/unknown → SUPERSEDE; during an open conflict → CONFLICT_UPDATE (a channel replaces only its own side; the conflict closes when one value remains); same source or same channel → SUPERSEDE, except different sources disagreeing within 30 s → CONTRADICT; cross-channel within the attribute's contradiction window → CONTRADICT; outside it, weaker → UNCONFIRMED, else SUPERSEDE.
+- **Consequences**: Contradictions are explicit `Conflict` records with both sides retained; nothing is decided by model confidence. Unconfirmed claims are kept as zero-length versions with a reason (evidence is never discarded). `detect_contradictions=False` gives the last-writer-wins ablation baseline.
+
+## ADR-012 — Freshness and STALE/CONTRADICTED are derived at read time
+- **Status**: Accepted (Phase 2)
+- **Context**: Phase 0 wrote STALE into stored versions (rewriting history) and never refreshed support on re-observation.
+- **Decision**: `StateVersion.status` stores only the evidential grade at assertion. `ClaimEvaluator` derives STALE (TTL from the attribute's volatility policy, or explicit invalidation not followed by new support) and CONTRADICTED (conflict open at `as_of`) for any instant. Support refs carry timestamps so freshness is correct for past `as_of`. Entities keep a cached `current_state`/`attribute_statuses` view, refreshed at the latest known time.
+- **Consequences**: "As of" questions are answerable; history is append-oriented; the cache is a convenience, never the gate. Only fresh OBSERVED/VERIFIED claims are `supportable`.
+
+## ADR-013 — Invalidation propagation via explicit dependencies and policy triggers
+- **Status**: Accepted (Phase 2)
+- **Decision**: Claims are invalidated by interventions, changes or contradictions of claims they depend on. Dependencies are explicit `ClaimDependency` records (cross-entity) or `FreshnessPolicy.invalidation_triggers` (same entity, e.g. `calibration` ← `location`/`configuration`/`firmware`). Propagation is transitive with a visited-set cycle guard and emits `STATE_INVALIDATED` events. An intervention also closes open conflicts on the affected attributes.
+- **Consequences**: Task steps (Phase 5) can depend on claims through the same mechanism.

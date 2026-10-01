@@ -20,6 +20,10 @@ class EventType(str, Enum):
     # Identity events (Phase 1): re-identification decisions that need surfacing.
     IDENTITY_AMBIGUOUS = "IDENTITY_AMBIGUOUS"
     IDENTITY_CONFLICT = "IDENTITY_CONFLICT"
+    # Belief events (Phase 2): changes to what ORBIT believes, not to the world itself.
+    CONFLICT_RESOLVED = "CONFLICT_RESOLVED"
+    UNCONFIRMED_CHANGE = "UNCONFIRMED_CHANGE"
+    STATE_INVALIDATED = "STATE_INVALIDATED"
 
 class VolatilityClass(str, Enum):
     LOW = "LOW"        # e.g., wall color, equipment serial
@@ -41,3 +45,54 @@ class ResolutionMethod(str, Enum):
     NEW = "NEW"
     NEW_AMBIGUOUS = "NEW_AMBIGUOUS"
     NEW_IDENTITY_CONFLICT = "NEW_IDENTITY_CONFLICT"
+
+
+class SourceType(str, Enum):
+    """Spec §9 evidence source types."""
+
+    VISUAL_OBSERVATION = "VISUAL_OBSERVATION"
+    AUDIO_OBSERVATION = "AUDIO_OBSERVATION"
+    SENSOR_READING = "SENSOR_READING"
+    USER_STATEMENT = "USER_STATEMENT"
+    EXTERNAL_RECORD = "EXTERNAL_RECORD"
+    PROCEDURE = "PROCEDURE"
+    SYSTEM_EVENT = "SYSTEM_EVENT"
+    TOOL_OUTPUT = "TOOL_OUTPUT"
+    MANUAL_VERIFICATION = "MANUAL_VERIFICATION"
+    INFERENCE = "INFERENCE"
+    OTHER = "OTHER"
+
+
+class EvidenceChannel(str, Enum):
+    """Independent ways of knowing. Disagreement *across* channels is a contradiction
+    candidate; a later claim on the *same* channel is temporal succession."""
+
+    DIRECT = "DIRECT"  # perception and hands-on verification
+    RECORD = "RECORD"  # registries, procedures, system/tool output
+    TESTIMONY = "TESTIMONY"  # what a person says
+    INFERENCE = "INFERENCE"  # derived by reasoning
+
+
+class ClaimDisposition(str, Enum):
+    ACCEPTED = "ACCEPTED"  # part of current belief (or was, until valid_to)
+    CONFLICTING = "CONFLICTING"  # one side of a conflict
+    UNCONFIRMED = "UNCONFIRMED"  # retained as evidence, never current belief
+    REJECTED = "REJECTED"  # losing side of a resolved conflict
+
+
+class ClaimDecision(str, Enum):
+    NEW = "NEW"
+    CORROBORATE = "CORROBORATE"
+    SUPERSEDE = "SUPERSEDE"
+    CONTRADICT = "CONTRADICT"
+    CONFLICT_UPDATE = "CONFLICT_UPDATE"
+    RESOLVE = "RESOLVE"
+    UNCONFIRMED = "UNCONFIRMED"
+
+
+class FreshnessState(str, Enum):
+    FRESH = "FRESH"
+    AGING = "AGING"  # > 75% of TTL used: good target for a refresh observation
+    STALE = "STALE"  # TTL exceeded
+    INVALIDATED = "INVALIDATED"  # explicitly invalidated (intervention, dependency, revision)
+    NOT_APPLICABLE = "NOT_APPLICABLE"
