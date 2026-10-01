@@ -1,7 +1,7 @@
 # ORBIT Project Status
 
 ## Current Phase
-Phase 7 — Active perception + action safety (COMPLETE). Next: Phase 8 — Perception adapter + web inspection UI.
+Phase 8 — Perception adapter + web inspection UI (COMPLETE). Next: Phase 9 — ORBIT-BENCH + ablations.
 
 ## Phase Log
 
@@ -102,11 +102,22 @@ Phase 7 — Active perception + action safety (COMPLETE). Next: Phase 8 — Perc
 - API: `POST /active-perception/plan`, `POST/GET /principals`, `POST/GET /actions`, `GET /actions/{id}`, `POST /actions/{id}/recheck|authorize|performed|verify-outcome|execute(403)`, `GET /outcomes`. Migration `0006`. ADR-023, ADR-024.
 - **Result (Experiment F, Phase 7 scene):** 3 looks remove 2.89/3.10 uncertainty (information gain) vs 1.93 (fixed) vs 1.67–2.89 (random seeds 0–9).
 
+### Phase 8 — Perception adapter + web inspection UI (§48 steps 16–17)
+**Planned**
+- Vendor-neutral device/perception boundary, evidence minimisation and redaction, simple inspection dashboard, demo scenario.
+
+**Implemented**
+- `providers/perception.py` (`RawFrame`, `make_frame`, `DetectionPerceptionProvider`, `parse_identifiers`, `SimulatedScene`, `SimulatedPerceptionProvider`), `services/perception_gateway.py` (ingest, hash-only retention, redaction), integrity v2; `Observation.redaction`.
+- `services/dashboard.py` + `frontend/` (static dashboard at `/ui/`): current world, recent changes, ranked observation requests, tasks, open conflicts, query box.
+- `scripts/seed_demo.py`: spec §4 flagship scenario via simulated perception (anonymous camera in Session B).
+- API: `POST /perception/frames`, `POST /observations/{id}/redact`, `GET /inspect/summary`, `/ui/`, `/dashboard`. Migration `0007`. ADR-025, ADR-026.
+- Verified in a browser: desktop and 375 px mobile (no page-level horizontal scroll); two UI bugs found and fixed (nested-node rendering in conflicts, confirmed-absent objects shown with their old location).
+
 ## Known Issues / Limitations (to be addressed in named phases)
 - Ambiguous entities cannot yet be merged into their true identity after verification (future work).
 
 ## Tests
-- `.venv/bin/pytest` → 312 passed.
+- `.venv/bin/pytest` → 328 passed.
 
 ## Recent Architecture Decisions
 - ADR-005 Repository boundary + SQL store · ADR-006 UTC time · ADR-007 §48 phase order · ADR-008 status classification
@@ -117,6 +128,7 @@ Phase 7 — Active perception + action safety (COMPLETE). Next: Phase 8 — Perc
 - ADR-019 Resume protocol · ADR-020 Strict evidence inputs
 - ADR-021 Deterministic replaceable providers · ADR-022 Grounded response contract
 - ADR-023 Marginal information-gain perception · ADR-024 Action safety boundary
+- ADR-025 Vendor-neutral perception, hash-only retention · ADR-026 Static dashboard
 
 ## Research Experiments Enabled
 - Experiment A (persistent identity): re-ID decisions are auditable per observation.

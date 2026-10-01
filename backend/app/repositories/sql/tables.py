@@ -83,6 +83,7 @@ observations = Table(
     Column("authority", Float, nullable=False),
     Column("provenance", JSON, nullable=False),
     Column("resolutions", JSON, nullable=False, server_default="[]"),
+    Column("redaction", JSON),
 )
 
 evidence = Table(

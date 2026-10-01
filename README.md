@@ -36,6 +36,13 @@ State is stored in `./orbit.db` (SQLite) by default; set `ORBIT_DATABASE_URL`
 (e.g. `postgresql+psycopg://…`) to use PostgreSQL. Migrations run automatically on
 start; to run them by hand: `.venv/bin/alembic upgrade head`.
 
+### Demo: the flagship scenario
+```bash
+.venv/bin/python scripts/seed_demo.py --reset
+ORBIT_DATABASE_URL=sqlite:///./orbit_demo.db .venv/bin/uvicorn backend.app.main:app --port 8765
+```
+Then open http://localhost:8765/ui/ and ask "What changed?" or "Continue.".
+
 ### Documentation
 `ORBIT_PROJECT_INIT.md` (spec) · `ARCHITECTURE.md` · `DECISIONS.md` · `ROADMAP.md` ·
 `PROJECT_STATUS.md` · `docs/experiments/BENCHMARK_PROTOCOL.md`

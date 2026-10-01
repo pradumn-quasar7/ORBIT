@@ -28,7 +28,7 @@ from backend.app.repositories.in_memory_repository import InMemoryRepository
 from backend.app.services.belief import LOCATION, BeliefUpdater, ClaimResult
 from backend.app.services.claims import ClaimEvaluator
 from backend.app.services.entity_registry import EntityRegistry, Resolution
-from backend.app.services.evidence_policy import Claim, EvidencePolicy, evidence_integrity, grade, infer_source_type
+from backend.app.services.evidence_policy import Claim, EvidencePolicy, canonical_hash, evidence_integrity, grade, infer_source_type
 from backend.app.services.freshness import FreshnessPolicyRegistry
 from backend.app.services.relations import RelationService
 from backend.app.services.spatial import AnchorRegistry
@@ -104,12 +104,21 @@ class WorldStateEngine:
             obs = self.repo.get_observation(evidence.source_reference)
             if obs is None:
                 return False
-            subject = self._observation_subject(obs)
+            subject = self._observation_subject(obs, version=evidence.content.get("integrity_v", 1))
         return evidence_integrity(evidence, subject) == evidence.integrity_reference
 
     @staticmethod
-    def _observation_subject(obs: Observation) -> Dict[str, Any]:
-        return obs.model_dump(mode="json", exclude={"resolutions"})
+    def _observation_subject(obs: Observation, version: int = 2) -> Dict[str, Any]:
+        """What the integrity hash covers. v2 hashes a digest of the raw reference, so
+        redacting raw media (spec §17) keeps the record verifiable."""
+        if version == 1:
+            return obs.model_dump(mode="json", exclude={"resolutions", "redaction"})
+        subject = obs.model_dump(mode="json", exclude={"resolutions", "redaction", "raw_reference"})
+        if obs.raw_reference is not None:
+            subject["raw_digest"] = canonical_hash(obs.raw_reference)
+        else:
+            subject["raw_digest"] = (obs.redaction or {}).get("raw_digest")
+        return subject
 
     # --------------------------------------------------------------- observation
     def record_observation(self, observation: Observation) -> List[Event]:
@@ -126,7 +135,7 @@ class WorldStateEngine:
                 quality=observation.quality,
                 authority=observation.authority,
                 provenance=observation.provenance,
-                content={"kind": "observation", "detections": len(observation.observed_entities)},
+                content={"kind": "observation", "detections": len(observation.observed_entities), "integrity_v": 2},
                 subject=self._observation_subject(observation),
             )
             self._touch_session(observation)

@@ -226,6 +226,7 @@ class Observation(StrictInput):
     authority: float = 1.0
     provenance: Dict[str, Any] = Field(default_factory=dict)
     resolutions: List[EntityResolution] = Field(default_factory=list)  # filled by the engine
+    redaction: Optional[Dict[str, Any]] = None  # set when the raw reference is removed (spec §17)
 
 
 class Anchor(BaseModel):

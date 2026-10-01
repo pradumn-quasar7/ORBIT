@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ORBIT Inspector</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◎</span>
+      <div>
+        <h1>ORBIT</h1>
+        <p class="tagline">Persistent world model — inspection view</p>
+      </div>
+    </div>
+    <div class="meta">
+      <span id="as-of">loading…</span>
+      <button id="refresh" type="button">Refresh</button>
+    </div>
+  </header>
+
+  <section class="counts" id="counts" aria-label="Summary counts"></section>
+
+  <main>
+    <section class="card wide" aria-labelledby="world-h">
+      <div class="card-head">
+        <h2 id="world-h">Current world</h2>
+        <span class="hint">Location claims as ORBIT can support them right now</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Entity</th><th>Type</th><th>Location</th><th>Status</th><th>Last supported</th><th>Other attributes</th></tr></thead>
+          <tbody id="world"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="changes-h">
+      <div class="card-head">
+        <h2 id="changes-h">Recent changes</h2>
+        <span class="hint" id="baseline"></span>
+      </div>
+      <ul id="changes" class="list"></ul>
+    </section>
+
+    <section class="card" aria-labelledby="obs-h">
+      <div class="card-head">
+        <h2 id="obs-h">Requested observations</h2>
+        <span class="hint">Ranked by information gain ÷ cost</span>
+      </div>
+      <ol id="observations" class="list"></ol>
+    </section>
+
+    <section class="card" aria-labelledby="tasks-h">
+      <div class="card-head"><h2 id="tasks-h">Tasks</h2></div>
+      <div id="tasks"></div>
+    </section>
+
+    <section class="card" aria-labelledby="conflicts-h">
+      <div class="card-head">
+        <h2 id="conflicts-h">Open conflicts</h2>
+        <span class="hint">Retained, never silently resolved</span>
+      </div>
+      <ul id="conflicts" class="list"></ul>
+    </section>
+
+    <section class="card wide" aria-labelledby="ask-h">
+      <div class="card-head">
+        <h2 id="ask-h">Ask ORBIT</h2>
+        <span class="hint">Answers only what the evidence supports</span>
+      </div>
+      <form id="ask">
+        <input id="q" name="q" type="text" autocomplete="off" placeholder="Where is M17? · What changed? · Continue." aria-label="Question">
+        <button type="submit">Ask</button>
+      </form>
+      <div class="examples" id="examples"></div>
+      <div id="answer" class="answer" hidden></div>
+    </section>
+  </main>
+
+  <footer>Statuses: <span class="badge VERIFIED">VERIFIED</span> <span class="badge OBSERVED">OBSERVED</span>
+    <span class="badge INFERRED">INFERRED</span> <span class="badge STALE">STALE</span>
+    <span class="badge CONTRADICTED">CONTRADICTED</span> <span class="badge UNKNOWN">UNKNOWN</span></footer>
+  <script src="app.js"></script>
+</body>
+</html>
