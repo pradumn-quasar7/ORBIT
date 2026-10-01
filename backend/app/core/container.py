@@ -9,6 +9,8 @@ from typing import Optional
 
 from backend.app.core.clock import Clock, SystemClock
 from backend.app.repositories.base import Repository
+from backend.app.services.actions import ActionSafetyService
+from backend.app.services.active_perception import ActivePerceptionPlanner
 from backend.app.services.hypotheses import HypothesisService
 from backend.app.services.memory import MemoryService
 from backend.app.services.query_agent import QueryAgent
@@ -35,6 +37,8 @@ class OrbitServices:
     search: SearchService
     diff: WorldDiffService
     agent: QueryAgent
+    perception: ActivePerceptionPlanner
+    actions: ActionSafetyService
 
     @classmethod
     def build(cls, repo: Repository, clock: Optional[Clock] = None) -> "OrbitServices":
@@ -46,6 +50,9 @@ class OrbitServices:
         tasks = TaskService(repo, engine)
         hypotheses = HypothesisService(repo, engine)
         diff = WorldDiffService(repo, memory, tasks)
+        perception = ActivePerceptionPlanner(repo, engine.claims, anchors, tasks)
+        actions = ActionSafetyService(repo, tasks.conditions)
+        actions.ensure_agent_principal(clock.now())
         return cls(
             repo=repo,
             clock=clock,
@@ -57,7 +64,9 @@ class OrbitServices:
             hypotheses=hypotheses,
             search=SearchService(repo, engine),
             diff=diff,
-            agent=QueryAgent(repo, engine, memory, diff, tasks, hypotheses),
+            agent=QueryAgent(repo, engine, memory, diff, tasks, hypotheses, planner=perception),
+            perception=perception,
+            actions=actions,
         )
 
 

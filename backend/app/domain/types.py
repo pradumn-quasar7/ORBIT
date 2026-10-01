@@ -24,6 +24,8 @@ class EventType(str, Enum):
     CONFLICT_RESOLVED = "CONFLICT_RESOLVED"
     UNCONFIRMED_CHANGE = "UNCONFIRMED_CHANGE"
     STATE_INVALIDATED = "STATE_INVALIDATED"
+    # Action safety (Phase 7): every transition of a consequential action is audited.
+    ACTION_STATUS_CHANGED = "ACTION_STATUS_CHANGED"
 
 class VolatilityClass(str, Enum):
     LOW = "LOW"        # e.g., wall color, equipment serial
@@ -154,3 +156,41 @@ class QueryKind(str, Enum):
     WHAT_HAPPENED = "WHAT_HAPPENED"
     WHY = "WHY"
     UNKNOWN = "UNKNOWN"
+
+
+class ObservationActionType(str, Enum):
+    LOOK_AT_ANCHOR = "LOOK_AT_ANCHOR"  # wide view of a region
+    INSPECT_ENTITY = "INSPECT_ENTITY"  # close-up of one attribute
+    SEARCH_REGION = "SEARCH_REGION"  # coverage search for an object whose whereabouts are unknown
+    VERIFY_WITH_PERSON = "VERIFY_WITH_PERSON"  # hands-on check by a person
+
+
+class PrincipalKind(str, Enum):
+    HUMAN = "HUMAN"
+    AGENT = "AGENT"
+
+
+class Scope(str, Enum):
+    OBSERVE = "observe"
+    REASON = "reason"
+    RECOMMEND = "recommend"  # may propose an action
+    AUTHORIZE = "authorize"  # may approve/deny a consequential action (humans only)
+    ACTUATE = "actuate"  # may physically perform an action (humans only in v0.1)
+
+
+class ActionStatus(str, Enum):
+    PREREQUISITES_FAILED = "PREREQUISITES_FAILED"
+    AWAITING_AUTHORIZATION = "AWAITING_AUTHORIZATION"
+    AUTHORIZED = "AUTHORIZED"
+    DENIED = "DENIED"
+    PERFORMED = "PERFORMED"
+    OUTCOME_VERIFIED = "OUTCOME_VERIFIED"
+    OUTCOME_FAILED = "OUTCOME_FAILED"
+    OUTCOME_UNVERIFIED = "OUTCOME_UNVERIFIED"
+    CANCELLED = "CANCELLED"
+
+
+class OutcomeResult(str, Enum):
+    VERIFIED = "VERIFIED"
+    FAILED = "FAILED"
+    UNVERIFIED = "UNVERIFIED"

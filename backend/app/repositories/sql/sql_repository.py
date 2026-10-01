@@ -14,6 +14,7 @@ from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.pool import StaticPool
 
 from backend.app.domain.models import (
+    ActionRequest,
     Anchor,
     CausalHypothesis,
     ClaimDependency,
@@ -22,6 +23,8 @@ from backend.app.domain.models import (
     Event,
     Evidence,
     Observation,
+    OutcomeRecord,
+    Principal,
     Relation,
     SearchCoverage,
     Session,
@@ -311,6 +314,36 @@ class SqlRepository(Repository):
 
     def list_search_coverage(self) -> List[SearchCoverage]:
         return self._list(t.search_coverage, SearchCoverage, [t.search_coverage.c.timestamp])
+
+    # ---------------------------------------------------------------- principals
+    def save_principal(self, principal: Principal) -> Principal:
+        self._upsert(t.principals, principal)
+        return principal
+
+    def get_principal(self, principal_id: str) -> Optional[Principal]:
+        return self._get_one(t.principals, Principal, principal_id)
+
+    def list_principals(self) -> List[Principal]:
+        return self._list(t.principals, Principal, [t.principals.c.created_at])
+
+    # ------------------------------------------------------- actions / outcomes
+    def save_action(self, action: ActionRequest) -> ActionRequest:
+        self._upsert(t.actions, action)
+        return action
+
+    def get_action(self, action_id: str) -> Optional[ActionRequest]:
+        return self._get_one(t.actions, ActionRequest, action_id)
+
+    def list_actions(self) -> List[ActionRequest]:
+        return self._list(t.actions, ActionRequest, [t.actions.c.created_at])
+
+    def save_outcome(self, outcome: OutcomeRecord) -> OutcomeRecord:
+        self._upsert(t.outcomes, outcome)
+        return outcome
+
+    def list_outcomes(self, action_id: Optional[str] = None) -> List[OutcomeRecord]:
+        cond = t.outcomes.c.action_id == action_id if action_id is not None else None
+        return self._list(t.outcomes, OutcomeRecord, [t.outcomes.c.recorded_at], cond)
 
 
 __all__ = ["SqlRepository", "make_engine"]

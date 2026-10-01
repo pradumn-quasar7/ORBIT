@@ -8,7 +8,7 @@ timestamps tie. Schema changes must ship with an Alembic migration in
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Column, DateTime, Float, Integer, MetaData, String, Table, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, Integer, MetaData, String, Table, Text
 from sqlalchemy.types import TypeDecorator
 
 
@@ -291,4 +291,55 @@ causal_hypotheses = Table(
     Column("created_by", String(128)),
     Column("created_at", UTCDateTimeType, nullable=False),
     Column("updated_at", UTCDateTimeType, nullable=False),
+)
+
+principals = Table(
+    "principals",
+    metadata,
+    Column("id", String(128), primary_key=True),
+    _seq(),
+    Column("kind", String(16), nullable=False),
+    Column("scopes", JSON, nullable=False),
+    Column("entity_scope", JSON),
+    Column("created_at", UTCDateTimeType, nullable=False),
+)
+
+actions = Table(
+    "actions",
+    metadata,
+    Column("id", String(128), primary_key=True),
+    _seq(),
+    Column("action", Text, nullable=False),
+    Column("target_entity_ids", JSON, nullable=False),
+    Column("consequential", Boolean, nullable=False),
+    Column("prerequisites", JSON, nullable=False),
+    Column("expected_outcome", JSON, nullable=False),
+    Column("requested_by", String(128), nullable=False),
+    Column("status", String(32), nullable=False, index=True),
+    Column("prerequisite_checks", JSON, nullable=False),
+    Column("outcome_checks", JSON, nullable=False),
+    Column("requested_observations", JSON, nullable=False),
+    Column("authorization", JSON),
+    Column("performed_by", String(128)),
+    Column("performed_at", UTCDateTimeType),
+    Column("task_id", String(128)),
+    Column("step_id", String(128)),
+    Column("notes", Text),
+    Column("created_at", UTCDateTimeType, nullable=False),
+    Column("updated_at", UTCDateTimeType, nullable=False),
+)
+
+outcomes = Table(
+    "outcomes",
+    metadata,
+    Column("id", String(128), primary_key=True),
+    _seq(),
+    Column("action_id", String(128), nullable=False, index=True),
+    Column("action", Text, nullable=False),
+    Column("conditions", JSON, nullable=False),
+    Column("result", String(16), nullable=False),
+    Column("observed", JSON, nullable=False),
+    Column("evidence_refs", JSON, nullable=False),
+    Column("performed_by", String(128)),
+    Column("recorded_at", UTCDateTimeType, nullable=False),
 )

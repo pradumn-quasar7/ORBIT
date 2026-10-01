@@ -4,6 +4,7 @@ from typing import Dict, Iterator, List, Optional, TypeVar
 from pydantic import BaseModel
 
 from backend.app.domain.models import (
+    ActionRequest,
     Anchor,
     CausalHypothesis,
     ClaimDependency,
@@ -12,6 +13,8 @@ from backend.app.domain.models import (
     Event,
     Evidence,
     Observation,
+    OutcomeRecord,
+    Principal,
     Relation,
     SearchCoverage,
     Session,
@@ -38,6 +41,9 @@ _STORES = (
     "conflicts",
     "dependencies",
     "hypotheses",
+    "principals",
+    "actions",
+    "outcomes",
 )
 
 
@@ -63,6 +69,9 @@ class InMemoryRepository(Repository):
         self.conflicts: Dict[str, Conflict] = {}
         self.dependencies: Dict[str, ClaimDependency] = {}
         self.hypotheses: Dict[str, CausalHypothesis] = {}
+        self.principals: Dict[str, Principal] = {}
+        self.actions: Dict[str, ActionRequest] = {}
+        self.outcomes: Dict[str, OutcomeRecord] = {}
         self._depth = 0
 
     @contextmanager
@@ -249,3 +258,30 @@ class InMemoryRepository(Repository):
 
     def list_search_coverage(self) -> List[SearchCoverage]:
         return sorted((_copy(c) for c in self.search_coverages.values()), key=lambda c: c.timestamp)
+
+    # Principals
+    def save_principal(self, principal: Principal) -> Principal:
+        return self._put(self.principals, principal)
+
+    def get_principal(self, principal_id: str) -> Optional[Principal]:
+        return self._get(self.principals, principal_id)
+
+    def list_principals(self) -> List[Principal]:
+        return sorted((_copy(p) for p in self.principals.values()), key=lambda p: p.created_at)
+
+    # Actions and outcomes
+    def save_action(self, action: ActionRequest) -> ActionRequest:
+        return self._put(self.actions, action)
+
+    def get_action(self, action_id: str) -> Optional[ActionRequest]:
+        return self._get(self.actions, action_id)
+
+    def list_actions(self) -> List[ActionRequest]:
+        return sorted((_copy(a) for a in self.actions.values()), key=lambda a: a.created_at)
+
+    def save_outcome(self, outcome: OutcomeRecord) -> OutcomeRecord:
+        return self._put(self.outcomes, outcome)
+
+    def list_outcomes(self, action_id: Optional[str] = None) -> List[OutcomeRecord]:
+        found = [_copy(o) for o in self.outcomes.values() if action_id is None or o.action_id == action_id]
+        return sorted(found, key=lambda o: o.recorded_at)

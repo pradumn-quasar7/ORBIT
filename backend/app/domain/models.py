@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from backend.app.core.time import UTCDateTime
 from backend.app.domain.types import (
     AbsenceStatus,
+    ActionStatus,
     ClaimDisposition,
     ConditionState,
     EpistemicStatus,
@@ -13,8 +14,12 @@ from backend.app.domain.types import (
     FreshnessState,
     HypothesisStatus,
     IdentityStatus,
+    ObservationActionType,
+    OutcomeResult,
+    PrincipalKind,
     QueryKind,
     ResolutionMethod,
+    Scope,
     SearchResult,
     SourceType,
     StepStatus,
@@ -576,3 +581,102 @@ class GroundedResponse(BaseModel):
     resume_plan: Optional[ResumePlan] = None
     retrieval: List[RetrievalHit] = Field(default_factory=list)
     providers: Dict[str, str] = Field(default_factory=dict)
+
+
+# ----------------------------------------------------------- active perception
+class ObservationCost(BaseModel):
+    time_seconds: float
+    effort: float  # user effort 0..1
+    motion: float  # camera / body movement 0..1
+    privacy: float  # exposure of unrelated people/things 0..1
+    interruption: float  # disruption of ongoing work 0..1
+
+    @property
+    def total(self) -> float:
+        return max(0.05, self.time_seconds / 60.0 + self.effort + self.motion + self.privacy + self.interruption)
+
+
+class UncertainClaim(BaseModel):
+    entity_id: str
+    attribute: str
+    status: EpistemicStatus
+    reason: str
+    last_known_value: Any = None
+    region: Optional[str] = None  # where looking would help
+    weight: float  # uncertainty × relevance
+    blocking_steps: List[str] = Field(default_factory=list)
+
+
+class PlannedObservation(BaseModel):
+    action_type: ObservationActionType
+    target: str  # anchor id or entity id
+    attribute: Optional[str] = None
+    instruction: str
+    resolves: List[str] = Field(default_factory=list)  # "entity.attribute"
+    expected_uncertainty_reduction: float
+    cost: ObservationCost
+    cost_total: float
+    score: float
+
+
+class PerceptionPlan(BaseModel):
+    as_of: UTCDateTime
+    policy: str
+    uncertain_claims: List[UncertainClaim]
+    total_uncertainty: float
+    actions: List[PlannedObservation]
+
+
+# ---------------------------------------------------------------- action safety
+class Principal(BaseModel):
+    id: str
+    kind: PrincipalKind
+    scopes: List[Scope] = Field(default_factory=list)
+    entity_scope: Optional[List[str]] = None  # None = all entities
+    created_at: UTCDateTime
+
+
+class Authorization(BaseModel):
+    principal_id: str
+    approved: bool
+    at: UTCDateTime
+    reason: Optional[str] = None
+
+
+class ActionRequest(BaseModel):
+    """A consequential physical action routed through observe → verify prerequisites →
+    authorize → act (by a person) → verify outcome → outcome memory (spec §16)."""
+
+    id: str = Field(default_factory=lambda: generate_id("act"))
+    action: str
+    target_entity_ids: List[str] = Field(default_factory=list)
+    consequential: bool = True
+    prerequisites: List[StateCondition] = Field(default_factory=list)
+    expected_outcome: List[StateCondition] = Field(default_factory=list)
+    requested_by: str
+    status: ActionStatus
+    prerequisite_checks: List[ConditionCheck] = Field(default_factory=list)
+    outcome_checks: List[ConditionCheck] = Field(default_factory=list)
+    requested_observations: List[ObservationRequest] = Field(default_factory=list)
+    authorization: Optional[Authorization] = None
+    performed_by: Optional[str] = None
+    performed_at: Optional[UTCDateTime] = None
+    task_id: Optional[str] = None
+    step_id: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
+
+
+class OutcomeRecord(BaseModel):
+    """Outcome memory (spec §7): action A under conditions C produced outcome O."""
+
+    id: str = Field(default_factory=lambda: generate_id("out"))
+    action_id: str
+    action: str
+    conditions: List[ConditionCheck]
+    result: OutcomeResult
+    observed: List[ConditionCheck]
+    evidence_refs: List[str] = Field(default_factory=list)
+    performed_by: Optional[str] = None
+    recorded_at: UTCDateTime
