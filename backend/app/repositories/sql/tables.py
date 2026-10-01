@@ -195,9 +195,11 @@ world_diffs = Table(
     metadata,
     Column("id", String(128), primary_key=True),
     _seq(),
+    Column("mode", String(32), nullable=False, server_default="snapshot"),
     Column("baseline_timestamp", UTCDateTimeType),
     Column("target_timestamp", UTCDateTimeType, nullable=False),
     Column("changes", JSON, nullable=False),
+    Column("uncertain", JSON, nullable=False, server_default="[]"),
     Column("created_at", UTCDateTimeType, nullable=False),
 )
 
@@ -208,9 +210,16 @@ search_coverage = Table(
     _seq(),
     Column("region", String(128), nullable=False, index=True),
     Column("timestamp", UTCDateTimeType, nullable=False, index=True),
+    Column("source", String(128), nullable=False, server_default="unknown"),
+    Column("session_id", String(128), index=True),
     Column("visibility_conditions", JSON, nullable=False),
+    Column("coverage_fraction", Float, nullable=False, server_default="1.0"),
     Column("searched_for", JSON, nullable=False),
+    Column("found", JSON, nullable=False, server_default="[]"),
+    Column("confirmed_absent", JSON, nullable=False, server_default="[]"),
+    Column("inconclusive", JSON, nullable=False, server_default="[]"),
     Column("result", String(64), nullable=False),
+    Column("policy", String(64), nullable=False, server_default="coverage-v1"),
     Column("confidence", Float, nullable=False),
     Column("evidence_refs", JSON, nullable=False),
 )

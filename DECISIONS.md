@@ -90,3 +90,13 @@
 - **Status**: Accepted (Phase 3)
 - **Decision**: Hypotheses are created INFERRED/HYPOTHESIS; a cause after its effect is rejected. Evidence of `kind="causal_test"` from `TOOL_OUTPUT` or `MANUAL_VERIFICATION` with authority ≥ 0.9 may mark it SUPPORTED/REFUTED; all other evidence (co-occurrence, observations, statements) is retained as context only.
 - **Consequences**: Enables the "unsupported causal claim rate" metric (Experiment E).
+
+## ADR-017 — World diff is a net comparison of belief snapshots
+- **Status**: Accepted (Phase 4); supersedes the Phase 0 event-log diff
+- **Context**: Replaying events reports A→B→A as two moves, mislabels creation-in-window, cannot express confirmed absence, and misses task progress and unobserved objects.
+- **Decision**: `WorldDiffService.diff(a, b)` compares `WorldSnapshot(a)` with `WorldSnapshot(b)`. Reported: OBJECT_ADDED (with identity/replacement notes), OBJECT_MOVED, OBJECT_STATE_CHANGED, PROCEDURE_REVISION_DETECTED, RELATION_CHANGED (exclusive retarget or add/remove), EVIDENCE_CONFLICT (newly contradicted), OBJECT_REMOVED_OR_UNOBSERVED (graded by `AbsenceStatus`), TASK_PROGRESS_CHANGED. Not reported as changes: first observation of an attribute (knowledge gain) and knowledge decay — stale/unconfirmed claims go to `WorldDiff.uncertain`. Replacement is only ever an INFERRED note. The event-log diff is kept as an ablation baseline (`mode="event_log"`).
+- **Consequences**: On Experiment B-0 the snapshot diff scores P = R = 1.0; the event-log baseline scores P = 0.71, R = 0.62.
+
+## ADR-018 — Absence requires validated search coverage of the last known location
+- **Status**: Accepted (Phase 4)
+- **Decision**: `SearchService.record_search` stores negative memory (`SearchCoverage`: region, coverage fraction, visibility, confidence, targets found / confirmed absent / inconclusive). A target is CONFIRMED_ABSENT only if it was searched for, its last known location lies inside the region, and `SearchPolicy` validates coverage (≥ 90 %, confidence ≥ 0.7, lighting not poor, occlusion ≤ 0.2). Confirmed absence closes the location claim (whereabouts UNKNOWN, reason retained) and emits OBJECT_REMOVED_OR_UNOBSERVED; nothing else changes belief. Ablations: `SearchPolicy(enabled=False)` and `WorldDiffService(treat_unobserved_as_removed=True)`.

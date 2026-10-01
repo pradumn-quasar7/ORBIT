@@ -14,6 +14,7 @@ from backend.app.domain.models import (
     Geometry,
     Observation,
     ObservedEntity,
+    SearchCoverage,
     StateVersion,
     WorldDiff,
 )
@@ -42,7 +43,10 @@ class EntityRegistration(BaseModel):
 
 class DiffRequest(BaseModel):
     baseline_timestamp: Optional[UTCDateTime] = None
+    baseline_session_id: Optional[str] = None  # "what changed since session X ended?"
     target_timestamp: Optional[UTCDateTime] = None
+    mode: str = "snapshot"  # snapshot | event_log (ablation baseline)
+    include_unobserved: bool = True
 
 
 class FreshnessCheckRequest(BaseModel):
@@ -132,4 +136,48 @@ def list_events(svc: OrbitServices = Depends(get_services)):
 @router.post("/world/diff", response_model=WorldDiff)
 def compute_world_diff(req: DiffRequest, svc: OrbitServices = Depends(get_services)):
     target: datetime = req.target_timestamp or svc.clock.now()
-    return svc.engine.compute_world_diff(baseline_timestamp=req.baseline_timestamp, target_timestamp=target)
+    if req.mode == "event_log":
+        return svc.diff.event_log_diff(req.baseline_timestamp, target)
+    if req.baseline_session_id:
+        try:
+            return svc.diff.diff_since_session(req.baseline_session_id, target, include_unobserved=req.include_unobserved)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+    if req.baseline_timestamp is None:
+        raise HTTPException(status_code=422, detail="baseline_timestamp or baseline_session_id is required")
+    return svc.diff.diff(req.baseline_timestamp, target, include_unobserved=req.include_unobserved)
+
+
+class SearchRequest(BaseModel):
+    region: str
+    searched_for: List[str]  # entity ids or "type:<type>"
+    observation: Optional[Observation] = None  # what was actually seen during the search
+    coverage_fraction: float = 1.0
+    visibility_conditions: Dict[str, Any] = Field(default_factory=dict)
+    confidence: float = 1.0
+    source: str = "camera"
+    session_id: Optional[str] = None
+    timestamp: Optional[UTCDateTime] = None
+
+
+@router.post("/search", response_model=SearchCoverage)
+def record_search(req: SearchRequest, svc: OrbitServices = Depends(get_services)):
+    try:
+        return svc.search.record_search(
+            req.region,
+            req.timestamp or (req.observation.timestamp if req.observation else svc.clock.now()),
+            req.searched_for,
+            req.observation,
+            req.coverage_fraction,
+            req.visibility_conditions,
+            req.confidence,
+            req.source,
+            req.session_id,
+        )
+    except EntityNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/search-coverage", response_model=List[SearchCoverage])
+def list_search_coverage(svc: OrbitServices = Depends(get_services)):
+    return svc.repo.list_search_coverage()

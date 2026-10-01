@@ -46,10 +46,13 @@ def test_api_entity_and_observation_flow(client):
     history = client.get("/entities/laptop_99/history?attribute=location").json()
     assert [h["value"] for h in history] == ["bench_left", "bench_right"]
 
-    diff = client.post(
-        "/world/diff", json={"baseline_timestamp": _ts(9, 59), "target_timestamp": _ts(10, 35)}
-    ).json()
-    assert "OBJECT_MOVED" in [c["change_type"] for c in diff["changes"]]
+    # Net (snapshot) semantics: across the whole window the laptop *appeared*;
+    # after it existed, it *moved*.
+    whole = client.post("/world/diff", json={"baseline_timestamp": _ts(9, 59), "target_timestamp": _ts(10, 35)}).json()
+    assert [c["change_type"] for c in whole["changes"]] == ["OBJECT_ADDED"]
+    assert whole["changes"][0]["after"]["location"] == "bench_right"
+    diff = client.post("/world/diff", json={"baseline_timestamp": _ts(10, 5), "target_timestamp": _ts(10, 35)}).json()
+    assert [(c["change_type"], c["before"], c["after"]) for c in diff["changes"]] == [("OBJECT_MOVED", "bench_left", "bench_right")]
 
 
 def test_duplicate_observation_is_rejected(client):
