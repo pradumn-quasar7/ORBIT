@@ -15,6 +15,8 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app.domain.models import (
     Anchor,
+    ClaimDependency,
+    Conflict,
     Entity,
     Event,
     Evidence,
@@ -166,6 +168,40 @@ class SqlRepository(Repository):
         if attribute is not None:
             cond = cond & (t.state_versions.c.attribute == attribute)
         return self._list(t.state_versions, StateVersion, [t.state_versions.c.valid_from], cond)
+
+    # ----------------------------------------------------------------- conflicts
+    def save_conflict(self, conflict: Conflict) -> Conflict:
+        self._upsert(t.conflicts, conflict)
+        return conflict
+
+    def get_conflict(self, conflict_id: str) -> Optional[Conflict]:
+        return self._get_one(t.conflicts, Conflict, conflict_id)
+
+    def list_conflicts(self, entity_id: Optional[str] = None, attribute: Optional[str] = None) -> List[Conflict]:
+        cond = None
+        if entity_id is not None:
+            cond = t.conflicts.c.entity_id == entity_id
+        if attribute is not None:
+            a = t.conflicts.c.attribute == attribute
+            cond = a if cond is None else cond & a
+        return self._list(t.conflicts, Conflict, [t.conflicts.c.opened_at], cond)
+
+    # -------------------------------------------------------------- dependencies
+    def save_dependency(self, dependency: ClaimDependency) -> ClaimDependency:
+        self._upsert(t.claim_dependencies, dependency)
+        return dependency
+
+    def list_dependencies(
+        self, depends_on_entity_id: Optional[str] = None, depends_on_attribute: Optional[str] = None
+    ) -> List[ClaimDependency]:
+        d = t.claim_dependencies.c
+        cond = None
+        if depends_on_entity_id is not None:
+            cond = d.depends_on_entity_id == depends_on_entity_id
+        if depends_on_attribute is not None:
+            a = d.depends_on_attribute == depends_on_attribute
+            cond = a if cond is None else cond & a
+        return self._list(t.claim_dependencies, ClaimDependency, [d.created_at], cond)
 
     # -------------------------------------------------------------------- events
     def save_event(self, event: Event) -> Event:

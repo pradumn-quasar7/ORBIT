@@ -74,6 +74,7 @@ observations = Table(
     _seq(),
     Column("timestamp", UTCDateTimeType, nullable=False, index=True),
     Column("source", String(128), nullable=False),
+    Column("source_type", String(64)),
     Column("session_id", String(128), index=True),
     Column("raw_reference", Text),
     Column("observed_entities", JSON, nullable=False),
@@ -90,11 +91,13 @@ evidence = Table(
     Column("id", String(128), primary_key=True),
     _seq(),
     Column("source_type", String(64), nullable=False, index=True),
+    Column("source", String(128), nullable=False, server_default="unknown"),
     Column("source_reference", String(256), nullable=False, index=True),
     Column("timestamp", UTCDateTimeType, nullable=False, index=True),
     Column("quality", Float, nullable=False),
     Column("authority", Float, nullable=False),
     Column("provenance", JSON, nullable=False),
+    Column("content", JSON, nullable=False, server_default="{}"),
     Column("retention_policy", String(64)),
     Column("integrity_reference", String(128)),
 )
@@ -108,9 +111,15 @@ state_versions = Table(
     Column("attribute", String(128), nullable=False, index=True),
     Column("value", JSON),
     Column("status", String(32), nullable=False),
+    Column("disposition", String(32), nullable=False, server_default="ACCEPTED"),
     Column("valid_from", UTCDateTimeType, nullable=False, index=True),
     Column("valid_to", UTCDateTimeType),
     Column("supported_by", JSON, nullable=False),
+    Column("support", JSON, nullable=False, server_default="[]"),
+    Column("last_supported_at", UTCDateTimeType),
+    Column("last_validated_at", UTCDateTimeType),
+    Column("volatility_class", String(16)),
+    Column("invalidated_at", UTCDateTimeType),
     Column("invalidation_reason", Text),
 )
 
@@ -217,4 +226,32 @@ sessions = Table(
     Column("started_at", UTCDateTimeType, nullable=False, index=True),
     Column("ended_at", UTCDateTimeType),
     Column("last_observation_at", UTCDateTimeType),
+)
+
+conflicts = Table(
+    "conflicts",
+    metadata,
+    Column("id", String(128), primary_key=True),
+    _seq(),
+    Column("entity_id", String(128), nullable=False, index=True),
+    Column("attribute", String(128), nullable=False, index=True),
+    Column("version_ids", JSON, nullable=False),
+    Column("opened_at", UTCDateTimeType, nullable=False, index=True),
+    Column("resolved_at", UTCDateTimeType),
+    Column("resolution_version_id", String(128)),
+    Column("resolution_evidence", String(128)),
+    Column("resolution_reason", Text),
+)
+
+claim_dependencies = Table(
+    "claim_dependencies",
+    metadata,
+    Column("id", String(128), primary_key=True),
+    _seq(),
+    Column("dependent_entity_id", String(128), nullable=False, index=True),
+    Column("dependent_attribute", String(128), nullable=False),
+    Column("depends_on_entity_id", String(128), nullable=False, index=True),
+    Column("depends_on_attribute", String(128), nullable=False),
+    Column("reason", Text),
+    Column("created_at", UTCDateTimeType, nullable=False),
 )

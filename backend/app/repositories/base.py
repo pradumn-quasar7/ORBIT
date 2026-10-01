@@ -10,6 +10,8 @@ from typing import Iterator, List, Optional
 
 from backend.app.domain.models import (
     Anchor,
+    ClaimDependency,
+    Conflict,
     Entity,
     Event,
     Evidence,
@@ -70,6 +72,25 @@ class Repository(ABC):
     def get_state_versions_for_entity(
         self, entity_id: str, attribute: Optional[str] = None
     ) -> List[StateVersion]: ...
+
+    # Conflicts (sorted by opened_at)
+    @abstractmethod
+    def save_conflict(self, conflict: Conflict) -> Conflict: ...
+
+    @abstractmethod
+    def get_conflict(self, conflict_id: str) -> Optional[Conflict]: ...
+
+    @abstractmethod
+    def list_conflicts(self, entity_id: Optional[str] = None, attribute: Optional[str] = None) -> List[Conflict]: ...
+
+    # Claim dependencies
+    @abstractmethod
+    def save_dependency(self, dependency: ClaimDependency) -> ClaimDependency: ...
+
+    @abstractmethod
+    def list_dependencies(
+        self, depends_on_entity_id: Optional[str] = None, depends_on_attribute: Optional[str] = None
+    ) -> List[ClaimDependency]: ...
 
     # Events (sorted by timestamp)
     @abstractmethod

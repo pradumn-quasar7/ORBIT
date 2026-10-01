@@ -1,7 +1,7 @@
 # ORBIT Project Status
 
 ## Current Phase
-Phase 1 — Spatial persistence (COMPLETE). Next: Phase 2 — Evidence engine.
+Phase 2 — Evidence engine (COMPLETE). Next: Phase 3 — Memory core.
 
 ## Phase Log
 
@@ -34,21 +34,35 @@ Phase 1 — Spatial persistence (COMPLETE). Next: Phase 2 — Evidence engine.
 - API: `POST/GET /anchors`, `GET /anchors/{id}`, `POST/GET /sessions`, `POST /sessions/{id}/end`, `GET /sessions/{id}/observations`, `GET /entities/{id}/relations`.
 - Migration `0002`. Tests: `test_spatial_persistence.py` (16 cases × 2 backends) incl. same-looking objects, replaced object, relocation, relation lifecycle.
 
+### Phase 2 — Evidence engine (§48 steps 7–8)
+**Planned**
+- Evidence source types, provenance, integrity; deterministic evidence policy; attribute-level freshness engine; interventions; invalidation propagation; contradiction lifecycle.
+- Exit: unsupported current-state claims are blocked or downgraded.
+
+**Implemented**
+- Domain: `SourceType`, `EvidenceChannel`, `ClaimDisposition`, `ClaimDecision`, `FreshnessState`; `Evidence.source/content`; `SupportRef`; `StateVersion` support history, disposition, invalidation fields; `Conflict`, `ClaimDependency`; read models `FreshnessAssessment`, `ClaimAssessment`, `EntityAssessment`; events `CONFLICT_RESOLVED`, `UNCONFIRMED_CHANGE`, `STATE_INVALIDATED`.
+- `services/freshness.py` (policy registry, read-time assessment, ablation switch), `services/evidence_policy.py` (source inference, grading, integrity hashing, decision table), `services/claims.py` (evidence gate), `services/belief.py` (decision execution, conflicts, invalidation + propagation, materialisation).
+- Engine: observations, `assert_claim`, `record_intervention`, `add_dependency`, `verify_evidence` all share one policy path; late observations cannot rewind the cache.
+- API: `GET /entities/{id}/state`, `GET /entities/{id}/claims/{attr}`, `POST /claims`, `POST /entities/{id}/interventions`, `POST /dependencies`, `GET /conflicts`, `GET /evidence/{id}`.
+- Migration `0003` (schema + data backfill of source types and support). ADR-011…013.
+- Tests: `test_evidence_engine.py` (31 cases × 2 backends) incl. exit-criterion table, weak/misleading/out-of-order evidence, conflict lifecycle, transitive cycle-safe propagation, tamper detection, ablations, migration backfill.
+
 ## Known Issues / Limitations (to be addressed in named phases)
-- Conflicting observations still overwrite state unless `record_contradiction` is called (Phase 2).
-- Freshness mutates stored versions and re-observation does not refresh support (Phase 2).
 - World diff is an event-log filter, not a snapshot diff (Phase 4).
 - Ambiguous entities cannot yet be merged into their true identity after verification (future work).
 
 ## Tests
-- `.venv/bin/pytest` → 73 passed.
+- `.venv/bin/pytest` → 135 passed.
 
 ## Recent Architecture Decisions
 - ADR-005 Repository boundary + SQL store · ADR-006 UTC time · ADR-007 §48 phase order · ADR-008 status classification
 - ADR-009 Conservative re-identification · ADR-010 Relation semantics
+- ADR-011 Evidence policy · ADR-012 Read-time freshness · ADR-013 Invalidation propagation
 
 ## Research Experiments Enabled
 - Experiment A (persistent identity): re-ID decisions are auditable per observation.
+- Experiment C (stale-memory resistance): freshness gate + ablation switch.
+- Conflict handling ablation: `detect_contradictions=False` (last writer wins).
 - Experiment B-0 protocol defined (not yet runnable end-to-end).
 
 ## Last Updated

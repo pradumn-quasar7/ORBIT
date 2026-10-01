@@ -5,7 +5,8 @@ import pytest
 from sqlalchemy import create_engine
 
 from backend.app.domain.models import Observation, ObservedEntity, Task, TaskStep
-from backend.app.domain.status import aggregate_status, classify_source_status
+from backend.app.domain.status import aggregate_status
+from backend.app.services.evidence_policy import grade, infer_source_type
 from backend.app.domain.types import EpistemicStatus as S
 from backend.app.domain.types import EventType
 from backend.app.repositories.sql import metadata
@@ -36,7 +37,7 @@ def test_naive_and_offset_timestamps_normalise_to_utc():
     ],
 )
 def test_source_status_classification(source, authority, expected):
-    assert classify_source_status(source, authority) == expected
+    assert grade(infer_source_type(source), 1.0, authority) == expected
 
 
 def test_aggregate_status_is_weakest_link():

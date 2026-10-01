@@ -1,29 +1,40 @@
+"""World State Engine: orchestrates B_t = Update(B_t-1, O_t, context, evidence, time).
+
+For each observation it records evidence (with an integrity hash), resolves identity
+for every detection, turns detections into per-attribute claims and hands each claim
+to the ``BeliefUpdater``, which applies the deterministic evidence policy. Other entry
+points (claims from records/people, interventions, dependencies) share that path so
+every state change is evidence-backed and auditable.
+"""
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Union
 
 from backend.app.domain.models import (
+    ClaimDependency,
     Entity,
     EntityResolution,
     Event,
     Evidence,
-    FreshnessPolicy,
     Observation,
     ObservedEntity,
     Session,
-    StateVersion,
     WorldChange,
     WorldDiff,
     generate_id,
 )
-from backend.app.domain.status import aggregate_status, classify_source_status
-from backend.app.domain.types import EpistemicStatus, EventType, ResolutionMethod, VolatilityClass
+from backend.app.domain.status import aggregate_status
+from backend.app.domain.types import ClaimDecision, EpistemicStatus, EventType, ResolutionMethod, SourceType
 from backend.app.repositories.base import Repository
 from backend.app.repositories.in_memory_repository import InMemoryRepository
+from backend.app.services.belief import LOCATION, BeliefUpdater, ClaimResult
+from backend.app.services.claims import ClaimEvaluator
 from backend.app.services.entity_registry import EntityRegistry, Resolution
+from backend.app.services.evidence_policy import Claim, EvidencePolicy, evidence_integrity, grade, infer_source_type
+from backend.app.services.freshness import FreshnessPolicyRegistry
 from backend.app.services.relations import RelationService
 from backend.app.services.spatial import AnchorRegistry
 
-LOCATION = "location"
+LOCATION_DECISIONS = frozenset({ClaimDecision.NEW, ClaimDecision.SUPERSEDE, ClaimDecision.RESOLVE})
 
 
 class DuplicateObservationError(ValueError):
@@ -34,14 +45,6 @@ class EntityNotFoundError(ValueError):
     pass
 
 
-def default_freshness_policies() -> Dict[str, FreshnessPolicy]:
-    return {
-        LOCATION: FreshnessPolicy(volatility=VolatilityClass.MEDIUM, ttl_seconds=86400.0),
-        "configuration": FreshnessPolicy(volatility=VolatilityClass.LOW, ttl_seconds=604800.0),
-        "power": FreshnessPolicy(volatility=VolatilityClass.HIGH, ttl_seconds=300.0),
-    }
-
-
 class WorldStateEngine:
     def __init__(
         self,
@@ -49,32 +52,65 @@ class WorldStateEngine:
         anchors: Optional[AnchorRegistry] = None,
         registry: Optional[EntityRegistry] = None,
         relations: Optional[RelationService] = None,
+        freshness: Optional[FreshnessPolicyRegistry] = None,
+        policy: Optional[EvidencePolicy] = None,
     ):
         self.repo: Repository = repository or InMemoryRepository()
         self.anchors = anchors or AnchorRegistry(self.repo)
         self.registry = registry or EntityRegistry(self.repo, self.anchors)
         self.relations = relations or RelationService(self.repo)
+        self.freshness = freshness or FreshnessPolicyRegistry()
+        self.policy = policy or EvidencePolicy(self.freshness)
+        self.claims = ClaimEvaluator(self.repo, self.freshness)
+        self.belief = BeliefUpdater(self.repo, self.freshness, self.policy, self.claims)
 
     # ------------------------------------------------------------------ evidence
     def record_evidence(
         self,
-        source_type: str,
+        source_type: Union[SourceType, str],
         source_reference: str,
         timestamp: datetime,
         quality: float = 1.0,
         authority: float = 1.0,
         provenance: Optional[Dict[str, Any]] = None,
+        source: Optional[str] = None,
+        content: Optional[Dict[str, Any]] = None,
+        subject: Any = None,
     ) -> Evidence:
+        if isinstance(source_type, SourceType):
+            resolved_type, source_name = source_type, source or source_type.value.lower()
+        else:
+            resolved_type, source_name = infer_source_type(source_type), source or source_type
         evidence = Evidence(
             id=generate_id("evi"),
-            source_type=source_type,
+            source_type=resolved_type,
+            source=source_name,
             source_reference=source_reference,
             timestamp=timestamp,
             quality=quality,
             authority=authority,
             provenance=provenance or {},
+            content=content or {},
         )
+        evidence.integrity_reference = evidence_integrity(evidence, subject if subject is not None else evidence.content)
         return self.repo.save_evidence(evidence)
+
+    def verify_evidence(self, evidence_id: str) -> bool:
+        """Recompute the integrity hash (security: detect tampered memory records)."""
+        evidence = self.repo.get_evidence(evidence_id)
+        if evidence is None:
+            return False
+        subject: Any = evidence.content
+        if evidence.content.get("kind") == "observation":
+            obs = self.repo.get_observation(evidence.source_reference)
+            if obs is None:
+                return False
+            subject = self._observation_subject(obs)
+        return evidence_integrity(evidence, subject) == evidence.integrity_reference
+
+    @staticmethod
+    def _observation_subject(obs: Observation) -> Dict[str, Any]:
+        return obs.model_dump(mode="json", exclude={"resolutions"})
 
     # --------------------------------------------------------------- observation
     def record_observation(self, observation: Observation) -> List[Event]:
@@ -82,16 +118,18 @@ class WorldStateEngine:
             raise DuplicateObservationError(f"Observation {observation.id} already recorded")
 
         with self.repo.transaction():
-            self.repo.save_observation(observation)
+            observation.source_type = observation.source_type or infer_source_type(observation.source)
             evidence = self.record_evidence(
-                source_type=observation.source,
+                source_type=observation.source_type,
+                source=observation.source,
                 source_reference=observation.id,
                 timestamp=observation.timestamp,
                 quality=observation.quality,
                 authority=observation.authority,
                 provenance=observation.provenance,
+                content={"kind": "observation", "detections": len(observation.observed_entities)},
+                subject=self._observation_subject(observation),
             )
-            status = classify_source_status(observation.source, observation.authority)
             self._touch_session(observation)
 
             events: List[Event] = []
@@ -101,13 +139,10 @@ class WorldStateEngine:
             for idx, observed in enumerate(observation.observed_entities):
                 res = self.registry.resolve(observed, exclude=matched)
                 if res.is_match:
-                    entity = self.repo.get_entity(res.entity_id)  # type: ignore[arg-type]
-                    assert entity is not None
-                    events.extend(self._update_entity(entity, observed, observation, evidence, status))
-                    entity_id = entity.id
+                    entity_id, new_events = self._update_entity(res.entity_id, observed, observation, evidence)  # type: ignore[arg-type]
                 else:
-                    entity_id, new_events = self._create_entity(observed, observation, evidence, status, res)
-                    events.extend(new_events)
+                    entity_id, new_events = self._create_entity(observed, observation, evidence, res)
+                events.extend(new_events)
                 matched.add(entity_id)
                 if observed.candidate_entity_id:
                     resolved_ids.setdefault(observed.candidate_entity_id, entity_id)
@@ -124,6 +159,7 @@ class WorldStateEngine:
                 )
 
             # Relations last, so targets can refer to detections in the same observation.
+            status = grade(observation.source_type, observation.quality, observation.authority)
             for observed, resolution in zip(observation.observed_entities, resolutions):
                 for rel in observed.relations:
                     events.extend(
@@ -142,16 +178,6 @@ class WorldStateEngine:
             self.repo.save_observation(observation)
             return events
 
-    def _touch_session(self, observation: Observation) -> None:
-        if not observation.session_id:
-            return
-        session = self.repo.get_session(observation.session_id) or Session(
-            id=observation.session_id, started_at=observation.timestamp
-        )
-        if session.last_observation_at is None or observation.timestamp > session.last_observation_at:
-            session.last_observation_at = observation.timestamp
-        self.repo.save_session(session)
-
     def register_entity(self, observed: ObservedEntity, observation: Observation) -> Entity:
         """Explicit registration still goes through evidence (ADR-001): it is recorded as
         an observation from its declared source so the initial state is traceable."""
@@ -165,50 +191,46 @@ class WorldStateEngine:
         assert entity is not None
         return entity
 
-    def _create_entity(
-        self,
-        observed: ObservedEntity,
-        observation: Observation,
-        evidence: Evidence,
-        status: EpistemicStatus,
-        resolution: Resolution,
-    ) -> Tuple[str, List[Event]]:
-        entity_id = resolution.entity_id or generate_id(f"entity_{observed.type}")
-        current_state: Dict[str, Any] = {}
+    @staticmethod
+    def _claims_of(observed: ObservedEntity) -> Dict[str, Any]:
+        claims: Dict[str, Any] = {}
         if observed.location:
-            current_state[LOCATION] = observed.location
-        current_state.update(observed.attributes)
-        attribute_statuses = {attr: status for attr in current_state}
+            claims[LOCATION] = observed.location
+        claims.update(observed.attributes)
+        return claims
 
+    def _touch_session(self, observation: Observation) -> None:
+        if not observation.session_id:
+            return
+        session = self.repo.get_session(observation.session_id) or Session(
+            id=observation.session_id, started_at=observation.timestamp
+        )
+        if session.last_observation_at is None or observation.timestamp > session.last_observation_at:
+            session.last_observation_at = observation.timestamp
+        self.repo.save_session(session)
+
+    def _create_entity(
+        self, observed: ObservedEntity, observation: Observation, evidence: Evidence, resolution: Resolution
+    ):
         entity = Entity(
-            id=entity_id,
+            id=resolution.entity_id or generate_id(f"entity_{observed.type}"),
             type=observed.type,
             name=observed.name or observed.type,
             canonical_attributes=dict(observed.identifiers),
             geometry=observed.geometry,
             anchor=observed.anchor or observed.location,
-            current_state=current_state,
-            attribute_statuses=attribute_statuses,
-            status=aggregate_status(attribute_statuses.values()),
+            status=EpistemicStatus.UNKNOWN,
             observed_at=observation.timestamp,
-            freshness_policies=default_freshness_policies(),
             evidence_refs=[evidence.id],
             identity_status=resolution.identity_status,
             identity_candidates=list(resolution.candidates),
             created_at=observation.timestamp,
             updated_at=observation.timestamp,
         )
-        for attr, val in current_state.items():
-            sv = StateVersion(
-                entity_id=entity.id,
-                attribute=attr,
-                value=val,
-                status=status,
-                valid_from=observation.timestamp,
-                supported_by=[evidence.id],
-            )
-            self.repo.save_state_version(sv)
-            entity.history_refs.append(sv.id)
+        quality = observation.quality * observed.confidence
+        for attr, value in self._claims_of(observed).items():
+            self.belief.apply_claim(entity, attr, Claim(value, evidence, quality), emit=False)
+        self.belief.materialize(entity, observation.timestamp)
         self.repo.save_entity(entity)
 
         events = [
@@ -218,7 +240,7 @@ class WorldStateEngine:
                     event_type=EventType.OBJECT_ADDED,
                     entity_id=entity.id,
                     before_state=None,
-                    after_state=dict(current_state),
+                    after_state=dict(entity.current_state),
                     evidence_refs=[evidence.id],
                     description=f"Entity {entity.id} ({entity.name}) added to world state.",
                 )
@@ -244,77 +266,109 @@ class WorldStateEngine:
             )
         return entity.id, events
 
-    def _update_entity(
-        self,
-        entity: Entity,
-        observed: ObservedEntity,
-        observation: Observation,
-        evidence: Evidence,
-        status: EpistemicStatus,
-    ) -> List[Event]:
-        entity.observed_at = observation.timestamp
-        entity.updated_at = observation.timestamp
-        if evidence.id not in entity.evidence_refs:
-            entity.evidence_refs.append(evidence.id)
+    def _update_entity(self, entity_id: str, observed: ObservedEntity, observation: Observation, evidence: Evidence):
+        entity = self._require_entity(entity_id)
+        quality = observation.quality * observed.confidence
+        events: List[Event] = []
+        for attr, value in self._claims_of(observed).items():
+            result = self.belief.apply_claim(entity, attr, Claim(value, evidence, quality))
+            events.extend(result.events)
+            if attr == LOCATION and result.decision in LOCATION_DECISIONS:
+                entity.anchor = observed.anchor or value
         for key, value in observed.identifiers.items():
             entity.canonical_attributes.setdefault(key, value)  # resolution guarantees no conflict
         if observed.geometry is not None:
             entity.geometry = observed.geometry
-
-        claims: Dict[str, Any] = {}
-        if observed.location:
-            claims[LOCATION] = observed.location
-        claims.update(observed.attributes)
-
-        events: List[Event] = []
-        for attr, new_val in claims.items():
-            old_val = entity.current_state.get(attr)
-            if old_val == new_val:
-                continue
-            self._close_open_version(entity.id, attr, observation.timestamp)
-            sv = StateVersion(
-                entity_id=entity.id,
-                attribute=attr,
-                value=new_val,
-                status=status,
-                valid_from=observation.timestamp,
-                supported_by=[evidence.id],
-            )
-            self.repo.save_state_version(sv)
-            entity.history_refs.append(sv.id)
-            entity.current_state[attr] = new_val
-            entity.attribute_statuses[attr] = status
-
-            if attr == LOCATION:
-                entity.anchor = observed.anchor or new_val
-                event_type = EventType.OBJECT_MOVED
-                description = f"Entity {entity.id} moved from {old_val} to {new_val}."
-            else:
-                event_type = EventType.OBJECT_STATE_CHANGED
-                description = f"Entity {entity.id} attribute '{attr}' changed from {old_val} to {new_val}."
-            events.append(
-                self.repo.save_event(
-                    Event(
-                        timestamp=observation.timestamp,
-                        event_type=event_type,
-                        entity_id=entity.id,
-                        before_state={attr: old_val},
-                        after_state={attr: new_val},
-                        evidence_refs=[evidence.id],
-                        description=description,
-                    )
-                )
-            )
-
-        entity.status = aggregate_status(entity.attribute_statuses.values())
+        entity.observed_at = max(entity.observed_at, observation.timestamp)
+        entity.updated_at = max(entity.updated_at, observation.timestamp)
+        # Materialise at the latest known time: a late-arriving old observation must not
+        # rewind the cached current view.
+        self.belief.materialize(entity, entity.updated_at)
         self.repo.save_entity(entity)
-        return events
+        return entity.id, events
 
-    def _close_open_version(self, entity_id: str, attribute: str, at: datetime) -> None:
-        for sv in self.repo.get_state_versions_for_entity(entity_id, attribute=attribute):
-            if sv.valid_to is None:
-                sv.valid_to = at
-                self.repo.save_state_version(sv)
+    # ------------------------------------------------- claims from other sources
+    def assert_claim(
+        self,
+        entity_id: str,
+        attribute: str,
+        value: Any,
+        source: str,
+        timestamp: datetime,
+        source_type: Optional[SourceType] = None,
+        quality: float = 1.0,
+        authority: float = 1.0,
+        source_reference: Optional[str] = None,
+        provenance: Optional[Dict[str, Any]] = None,
+    ) -> ClaimResult:
+        """A claim from a record, a person or an inference (not a perception frame)."""
+        with self.repo.transaction():
+            entity = self._require_entity(entity_id)
+            evidence = self.record_evidence(
+                source_type=source_type or infer_source_type(source),
+                source=source,
+                source_reference=source_reference or f"claim:{entity_id}.{attribute}",
+                timestamp=timestamp,
+                quality=quality,
+                authority=authority,
+                provenance=provenance,
+                content={"kind": "claim", "entity_id": entity_id, "attribute": attribute, "value": value},
+            )
+            result = self.belief.apply_claim(entity, attribute, Claim(value, evidence, quality))
+            if attribute == LOCATION and result.decision in LOCATION_DECISIONS:
+                entity.anchor = value
+            entity.updated_at = max(entity.updated_at, timestamp)
+            self.belief.materialize(entity, entity.updated_at)
+            self.repo.save_entity(entity)
+            return result
+
+    def record_intervention(
+        self,
+        entity_id: str,
+        timestamp: datetime,
+        description: str,
+        attributes: Optional[List[str]] = None,
+        source: str = "user",
+        source_type: SourceType = SourceType.USER_STATEMENT,
+        provenance: Optional[Dict[str, Any]] = None,
+    ) -> List[Event]:
+        """A known intervention (someone worked on the entity) invalidates the affected
+        attributes and everything depending on them (spec §10 invalidation triggers)."""
+        with self.repo.transaction():
+            self._require_entity(entity_id)
+            evidence = self.record_evidence(
+                source_type=source_type,
+                source=source,
+                source_reference=f"intervention:{entity_id}",
+                timestamp=timestamp,
+                provenance=provenance,
+                content={"kind": "intervention", "entity_id": entity_id, "attributes": attributes, "description": description},
+            )
+            return self.belief.invalidate(
+                entity_id, attributes, timestamp, f"intervention: {description}", evidence_refs=[evidence.id]
+            )
+
+    def add_dependency(
+        self,
+        dependent_entity_id: str,
+        dependent_attribute: str,
+        depends_on_entity_id: str,
+        depends_on_attribute: str,
+        created_at: datetime,
+        reason: Optional[str] = None,
+    ) -> ClaimDependency:
+        self._require_entity(dependent_entity_id)
+        self._require_entity(depends_on_entity_id)
+        return self.repo.save_dependency(
+            ClaimDependency(
+                dependent_entity_id=dependent_entity_id,
+                dependent_attribute=dependent_attribute,
+                depends_on_entity_id=depends_on_entity_id,
+                depends_on_attribute=depends_on_attribute,
+                reason=reason,
+                created_at=created_at,
+            )
+        )
 
     # ------------------------------------------------------------- contradiction
     def record_contradiction(
@@ -324,66 +378,28 @@ class WorldStateEngine:
         conflicting_value: Any,
         evidence: Evidence,
     ) -> Event:
-        """Rule 2.8: contradictions are retained, never silently resolved."""
-        entity = self._require_entity(entity_id)
+        """Record a contradiction detected outside the policy (e.g. by an auditor)."""
         with self.repo.transaction():
-            current_val = entity.current_state.get(attribute)
-            entity.attribute_statuses[attribute] = EpistemicStatus.CONTRADICTED
-            entity.status = aggregate_status(entity.attribute_statuses.values())
-            if evidence.id not in entity.evidence_refs:
-                entity.evidence_refs.append(evidence.id)
-
-            conflict_sv = StateVersion(
-                entity_id=entity.id,
-                attribute=attribute,
-                value=conflicting_value,
-                status=EpistemicStatus.CONTRADICTED,
-                valid_from=evidence.timestamp,
-                supported_by=[evidence.id],
-                invalidation_reason=f"Conflicts with existing value: {current_val}",
-            )
-            self.repo.save_state_version(conflict_sv)
-            entity.history_refs.append(conflict_sv.id)
+            entity = self._require_entity(entity_id)
+            event = self.belief.force_conflict(entity, attribute, Claim(conflicting_value, evidence, evidence.quality))
+            entity.updated_at = max(entity.updated_at, evidence.timestamp)
+            self.belief.materialize(entity, entity.updated_at)
             self.repo.save_entity(entity)
-
-            return self.repo.save_event(
-                Event(
-                    timestamp=evidence.timestamp,
-                    event_type=EventType.EVIDENCE_CONFLICT,
-                    entity_id=entity.id,
-                    before_state={attribute: current_val},
-                    after_state={attribute: f"CONFLICT({current_val} vs {conflicting_value})"},
-                    evidence_refs=[evidence.id],
-                    description=(
-                        f"Contradiction detected on {entity.id}.{attribute}: "
-                        f"'{current_val}' vs '{conflicting_value}'"
-                    ),
-                )
-            )
+            return event
 
     # ----------------------------------------------------------------- freshness
     def evaluate_freshness(self, entity_id: str, as_of: datetime) -> Dict[str, EpistemicStatus]:
-        """Rule 2.6: freshness is attribute-specific. Expired attributes become STALE."""
+        """Attribute statuses at ``as_of`` (rule 2.6). The cached view on the entity is
+        refreshed only for evaluations at or after its last update."""
         entity = self._require_entity(entity_id)
-        with self.repo.transaction():
-            for attr, policy in entity.freshness_policies.items():
-                if policy.ttl_seconds is None:
-                    continue
-                versions = self.repo.get_state_versions_for_entity(entity_id, attribute=attr)
-                if not versions:
-                    continue
-                latest = versions[-1]
-                age_seconds = (as_of - latest.valid_from).total_seconds()
-                if age_seconds > policy.ttl_seconds:
-                    entity.attribute_statuses[attr] = EpistemicStatus.STALE
-                    latest.status = EpistemicStatus.STALE
-                    latest.invalidation_reason = (
-                        f"TTL expired ({age_seconds:.0f}s > {policy.ttl_seconds:.0f}s)"
-                    )
-                    self.repo.save_state_version(latest)
+        assessment = self.claims.assess_entity(entity_id, as_of)
+        assert assessment is not None
+        statuses = {a: c.status for a, c in assessment.attributes.items()}
+        if as_of >= entity.updated_at:
+            entity.attribute_statuses.update(statuses)
             entity.status = aggregate_status(entity.attribute_statuses.values())
             self.repo.save_entity(entity)
-        return dict(entity.attribute_statuses)
+        return statuses
 
     # ---------------------------------------------------------------- world diff
     def compute_world_diff(
