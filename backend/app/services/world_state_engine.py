@@ -44,6 +44,10 @@ class EntityNotFoundError(ValueError):
     pass
 
 
+class SimulationEvidenceRejected(ValueError):
+    """Counterfactual premises must never enter real memory (ADR-029)."""
+
+
 class WorldStateEngine:
     def __init__(
         self,
@@ -53,8 +57,11 @@ class WorldStateEngine:
         relations: Optional[RelationService] = None,
         freshness: Optional[FreshnessPolicyRegistry] = None,
         policy: Optional[EvidencePolicy] = None,
+        sandbox: bool = False,
     ):
         self.repo: Repository = repository or InMemoryRepository()
+        # Only a counterfactual sandbox may accept SIMULATION evidence.
+        self.sandbox = sandbox
         self.anchors = anchors or AnchorRegistry(self.repo)
         self.registry = registry or EntityRegistry(self.repo, self.anchors)
         self.relations = relations or RelationService(self.repo)
@@ -80,6 +87,8 @@ class WorldStateEngine:
             resolved_type, source_name = source_type, source or source_type.value.lower()
         else:
             resolved_type, source_name = infer_source_type(source_type), source or source_type
+        if resolved_type == SourceType.SIMULATION and not self.sandbox:
+            raise SimulationEvidenceRejected("SIMULATION evidence is only accepted inside a counterfactual sandbox")
         evidence = Evidence(
             id=generate_id("evi"),
             source_type=resolved_type,

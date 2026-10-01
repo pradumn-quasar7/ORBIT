@@ -101,5 +101,15 @@ reasoning, embedding), and wall-clock timings.
 | multi_user_handoff | Multi-user handoff | task resumption success |
 | adversarial_memory | Adversarial memory / misleading low-authority evidence | stale-claim rate |
 
-Known gaps for v0.2: counterfactual replay (Experiment H), AR utility (G), latency on
+## 7. Experiment H — counterfactual decisions vs static replay
+
+World: task T12 interrupted after steps 5–6. Five futures can occur during the
+interruption (nothing; valve reopened; spare pumps swapped; label reads CP-150;
+procedure revised), each with a known safe next step. Policies commit before the
+future is known: *static replay* plans once from the stored state; *counterfactual*
+builds a contingency table from sensitivity probes. Metrics: decision quality
+(prepared decision = safe decision) and unsafe pre-commitment rate. Implemented in
+`backend/app/evaluation/counterfactual_eval.py`; reported in `latest.md`.
+
+Known gaps: randomised futures for Experiment H, AR utility (G), latency on
 real perception, and larger randomised scene generators for statistical power.

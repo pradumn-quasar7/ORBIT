@@ -16,7 +16,7 @@ from backend.app.domain.models import (
     Evidence,
 )
 from backend.app.domain.types import ClaimDecision, SourceType
-from backend.app.services.world_state_engine import EntityNotFoundError
+from backend.app.services.world_state_engine import EntityNotFoundError, SimulationEvidenceRejected
 
 router = APIRouter()
 
@@ -101,6 +101,8 @@ def assert_claim(body: ClaimRequest, svc: OrbitServices = Depends(get_services))
         )
     except EntityNotFoundError as exc:
         _not_found(exc)
+    except SimulationEvidenceRejected as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
     return ClaimResponse(
         decision=result.decision,
         reason=result.reason,

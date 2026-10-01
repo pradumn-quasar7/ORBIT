@@ -1,8 +1,9 @@
 # ORBIT Project Status
 
 ## Current Phase
-**ORBIT v0.1 complete** — Phases 0–9 done (spec §48 steps 1–17 and 20). All spec §36 MVP
-acceptance criteria are covered by passing tests (table below). Next: v0.2 (see *Next*).
+**Phase 10 — Replay and counterfactual sandbox (COMPLETE).** ORBIT v0.1 (Phases 0–9) is
+complete; Phase 10 adds the spec §48 step 19 backend (VR replay/counterfactuals without
+VR hardware). All spec §36 MVP acceptance criteria are covered by passing tests.
 
 ## Phase Log
 
@@ -137,6 +138,20 @@ acceptance criteria are covered by passing tests (table below). Next: v0.2 (see 
 | search coverage precision | 1.00 | unobserved ⇒ removed | 0.67 |
 | entity persistence / false merges | 0.97 / 0.00 | — (abstains on an undecidable look-alike) | — |
 
+### Phase 10 — Replay and counterfactual sandbox (§48 step 19, §33, Experiment H)
+**Planned**
+- Rebuild the world as known at any past instant; replay history frame by frame; isolated sandboxes for what-if premises; compare decisions against static replay; sensitivity analysis; Experiment H.
+- Exit (spec §35 Phase 7): stored world states support controlled what-if experiments.
+
+**Implemented**
+- `services/grading.py` (`status_from_supports`), `services/projection.py` (`WorldProjector`), `services/sandbox.py` (`fork`), `services/counterfactual.py` (`apply_variation`, `compare`, `sensitivity`, `SandboxRegistry`), `services/replay.py`, `evaluation/counterfactual_eval.py` (Experiment H, included in the bench report).
+- `SourceType.SIMULATION`; real engine rejects it (`SimulationEvidenceRejected`, HTTP 403).
+- Domain: `VariationKind`, `Variation`, `SandboxInfo`, `DecisionComparison`, `CounterfactualReport`, `SensitivityItem`, `SensitivityReport`, `ReplayFrame`.
+- API: `GET /replay`, `POST/GET /sandboxes`, `GET/DELETE /sandboxes/{id}`, `POST /sandboxes/{id}/variations`, `GET /sandboxes/{id}/snapshot`, `POST /sandboxes/{id}/queries`, `POST /sandboxes/{id}/tasks/{task}/resume`, `POST /counterfactuals/compare`, `POST /tasks/{id}/sensitivity`.
+- **Bug fixed in the existing read path (found by the fidelity probe):** as-of questions cited later evidence and later status upgrades; now only evidence known at the time counts (ADR-012 amendment).
+- Tests: `test_counterfactuals.py` — projection identical to the source at every event instant of the flagship scenario; roll-back of later knowledge; premise kinds; real-world isolation; compare; sensitivity; replay; Experiment H. ADR-028…030.
+- **Result (Experiment H):** decision quality static replay 0.20 vs counterfactual 1.00; unsafe pre-commitments 0.80 vs 0.00.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -172,17 +187,18 @@ acceptance criteria are covered by passing tests (table below). Next: v0.2 (see 
 - Real camera perception requires plugging a detector into `DetectionPerceptionProvider`; none is bundled.
 - In-memory vector index is rebuilt per process; a pgvector `RetrievalProvider` is needed for large memories.
 - PostgreSQL is supported by the schema but CI runs on SQLite only (no Postgres available in this environment).
-- AR client and VR counterfactual replay (§48 steps 18–19) are intentionally deferred.
+- AR client and VR rendering (§48 steps 18–19 front-ends) are deferred; the replay/counterfactual backend exists.
+- Sandboxes are process-local and disposable (not persisted); each probe copies the world, which is fine for small workspaces but not optimised.
 
-## Next (v0.2 candidates)
+## Next (candidates)
 1. Identity merge workflow (verify an AMBIGUOUS entity → merge histories with provenance).
-2. Counterfactual replay: clone a `WorldSnapshot` into a sandbox repository and vary one claim (Experiment H foundation, no VR needed).
-3. Randomised scenario generator for ORBIT-BENCH with seeds and confidence intervals.
-4. Real detector integration (e.g. OWL-ViT/YOLO) behind the adapter + latency measurement on real frames.
-5. API authentication and workspace separation.
+2. Randomised scenario generator for ORBIT-BENCH (and for Experiment H futures) with seeds and confidence intervals.
+3. Real detector integration (e.g. OWL-ViT/YOLO) behind the adapter + latency measurement on real frames.
+4. API authentication and workspace separation.
+5. Use sensitivity results in active perception (rank "decision-critical" checks first).
 
 ## Tests
-- `.venv/bin/pytest` → 345 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 367 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
 ## Architecture Decisions
@@ -197,10 +213,12 @@ acceptance criteria are covered by passing tests (table below). Next: v0.2 (see 
 - ADR-023 Marginal information-gain perception · ADR-024 Action safety boundary
 - ADR-025 Vendor-neutral perception, hash-only retention · ADR-026 Static dashboard
 - ADR-027 ORBIT-BENCH design and metric definitions
+- ADR-028 World projection · ADR-012 amendment (no future evidence in as-of reads) · ADR-029 Sandbox isolation / SIMULATION evidence · ADR-030 Sensitivity analysis + Experiment H
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.
-- G (AR utility) and H (VR counterfactuals) — deferred.
+- H (counterfactual decisions vs static replay) — runnable, reported in the bench.
+- G (AR utility) — deferred (needs an AR client).
 
 ## Last Updated
-- 2026-10-01
+- 2026-10-02

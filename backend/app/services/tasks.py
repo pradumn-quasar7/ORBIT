@@ -37,6 +37,20 @@ PROCEDURE_ATTRIBUTE = "procedure_revision"
 DONE = (StepStatus.COMPLETED, StepStatus.SKIPPED)
 
 
+def replay_task_state(task: Task, events: List[Event], as_of: datetime) -> TaskStateView:
+    """Task and step progress at ``as_of``, replayed from TASK_PROGRESS_CHANGED events."""
+    status = TaskStatus.PENDING
+    steps = {s.id: StepStatus.PENDING for s in task.steps}
+    for e in events:
+        if e.timestamp > as_of or not e.after_state:
+            continue
+        if "task_status" in e.after_state:
+            status = TaskStatus(e.after_state["task_status"])
+        if "step_id" in e.after_state and e.after_state["step_id"] in steps:
+            steps[e.after_state["step_id"]] = StepStatus(e.after_state["status"])
+    return TaskStateView(task_id=task.id, as_of=as_of, status=status, steps=steps)
+
+
 class TaskError(ValueError):
     pass
 
@@ -230,16 +244,7 @@ class TaskService:
         task = self._require_task(task_id)
         if as_of < task.created_at:
             return None
-        status = TaskStatus.PENDING
-        steps = {s.id: StepStatus.PENDING for s in task.steps}
-        for e in self.repo.get_events_for_task(task_id):
-            if e.timestamp > as_of or not e.after_state:
-                continue
-            if "task_status" in e.after_state:
-                status = TaskStatus(e.after_state["task_status"])
-            if "step_id" in e.after_state and e.after_state["step_id"] in steps:
-                steps[e.after_state["step_id"]] = StepStatus(e.after_state["status"])
-        return TaskStateView(task_id=task_id, as_of=as_of, status=status, steps=steps)
+        return replay_task_state(task, self.repo.get_events_for_task(task_id), as_of)
 
     def history(self, task_id: str) -> List[Event]:
         self._require_task(task_id)

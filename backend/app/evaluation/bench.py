@@ -395,6 +395,7 @@ class BenchReport(BaseModel):
     counts: Dict[str, Dict[str, Tuple[float, float]]]
     latency: Dict[str, Dict[str, float]]
     per_scenario: List[ScenarioResult]
+    experiments: Dict[str, Any] = Field(default_factory=dict)  # e.g. Experiment H
 
 
 def _pct(values: List[float], q: float) -> float:
@@ -453,4 +454,15 @@ def to_markdown(report: BenchReport) -> str:
     for n in names:
         row = report.latency[n]
         lines.append(f"| {n} | " + " | ".join(f"{row[k]:.2f}" for k in sorted(row)) + " |")
+    h = report.experiments.get("H")
+    if h:
+        lines += ["", "## Experiment H — counterfactual decisions vs static replay", "",
+                  "| Future during interruption | Safe next step | ORBIT on return | Static replay | Counterfactual |", "|---|---|---|---|---|"]
+        lines += [f"| {r['future']} | {r['safe_next'] or 'wait/verify'} | {r['orbit_on_return'] or 'wait/verify'} | "
+                  f"{r['static_replay'] or 'wait/verify'} | {r['counterfactual'] or 'wait/verify'} |" for r in h["futures"]]
+        dq, un = h["decision_quality"], h["unsafe_precommitment_rate"]
+        lines += ["", f"- Decision quality: static replay **{dq['static_replay']:.2f}**, counterfactual **{dq['counterfactual']:.2f}**",
+                  f"- Unsafe pre-commitments ↓: static replay **{un['static_replay']:.2f}**, counterfactual **{un['counterfactual']:.2f}**",
+                  f"- Decision-critical claims found by sensitivity analysis: {', '.join(h['decision_critical_claims'])}",
+                  "- Caveat: futures are hand-specified; this measures contingency planning in a controlled world."]
     return "\n".join(lines) + "\n"

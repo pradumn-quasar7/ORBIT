@@ -11,10 +11,11 @@ from typing import Any, Iterable, List, Optional, Set, Tuple
 
 from backend.app.domain.models import Conflict, Entity, Event, StateVersion, SupportRef
 from backend.app.domain.status import aggregate_status
-from backend.app.domain.types import ClaimDecision, ClaimDisposition, EpistemicStatus, EventType, EvidenceChannel
+from backend.app.domain.types import ClaimDecision, ClaimDisposition, EpistemicStatus, EventType
 from backend.app.repositories.base import Repository
 from backend.app.services.claims import ClaimEvaluator
-from backend.app.services.evidence_policy import STRONG_STRENGTH, WEAK_STRENGTH, Claim, EvidencePolicy, channel
+from backend.app.services.evidence_policy import WEAK_STRENGTH, Claim, EvidencePolicy
+from backend.app.services.grading import independently_corroborated, status_from_supports  # noqa: F401 (re-export)
 from backend.app.services.freshness import FreshnessPolicyRegistry
 
 LOCATION = "location"
@@ -391,12 +392,7 @@ class BeliefUpdater:
     @staticmethod
     def _independently_corroborated(version: StateVersion) -> bool:
         """Two distinct strong direct sources agreeing count as strong evidence."""
-        sources = {
-            s.source
-            for s in version.support
-            if s.strength >= STRONG_STRENGTH and channel(s.source_type) == EvidenceChannel.DIRECT
-        }
-        return len(sources) >= 2
+        return independently_corroborated(version.support)
 
     def _close(self, version: StateVersion, at: datetime, disposition: Optional[ClaimDisposition] = None) -> None:
         version.valid_to = at

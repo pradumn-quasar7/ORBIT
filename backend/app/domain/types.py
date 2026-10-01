@@ -62,6 +62,7 @@ class SourceType(str, Enum):
     TOOL_OUTPUT = "TOOL_OUTPUT"
     MANUAL_VERIFICATION = "MANUAL_VERIFICATION"
     INFERENCE = "INFERENCE"
+    SIMULATION = "SIMULATION"  # a what-if premise; accepted only inside a counterfactual sandbox
     OTHER = "OTHER"
 
 
@@ -194,3 +195,14 @@ class OutcomeResult(str, Enum):
     VERIFIED = "VERIFIED"
     FAILED = "FAILED"
     UNVERIFIED = "UNVERIFIED"
+
+
+class VariationKind(str, Enum):
+    """What-if premises a counterfactual sandbox can apply (spec §33)."""
+
+    SET_ATTRIBUTE = "SET_ATTRIBUTE"  # "what if M17's configuration were R7?"
+    MOVE = "MOVE"  # "what if the cable were on the shelf?"
+    REMOVE = "REMOVE"  # "what if the spare pump were gone?"
+    INVALIDATE = "INVALIDATE"  # "what if we could no longer trust the valve reading?"
+    SET_RELATION = "SET_RELATION"  # "what if C4 were unplugged?"
+    ADVANCE_TIME = "ADVANCE_TIME"  # "what if we came back two hours later?"

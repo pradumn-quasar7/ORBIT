@@ -18,6 +18,15 @@ from backend.app.services.world_state_engine import WorldStateEngine
 CAUSAL_EVIDENCE_SOURCES = frozenset({SourceType.TOOL_OUTPUT, SourceType.MANUAL_VERIFICATION})
 
 
+def qualifies_as_causal_test(kind: str, source_type: SourceType, quality: float, authority: float) -> bool:
+    return (
+        kind == "causal_test"
+        and source_type in CAUSAL_EVIDENCE_SOURCES
+        and authority >= VERIFIED_AUTHORITY
+        and quality >= 0.5
+    )
+
+
 class CausalOrderError(ValueError):
     pass
 
@@ -92,12 +101,7 @@ class HypothesisService:
             )
             hypothesis.evidence_refs.append(evidence.id)
             hypothesis.updated_at = max(hypothesis.updated_at, at)
-            qualifies = (
-                kind == "causal_test"
-                and stype in CAUSAL_EVIDENCE_SOURCES
-                and authority >= VERIFIED_AUTHORITY
-                and quality >= 0.5
-            )
+            qualifies = qualifies_as_causal_test(kind, stype, quality, authority)
             if qualifies:
                 hypothesis.status = HypothesisStatus.SUPPORTED if supports else HypothesisStatus.REFUTED
                 hypothesis.epistemic_status = EpistemicStatus.VERIFIED

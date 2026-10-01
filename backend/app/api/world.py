@@ -18,7 +18,11 @@ from backend.app.domain.models import (
     StateVersion,
     WorldDiff,
 )
-from backend.app.services.world_state_engine import DuplicateObservationError, EntityNotFoundError
+from backend.app.services.world_state_engine import (
+    DuplicateObservationError,
+    EntityNotFoundError,
+    SimulationEvidenceRejected,
+)
 
 router = APIRouter()
 
@@ -74,6 +78,8 @@ def create_entity(body: EntityRegistration, svc: OrbitServices = Depends(get_ser
     )
     try:
         return svc.engine.register_entity(observed, observation)
+    except SimulationEvidenceRejected as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
 
@@ -118,6 +124,8 @@ def record_observation(obs: Observation, svc: OrbitServices = Depends(get_servic
         return svc.engine.record_observation(obs)
     except DuplicateObservationError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+    except SimulationEvidenceRejected as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
 
 
 @router.get("/observations/{observation_id}", response_model=Observation)
