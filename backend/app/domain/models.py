@@ -1,12 +1,13 @@
 import uuid
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.app.core.time import UTCDateTime
 from backend.app.domain.types import (
     AbsenceStatus,
     ClaimDisposition,
+    ConditionState,
     EpistemicStatus,
     EventType,
     FreshnessState,
@@ -23,6 +24,13 @@ from backend.app.domain.types import (
 
 def generate_id(prefix: str = "id") -> str:
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
+
+
+class StrictInput(BaseModel):
+    """Inputs that become evidence reject unknown fields: a misspelt field must fail
+    loudly rather than silently drop information (e.g. `quality` on a detection)."""
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class Geometry(BaseModel):
@@ -166,13 +174,13 @@ class Entity(BaseModel):
     updated_at: UTCDateTime
 
 
-class ObservedRelation(BaseModel):
+class ObservedRelation(StrictInput):
     relation_type: str  # on, inside, connected_to, adjacent_to, ...
     target: str  # entity id (or candidate id within the same observation) or anchor id
     present: bool = True  # False = relation observed NOT to hold (e.g. cable seen unplugged)
 
 
-class ObservedEntity(BaseModel):
+class ObservedEntity(StrictInput):
     candidate_entity_id: Optional[str] = None
     type: str
     name: Optional[str] = None
@@ -199,7 +207,7 @@ class EntityResolution(BaseModel):
     reason: str = ""
 
 
-class Observation(BaseModel):
+class Observation(StrictInput):
     id: str = Field(default_factory=lambda: generate_id("obs"))
     timestamp: UTCDateTime
     source: str
@@ -235,7 +243,7 @@ class Session(BaseModel):
 
 
 # ----------------------------------------------------------------------- tasks
-class StateCondition(BaseModel):
+class StateCondition(StrictInput):
     """A claim about the world a step requires (precondition) or establishes
     (postcondition), e.g. ``valve_v2.state == "closed"`` at least OBSERVED."""
 
@@ -452,3 +460,59 @@ class TaskStateView(BaseModel):
     as_of: UTCDateTime
     status: TaskStatus
     steps: Dict[str, StepStatus]
+
+
+# ------------------------------------------------------------- task continuity
+class ConditionCheck(BaseModel):
+    condition: StateCondition
+    state: ConditionState
+    observed_value: Any = None
+    status: EpistemicStatus
+    reason: str
+    evidence_refs: List[str] = Field(default_factory=list)
+
+
+class ObservationRequest(BaseModel):
+    """A targeted request for new evidence (spec §13), e.g. "Show the model label"."""
+
+    entity_id: str
+    attribute: str
+    reason: str
+    instruction: str
+    current_status: EpistemicStatus
+    last_known_value: Any = None
+    for_steps: List[str] = Field(default_factory=list)
+    score: Optional[float] = None  # filled by an active-perception policy (Phase 7)
+
+
+class StepAssessment(BaseModel):
+    step_id: str
+    step_order: int
+    description: str
+    status: StepStatus
+    completion_status: EpistemicStatus
+    ready: bool
+    blockers: List[str] = Field(default_factory=list)
+    preconditions: List[ConditionCheck] = Field(default_factory=list)
+    postconditions: List[ConditionCheck] = Field(default_factory=list)
+
+
+class ResumePlan(BaseModel):
+    """Output of the resume protocol (spec §11): what is still verified, what changed,
+    what must be observed, and only then the next supported step."""
+
+    task_id: str
+    as_of: UTCDateTime
+    checkpoint: UTCDateTime
+    resumed_by: Optional[str] = None
+    world_changes: List[WorldChange] = Field(default_factory=list)
+    invalidated_steps: List[str] = Field(default_factory=list)
+    blocked_steps: List[str] = Field(default_factory=list)
+    unresolved: List[ConditionCheck] = Field(default_factory=list)
+    requested_observations: List[ObservationRequest] = Field(default_factory=list)
+    procedure_revision: Optional[Dict[str, Any]] = None
+    steps: List[StepAssessment] = Field(default_factory=list)
+    next_step: Optional[StepAssessment] = None
+    can_continue: bool
+    task_status: TaskStatus
+    message: str

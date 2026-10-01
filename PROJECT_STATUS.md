@@ -1,7 +1,7 @@
 # ORBIT Project Status
 
 ## Current Phase
-Phase 4 — World diff (COMPLETE). Next: Phase 5 — Task continuity.
+Phase 5 — Task continuity (COMPLETE). Next: Phase 6 — Grounded query agent.
 
 ## Phase Log
 
@@ -70,11 +70,22 @@ Phase 4 — World diff (COMPLETE). Next: Phase 5 — Task continuity.
 - Migration `0005`. ADR-017, ADR-018. Tests: `test_world_diff.py` incl. Experiment B-0.
 - **Result (Experiment B-0):** snapshot diff P = 1.00 / R = 1.00 (8 changes); event-log baseline P = 0.71 / R = 0.62.
 
+### Phase 5 — Task continuity (§48 steps 11–12)
+**Planned**
+- Dependency checks, invalidation of affected steps, resume protocol (§11), procedure-revision handling, precondition gating.
+- Exit: interrupted tasks resume from verified state.
+
+**Implemented**
+- Domain: `ConditionState`, `ConditionCheck`, `ObservationRequest`, `StepAssessment`, `ResumePlan`; `StepSpec.step_order`; strict input models.
+- `services/conditions.py` (`ConditionEvaluator`, attribute-aware `instruction_for`), `TaskService.assess_step`, `ancestors`, `revision_check`, `resume`, `acknowledge_revision`; gated `start_step`; evidence-checked `complete_step`.
+- API: `POST /tasks/{id}/resume`, `POST /tasks/{id}/procedure/acknowledge`. ADR-019, ADR-020.
+- Tests: `test_task_continuity.py` — spec §11 T12 scenario: no-change resume, reopened valve invalidates step 5, stale outcome blocks + requests observation, unverified model number ("move closer so I can read the model number"), contradicted precondition, procedure revision, multi-user handoff, branching DAG; every plan checked for unsafe continuation.
+
 ## Known Issues / Limitations (to be addressed in named phases)
 - Ambiguous entities cannot yet be merged into their true identity after verification (future work).
 
 ## Tests
-- `.venv/bin/pytest` → 201 passed.
+- `.venv/bin/pytest` → 227 passed.
 
 ## Recent Architecture Decisions
 - ADR-005 Repository boundary + SQL store · ADR-006 UTC time · ADR-007 §48 phase order · ADR-008 status classification
@@ -82,11 +93,13 @@ Phase 4 — World diff (COMPLETE). Next: Phase 5 — Task continuity.
 - ADR-011 Evidence policy · ADR-012 Read-time freshness · ADR-013 Invalidation propagation
 - ADR-014 Memory as read model · ADR-015 Step progress vs completion evidence · ADR-016 Causal hypotheses
 - ADR-017 Snapshot world diff · ADR-018 Coverage-validated absence
+- ADR-019 Resume protocol · ADR-020 Strict evidence inputs
 
 ## Research Experiments Enabled
 - Experiment A (persistent identity): re-ID decisions are auditable per observation.
 - Experiment C (stale-memory resistance): freshness gate + ablation switch.
 - Conflict handling ablation: `detect_contradictions=False` (last writer wins).
+- Experiment D (task resumption): resume plans expose blocked/invalidated steps and requests.
 - Experiment E (evidence and causality): causal hypotheses gated on causal-test evidence.
 - Experiment B-0 (world diff) runnable as a test with precision/recall; negative-search ablations available.
 

@@ -137,3 +137,9 @@ class SearchResult(str, Enum):
     ALL_FOUND = "ALL_FOUND"
     NOT_FOUND_IN_COVERAGE = "NOT_FOUND_IN_COVERAGE"  # at least one target confirmed absent
     INCONCLUSIVE = "INCONCLUSIVE"  # targets missing but coverage did not validate absence
+
+
+class ConditionState(str, Enum):
+    SATISFIED = "SATISFIED"  # supported by sufficient, fresh evidence and holds
+    VIOLATED = "VIOLATED"  # supported by evidence and does NOT hold
+    UNSUPPORTED = "UNSUPPORTED"  # evidence stale, unknown, contradicted or below required status
