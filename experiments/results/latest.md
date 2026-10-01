@@ -1,7 +1,7 @@
 # ORBIT-BENCH results
 
-- **run_at**: `2026-10-01T21:22:12+00:00`
-- **git_commit**: `63c05ff+dirty`
+- **run_at**: `2026-10-01T21:22:29+00:00`
+- **git_commit**: `15bdf5e`
 - **schema_revision**: `0007`
 - **scenario_catalog**: `v0.1`
 - **scenarios**: `12`
@@ -65,13 +65,13 @@
 
 | Variant | observation_ms_p50 | observation_ms_p95 | query_ms_p50 | query_ms_p95 |
 |---|---|---|---|---|
-| orbit | 0.58 | 1.25 | 0.33 | 0.39 |
-| no_freshness | 0.58 | 1.15 | 0.26 | 0.32 |
-| last_writer_wins | 0.58 | 1.09 | 0.27 | 0.31 |
-| unobserved_removed | 0.58 | 1.14 | 0.26 | 0.31 |
-| no_evidence_gate | 0.61 | 1.16 | 0.29 | 0.82 |
-| event_log_diff | 0.59 | 1.10 | 0.26 | 0.32 |
-| naive_resume | 0.57 | 1.12 | 0.27 | 0.31 |
+| orbit | 0.58 | 1.21 | 0.33 | 0.40 |
+| no_freshness | 0.56 | 1.09 | 0.24 | 0.30 |
+| last_writer_wins | 0.56 | 1.07 | 0.26 | 0.29 |
+| unobserved_removed | 0.57 | 1.07 | 0.27 | 0.31 |
+| no_evidence_gate | 0.57 | 1.08 | 0.27 | 0.29 |
+| event_log_diff | 0.56 | 1.06 | 0.25 | 0.29 |
+| naive_resume | 0.57 | 1.15 | 0.25 | 0.30 |
 
 ## Experiment H — counterfactual decisions vs static replay
 
