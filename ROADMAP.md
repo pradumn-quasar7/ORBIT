@@ -1,49 +1,47 @@
 # ORBIT Development Roadmap
 
-- [x] **Phase 0 — Framing, Repository & World State Engine Foundations**
-  - Project documentation, ADRs, coding guidelines.
-  - Domain models: Entity, Observation, Evidence, StateVersion, Event, Relation, Task, TaskStep, WorldDiff, SearchCoverage.
-  - Epistemic status tracking (`OBSERVED`, `VERIFIED`, `INFERRED`, `STALE`, `CONTRADICTED`, `UNKNOWN`).
-  - Core World State Engine: observation ingestion, entity persistence, state transition, evidence provenance, movement detection (`OBJECT_MOVED`), structured world diff.
-  - Comprehensive automated tests for acceptance criteria.
+Phase order follows the spec §48 dependency order (ADR-007). Each phase ends with
+tests, updated `PROJECT_STATUS.md` / `DECISIONS.md`, and a merge to `main`.
 
-- [ ] **Phase 1 — Spatial Persistence & Entity Re-Identification**
-  - Spatial anchors, coordinate frames, bounding boxes.
-  - Entity re-identification heuristics (labels, visual embeddings, spatial proximity).
-  - Multi-session object identity preservation.
+- [x] **Phase 0 — Foundations** (§48 steps 1–3)
+  - Docs, ADRs, benchmark protocol draft, domain models, epistemic statuses.
+  - Repository boundary; SQL schema + Alembic migrations; UTC time; injectable clock.
+  - Remediation of the initial engine (status classification, atomic ingestion, evidence-backed registration).
 
-- [ ] **Phase 2 — Memory Core (Temporal, Spatial, Episodic, Procedural)**
-  - Time-series queries ("Where was M17 at 10:00 AM?").
-  - Spatial queries ("What is on Bench B3?").
-  - Episodic session indexing and timeline generation.
+- [ ] **Phase 1 — Spatial persistence** (steps 4–6)
+  - Anchor hierarchy, entity registry with deterministic re-identification (explicit id, strong identifiers, signature + spatial proximity, ambiguity handling).
+  - Relation maintenance (`on`, `inside`, `connected_to`, …) with validity intervals; sessions.
+  - Exit: same object persists across two observations/sessions.
 
-- [ ] **Phase 3 — Evidence Engine & Contextual Freshness**
-  - Attribute-specific volatility classes (low, medium, high).
-  - Time-to-live and condition-based invalidation rules.
-  - Contradiction resolution workflows.
+- [ ] **Phase 2 — Evidence engine** (steps 7–8)
+  - Evidence source types, provenance, integrity hashes; evidence policy (supersede / corroborate / contradict / unconfirmed).
+  - Attribute-level freshness policy engine; interventions; invalidation propagation; contradiction lifecycle.
+  - Exit: unsupported current-state claims are blocked or downgraded.
 
-- [ ] **Phase 4 — Longitudinal World Diff & Change Detection**
-  - Deep diff between arbitrary timestamps / sessions.
-  - Typed change events: `OBJECT_MOVED`, `OBJECT_STATE_CHANGED`, `OBJECT_ADDED`, `OBJECT_REMOVED_OR_UNOBSERVED`, `RELATION_CHANGED`.
-  - Negative search / coverage tracking.
+- [ ] **Phase 3 — Memory core** (step 9)
+  - Temporal (state as-of), spatial (what is at an anchor), episodic (sessions), procedural (task persistence), causal-hypothesis memory.
+  - Exit: history and task state are queryable.
 
-- [ ] **Phase 5 — Agentic Active Perception**
-  - Information gain heuristic.
-  - Targeted observation prompts ("Point camera at pump label").
-  - Cost vs uncertainty optimization.
+- [ ] **Phase 4 — World diff** (step 10)
+  - Snapshot diff `Diff(B_a, B_b)`, typed changes, relation changes, conflicts.
+  - Negative search memory + coverage-validated absence; precision/recall evaluation.
+  - Exit: known scene changes are measured with precision/recall.
 
-- [ ] **Phase 6 — Task Resumption & Safety Boundary**
-  - Task state machine and dependency graph.
-  - Invalidation of steps when prerequisites change.
-  - Human authorization gates for actions.
+- [ ] **Phase 5 — Task continuity** (steps 11–12)
+  - Task graph (dependencies, preconditions, postconditions), interruptions, resume protocol (§11).
+  - Exit: interrupted tasks resume from verified state.
 
-- [ ] **Phase 7 — Grounded Query Agent & Hybrid Retrieval**
-  - Structured state lookup + vector search hybrid.
-  - Grounded response contract with claims, freshness, and evidence citations.
+- [ ] **Phase 6 — Grounded query agent** (steps 13–14)
+  - Replaceable Embedding/Retrieval/Reasoning providers; hybrid retrieval; response contract (§15) with claims, freshness, evidence, conflicts, abstention.
 
-- [ ] **Phase 8 — Web Inspection Dashboard**
-  - Visual display of current world state, change log, task progress, and evidence.
+- [ ] **Phase 7 — Active perception + action safety** (step 15, §16)
+  - Information-gain heuristic vs fixed/random policies; targeted observation requests.
+  - Observe → verify prerequisites → authorize → act → verify outcome → outcome memory.
 
-- [ ] **Phase 9 — Benchmarking (ORBIT-BENCH) & Ablations**
-  - Controlled dataset and evaluation runners.
-  - Ablation matrix.
+- [ ] **Phase 8 — Perception adapter + web inspection UI** (steps 16–17)
+  - `PerceptionProvider` / device adapter; evidence minimisation; inspection dashboard (§31).
+
+- [ ] **Phase 9 — ORBIT-BENCH + ablations** (step 20)
+  - Scenario runner, metrics, ablation matrix, run metadata.
+
+- [ ] **Later** — AR client (step 18), VR replay/counterfactuals (step 19), wearable clients, pilot study.

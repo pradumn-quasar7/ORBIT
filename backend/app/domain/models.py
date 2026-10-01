@@ -1,8 +1,8 @@
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 import uuid
 
+from backend.app.core.time import UTCDateTime
 from backend.app.domain.types import EpistemicStatus, EventType, VolatilityClass
 
 def generate_id(prefix: str = "id") -> str:
@@ -22,7 +22,7 @@ class Evidence(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("evi"))
     source_type: str  # visual, audio, user_statement, digital_registry, system_event
     source_reference: str
-    timestamp: datetime
+    timestamp: UTCDateTime
     quality: float = 1.0  # 0.0 to 1.0
     authority: float = 1.0  # 0.0 to 1.0 (authoritative digital registry = 1.0, noisy webcam = 0.5)
     provenance: Dict[str, Any] = Field(default_factory=dict)
@@ -35,14 +35,14 @@ class StateVersion(BaseModel):
     attribute: str
     value: Any
     status: EpistemicStatus = EpistemicStatus.OBSERVED
-    valid_from: datetime
-    valid_to: Optional[datetime] = None
+    valid_from: UTCDateTime
+    valid_to: Optional[UTCDateTime] = None
     supported_by: List[str] = Field(default_factory=list)  # Evidence IDs
     invalidation_reason: Optional[str] = None
 
 class Event(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("evt"))
-    timestamp: datetime
+    timestamp: UTCDateTime
     event_type: EventType
     entity_id: Optional[str] = None
     relation_id: Optional[str] = None
@@ -56,8 +56,8 @@ class Relation(BaseModel):
     source_entity: str
     relation_type: str  # on, connected_to, inside, adjacent
     target_entity: str
-    valid_from: datetime
-    valid_to: Optional[datetime] = None
+    valid_from: UTCDateTime
+    valid_to: Optional[UTCDateTime] = None
     status: EpistemicStatus = EpistemicStatus.OBSERVED
     evidence_refs: List[str] = Field(default_factory=list)
 
@@ -71,12 +71,13 @@ class Entity(BaseModel):
     current_state: Dict[str, Any] = Field(default_factory=dict)
     attribute_statuses: Dict[str, EpistemicStatus] = Field(default_factory=dict)
     status: EpistemicStatus = EpistemicStatus.OBSERVED
-    observed_at: datetime
+    observed_at: UTCDateTime
     freshness_policies: Dict[str, FreshnessPolicy] = Field(default_factory=dict)
     evidence_refs: List[str] = Field(default_factory=list)
     history_refs: List[str] = Field(default_factory=list)
-    created_at: datetime
-    updated_at: datetime
+    permissions: Dict[str, Any] = Field(default_factory=dict)
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
 
 class ObservedEntity(BaseModel):
     candidate_entity_id: Optional[str] = None
@@ -90,7 +91,7 @@ class ObservedEntity(BaseModel):
 
 class Observation(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("obs"))
-    timestamp: datetime
+    timestamp: UTCDateTime
     source: str
     session_id: Optional[str] = None
     raw_reference: Optional[str] = None
@@ -110,15 +111,15 @@ class TaskStep(BaseModel):
     preconditions: Dict[str, Any] = Field(default_factory=dict)
     evidence_refs: List[str] = Field(default_factory=list)
     blocked_reason: Optional[str] = None
-    completed_at: Optional[datetime] = None
+    completed_at: Optional[UTCDateTime] = None
 
 class Task(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("task"))
     goal: str
     status: str = "IN_PROGRESS"  # PENDING, IN_PROGRESS, COMPLETED, BLOCKED
     steps: List[TaskStep] = Field(default_factory=list)
-    created_at: datetime
-    updated_at: datetime
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
 
 class WorldChange(BaseModel):
     change_type: EventType
@@ -127,19 +128,19 @@ class WorldChange(BaseModel):
     before: Any = None
     after: Any = None
     evidence_refs: List[str] = Field(default_factory=list)
-    timestamp: datetime
+    timestamp: UTCDateTime
 
 class WorldDiff(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("diff"))
-    baseline_timestamp: Optional[datetime] = None
-    target_timestamp: datetime
+    baseline_timestamp: Optional[UTCDateTime] = None
+    target_timestamp: UTCDateTime
     changes: List[WorldChange] = Field(default_factory=list)
-    created_at: datetime
+    created_at: UTCDateTime
 
 class SearchCoverage(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("cov"))
     region: str
-    timestamp: datetime
+    timestamp: UTCDateTime
     visibility_conditions: Dict[str, Any] = Field(default_factory=dict)
     searched_for: List[str] = Field(default_factory=list)
     result: str  # FOUND, NOT_FOUND_IN_COVERAGE
