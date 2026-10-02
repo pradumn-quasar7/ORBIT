@@ -167,6 +167,8 @@ VARIANTS: List[Variant] = [
     Variant(name="no_evidence_gate", description="Answers from memory without the evidence gate", config=OrbitConfig(gate_evidence=False)),
     Variant(name="event_log_diff", description="Event replay instead of snapshot diff", diff_mode="event_log"),
     Variant(name="naive_resume", description="Resume = first unfinished step (no task graph checks)", naive_resume=True),
+    Variant(name="no_risk_grading", description="HIGH-risk steps accept any supportable evidence",
+            config=OrbitConfig(risk_grading_enabled=False)),
 ]
 
 METRICS = {

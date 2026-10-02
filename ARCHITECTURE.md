@@ -61,7 +61,8 @@ backend/app/
     belief.py             decision execution, conflicts, invalidation propagation, absence
     memory.py             temporal / spatial / episodic recall
     tasks.py              task graph, readiness, resume protocol
-    conditions.py         pre/postcondition checks, observation instructions
+    conditions.py         pre/postcondition checks (risk-aware), observation instructions
+    risk.py               risk-graded verification bar
     hypotheses.py         causal hypothesis memory
     search.py             negative search memory + coverage policy
     world_diff.py         Diff(B_a, B_b) + event-log baseline

@@ -14,10 +14,10 @@ def report():
 
 def test_catalog_covers_spec_scenarios():
     ids = {s.id for s in SCENARIOS}
-    assert len(SCENARIOS) == 12
+    assert len(SCENARIOS) == 13
     assert {"object_relocation", "configuration_change", "partial_observation", "contradiction", "stale_state",
             "negative_search", "task_interruption", "causal_temptation", "same_looking_objects", "object_replaced",
-            "multi_user_handoff", "adversarial_memory"} == ids
+            "multi_user_handoff", "adversarial_memory", "high_risk_stale_premise"} == ids
 
 
 def test_full_orbit_meets_ground_truth(report):
@@ -46,6 +46,8 @@ def test_full_orbit_meets_ground_truth(report):
         ("event_log_diff", "diff_precision"),
         ("naive_resume", "unsafe_continuation_rate"),
         ("naive_resume", "blocked_step_detection"),
+        ("no_risk_grading", "unsafe_continuation_rate"),
+        ("no_risk_grading", "task_resumption_success"),
     ],
 )
 def test_each_ablation_degrades_its_metric(report, variant, metric):

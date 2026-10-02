@@ -19,6 +19,7 @@ from backend.app.domain.types import (
     PrincipalKind,
     QueryKind,
     ResolutionMethod,
+    RiskLevel,
     Scope,
     SearchResult,
     SourceType,
@@ -278,6 +279,7 @@ class TaskStep(BaseModel):
     description: str
     status: StepStatus = StepStatus.PENDING
     completion_status: EpistemicStatus = EpistemicStatus.UNKNOWN
+    risk: RiskLevel = RiskLevel.MEDIUM
     dependencies: List[str] = Field(default_factory=list)  # step ids that must be COMPLETED first
     preconditions: List[StateCondition] = Field(default_factory=list)
     postconditions: List[StateCondition] = Field(default_factory=list)
@@ -478,6 +480,11 @@ class ConditionCheck(BaseModel):
     status: EpistemicStatus
     reason: str
     evidence_refs: List[str] = Field(default_factory=list)
+    last_supported_at: Optional[UTCDateTime] = None
+    risk: RiskLevel = RiskLevel.LOW  # the bar this check was evaluated at
+    # True when the evidence would satisfy a lower-risk bar but not this one (fresh
+    # OBSERVED, not verified or recent). Only such shortfalls can be waived by a person.
+    risk_shortfall: bool = False
 
 
 class ObservationRequest(BaseModel):
@@ -651,6 +658,9 @@ class Authorization(BaseModel):
     approved: bool
     at: UTCDateTime
     reason: Optional[str] = None
+    # Prerequisites ("entity.attribute") the authoriser knowingly accepted below the
+    # risk bar. Recorded for audit; only risk shortfalls can be waived.
+    waived: List[str] = Field(default_factory=list)
 
 
 class ActionRequest(BaseModel):
@@ -661,6 +671,7 @@ class ActionRequest(BaseModel):
     action: str
     target_entity_ids: List[str] = Field(default_factory=list)
     consequential: bool = True
+    risk: RiskLevel = RiskLevel.MEDIUM
     prerequisites: List[StateCondition] = Field(default_factory=list)
     expected_outcome: List[StateCondition] = Field(default_factory=list)
     requested_by: str

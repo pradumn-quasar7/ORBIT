@@ -156,6 +156,7 @@ class QueryKind(str, Enum):
     CONTINUE = "CONTINUE"
     WHAT_HAPPENED = "WHAT_HAPPENED"
     WHY = "WHY"
+    SAFETY = "SAFETY"  # "is it safe to …?" — readiness of a step at its risk level
     UNKNOWN = "UNKNOWN"
 
 
@@ -206,3 +207,11 @@ class VariationKind(str, Enum):
     INVALIDATE = "INVALIDATE"  # "what if we could no longer trust the valve reading?"
     SET_RELATION = "SET_RELATION"  # "what if C4 were unplugged?"
     ADVANCE_TIME = "ADVANCE_TIME"  # "what if we came back two hours later?"
+
+
+class RiskLevel(str, Enum):
+    """How consequential acting on a step/action is (spec §2.10, §16)."""
+
+    LOW = "LOW"  # prerequisites must hold on supportable evidence
+    MEDIUM = "MEDIUM"  # as LOW; unverified prerequisites are recommended for a check
+    HIGH = "HIGH"  # prerequisites must be VERIFIED or re-observed within the pre-action window

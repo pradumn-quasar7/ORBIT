@@ -224,7 +224,7 @@ class ActivePerceptionPlanner:
                 a = self.tasks.assess_step(task, step, as_of)
                 checks = list(a.preconditions)
                 for anc in self.tasks.ancestors(task, step):
-                    checks += [self.tasks.conditions.check(c, as_of) for c in anc.postconditions]
+                    checks += [self.tasks.conditions.check(c, as_of, step.risk) for c in anc.postconditions]
                 for chk in checks:
                     if chk.state == ConditionState.UNSUPPORTED:
                         needs.setdefault((chk.condition.entity_id, chk.condition.attribute), []).append(step.id)
