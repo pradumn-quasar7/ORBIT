@@ -194,3 +194,12 @@ def test_risk_api(client):
                                                               "reason": "locked out", "waive": ["v.state"]}).json()
     assert ok["status"] == "AUTHORIZED" and ok["authorization"]["waived"] == ["v.state"]
     assert client.get("/tasks/T").json()["steps"][1]["risk"] == "HIGH"
+
+
+def test_safety_question_is_about_the_step_not_an_ambiguous_object(svc):
+    """Regression (found in the live demo): with two valves, "the valve" is ambiguous,
+    but a safety question is about a task step and must not stop to ask which one."""
+    svc.engine.record_observation(Observation(id="other", timestamp=at(5), source="camera", observed_entities=[
+        ObservedEntity(candidate_entity_id="spare_valve", type="valve", location="shelf")]))
+    r = svc.agent.answer("Is it safe to cut the coolant line next to the valve?", at(120))
+    assert r.summary.startswith("Not yet for step 2 (cut the coolant line, HIGH risk)")

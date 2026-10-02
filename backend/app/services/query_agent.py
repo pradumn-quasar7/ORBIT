@@ -87,7 +87,10 @@ class QueryAgent:
 
     def answer(self, query: str, at: datetime) -> GroundedResponse:
         intent = self.reasoning.interpret(query, self.vocabulary(), at)
-        if intent.ambiguous and not intent.entity_ids and intent.kind not in (QueryKind.WHAT_CHANGED, QueryKind.CONTINUE):
+        # Questions about the world or a task step do not need a single object resolved.
+        if intent.ambiguous and not intent.entity_ids and intent.kind not in (
+            QueryKind.WHAT_CHANGED, QueryKind.CONTINUE, QueryKind.SAFETY
+        ):
             return self._finish(self._clarify(intent, at))
         handler = {
             QueryKind.WHERE_IS: self._where_is,
