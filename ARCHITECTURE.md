@@ -67,7 +67,7 @@ backend/app/
     world_diff.py         Diff(B_a, B_b) + event-log baseline
     hybrid_retrieval.py   semantic recall over structured records
     query_agent.py        grounded query agent (spec §15 contract)
-    active_perception.py  information-gain observation planning
+    active_perception.py  observation planning (information gain / decision value)
     actions.py            action safety boundary + outcome memory
     perception_gateway.py frame ingestion, retention, redaction
     dashboard.py          inspection read model
@@ -76,7 +76,7 @@ backend/app/
     sandbox.py            fork a world into an isolated sandbox
     counterfactual.py     what-if premises, decision comparison, sensitivity analysis
     replay.py             frame-by-frame history
-  evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner), counterfactual_eval.py (Experiment H)
+  evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner), counterfactual_eval.py (Experiment H), decision_perception_eval.py (Experiment F2)
   api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual)
   main.py          create_app(repository, clock) factory; lazy module-level `app`
 database/          Alembic migrations 0001–0007, migrate.py

@@ -34,6 +34,7 @@
       ...[
         ["entities", "tracked entities"],
         ["uncertain_claims", "claims needing a fresh look"],
+        ["decision_critical_checks", "unverified facts the next step rests on"],
         ["open_conflicts", "open conflicts"],
         ["open_tasks", "open tasks"],
       ].map(([k, label]) => el("div", { class: "count" }, el("b", {}, s.counts[k] ?? 0), el("span", {}, label)))
@@ -62,7 +63,8 @@
     fillList(
       $("observations"),
       s.requested_observations,
-      (o) => el("li", {}, o.instruction, " ", el("span", { class: "hint mono" }, `score ${o.score.toFixed(2)} · ${o.resolves.join(", ")}`)),
+      (o) => el("li", {}, o.decision_critical ? el("span", { class: "badge STALE" }, "next step depends on it") : null, o.decision_critical ? " " : null,
+        o.instruction, " ", el("span", { class: "hint mono" }, `score ${o.score.toFixed(2)} · ${o.resolves.join(", ")}`)),
       "Nothing to refresh — current claims are supported."
     );
     fillList(

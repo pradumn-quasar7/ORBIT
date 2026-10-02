@@ -1,9 +1,9 @@
 # ORBIT Project Status
 
 ## Current Phase
-**Phase 10 — Replay and counterfactual sandbox (COMPLETE).** ORBIT v0.1 (Phases 0–9) is
-complete; Phase 10 adds the spec §48 step 19 backend (VR replay/counterfactuals without
-VR hardware). All spec §36 MVP acceptance criteria are covered by passing tests.
+**Phase 11 — Decision-aware active perception (COMPLETE).** ORBIT v0.1 (Phases 0–9) is
+complete; Phase 10 added replay and counterfactual sandboxes; Phase 11 makes perception
+decision-aware. All spec §36 MVP acceptance criteria are covered by passing tests.
 
 ## Phase Log
 
@@ -152,6 +152,19 @@ VR hardware). All spec §36 MVP acceptance criteria are covered by passing tests
 - Tests: `test_counterfactuals.py` — projection identical to the source at every event instant of the flagship scenario; roll-back of later knowledge; premise kinds; real-world isolation; compare; sensitivity; replay; Experiment H. ADR-028…030.
 - **Result (Experiment H):** decision quality static replay 0.20 vs counterfactual 1.00; unsafe pre-commitments 0.80 vs 0.00.
 
+### Phase 11 — Decision-aware active perception (value of information)
+**Planned**
+- Non-mutating resume preview; decision-critical facts per next step; a policy ranking looks by value for the next decision; pre-action checks in "Continue."; Experiment F2.
+- Exit: before a consequential step ORBIT asks to check the facts it rests on — even fresh ones — and this measurably averts unsafe continuation.
+
+**Implemented**
+- `TaskService.preview` (rolled-back transaction), `TaskService.decision_critical`; `ResumePlan.decision_critical` / `recommended_checks`; `Repository.in_transaction`.
+- `UncertainClaim.decision_critical` / `decision_weight` / `critical_for_steps`; `DecisionAwarePolicy`; `PerceptionPlan.weighting`; blocked-on claims count as critical.
+- Agent: "Continue." adds "Before you start, confirm: …"; dashboard ranks by decision value with a "next step depends on it" badge and a decision-critical count.
+- API: `POST /tasks/{id}/preview`; `policy: "decision_aware"` on `POST /active-perception/plan`.
+- `evaluation/decision_perception_eval.py` (Experiment F2), included in the bench report. ADR-031, ADR-032. Tests: `test_decision_aware_perception.py`.
+- **Result (Experiment F2):** unsafe continuation 0.00 decision-aware vs 1.00 information gain / fixed / random (k = 1–3); safe work kept 1.00 for all; stale clutter refreshed after one look 1 vs 8 (decision-aware catches up at k = 2).
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -195,10 +208,10 @@ VR hardware). All spec §36 MVP acceptance criteria are covered by passing tests
 2. Randomised scenario generator for ORBIT-BENCH (and for Experiment H futures) with seeds and confidence intervals.
 3. Real detector integration (e.g. OWL-ViT/YOLO) behind the adapter + latency measurement on real frames.
 4. API authentication and workspace separation.
-5. Use sensitivity results in active perception (rank "decision-critical" checks first).
+5. Use decision-critical checks in the action-safety flow (recommend verification before authorising a consequential action).
 
 ## Tests
-- `.venv/bin/pytest` → 367 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 378 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
 ## Architecture Decisions
@@ -214,10 +227,12 @@ VR hardware). All spec §36 MVP acceptance criteria are covered by passing tests
 - ADR-025 Vendor-neutral perception, hash-only retention · ADR-026 Static dashboard
 - ADR-027 ORBIT-BENCH design and metric definitions
 - ADR-028 World projection · ADR-012 amendment (no future evidence in as-of reads) · ADR-029 Sandbox isolation / SIMULATION evidence · ADR-030 Sensitivity analysis + Experiment H
+- ADR-031 Decision-aware perception (value of information) · ADR-032 Rolled-back preview
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.
 - H (counterfactual decisions vs static replay) — runnable, reported in the bench.
+- F2 (decision-aware vs uncertainty-driven perception) — runnable, reported in the bench.
 - G (AR utility) — deferred (needs an AR client).
 
 ## Last Updated

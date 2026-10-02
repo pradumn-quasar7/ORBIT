@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from backend.app.evaluation.bench import VARIANTS, run_bench, to_markdown  # noqa: E402
 from backend.app.evaluation.counterfactual_eval import run_experiment_h  # noqa: E402
+from backend.app.evaluation.decision_perception_eval import run_experiment_f2  # noqa: E402
 from backend.app.providers.embedding import HashingEmbeddingProvider  # noqa: E402
 from backend.app.providers.reasoning import RuleBasedReasoningProvider  # noqa: E402
 from backend.app.providers.retrieval import InMemoryVectorIndex  # noqa: E402
@@ -60,6 +61,7 @@ def main() -> None:
         variants = [v for v in VARIANTS if v.name in wanted]
     report = run_bench(SCENARIOS, variants, metadata())
     report.experiments["H"] = run_experiment_h()
+    report.experiments["F2"] = run_experiment_f2()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "latest.json").write_text(report.model_dump_json(indent=2))

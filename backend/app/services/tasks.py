@@ -67,6 +67,10 @@ class PostconditionViolatedError(TaskError):
     pass
 
 
+class _Rollback(Exception):
+    """Internal: discards everything a preview wrote."""
+
+
 class StepSpec(BaseModel):
     id: Optional[str] = None
     step_order: Optional[int] = None  # defaults to position; set to keep a procedure's own numbering
@@ -412,6 +416,17 @@ class TaskService:
                 self._set_task(task, TaskStatus.BLOCKED, at, "resume blocked: evidence or prerequisites missing")
             self.repo.save_task(task)
 
+        critical: List[ConditionCheck] = []
+        checks_first: List[ObservationRequest] = []
+        if next_step is not None:
+            step_obj = next(s for s in task.steps if s.id == next_step.step_id)
+            critical = self.decision_critical(task, step_obj, at, revision)
+            for chk in critical:
+                if chk.state == ConditionState.SATISFIED and chk.status != EpistemicStatus.VERIFIED:
+                    req = self.conditions.request_for(chk, [next_step.step_id])
+                    req.reason = f"step {next_step.step_order} depends on this; it is {chk.status.value.lower()}, not verified"
+                    checks_first.append(req)
+
         rev_info = None
         if revision is not None:
             rev_info = {
@@ -433,6 +448,8 @@ class TaskService:
             procedure_revision=rev_info,
             steps=assessments,
             next_step=next_step,
+            decision_critical=critical,
+            recommended_checks=checks_first,
             can_continue=can_continue,
             task_status=task.status,
             message=self._resume_message(task, checkpoint, changes, invalidated, next_step, list(requests.values()), all_done),
@@ -454,6 +471,37 @@ class TaskService:
         for r in requests:
             parts.append(f"Requested observation: {r.instruction}")
         return " ".join(parts)
+
+    def preview(self, task_id: str, at: datetime) -> ResumePlan:
+        """What ``resume`` would decide, without changing anything: the real protocol
+        runs inside a transaction that is always rolled back (same logic, no writes)."""
+        if self.repo.in_transaction:
+            raise RuntimeError("preview cannot run inside an open transaction (writes could not be discarded)")
+        result: Dict[str, ResumePlan] = {}
+        try:
+            with self.repo.transaction():
+                result["plan"] = self.resume(task_id, at)
+                raise _Rollback
+        except _Rollback:
+            pass
+        return result["plan"]
+
+    def decision_critical(
+        self, task: Task, step: TaskStep, as_of: datetime, revision: Optional[ConditionCheck] = None
+    ) -> List[ConditionCheck]:
+        """Facts the decision to do ``step`` next rests on: its preconditions, the
+        outcomes of its completed prerequisite steps, and the procedure revision."""
+        checks = [self.conditions.check(c, as_of) for c in step.preconditions]
+        for anc in self.ancestors(task, step):
+            if anc.status in DONE:
+                checks += [self.conditions.check(c, as_of) for c in anc.postconditions]
+        revision = revision if revision is not None else self.revision_check(task, as_of)
+        if revision is not None:
+            checks.append(revision)
+        unique: Dict[tuple, ConditionCheck] = {}
+        for chk in checks:
+            unique.setdefault((chk.condition.entity_id, chk.condition.attribute), chk)
+        return list(unique.values())
 
     def acknowledge_revision(self, task_id: str, revision: str, at: datetime, actor: Optional[str] = None) -> Task:
         """A person reviews the task against a new procedure revision (human authority)."""

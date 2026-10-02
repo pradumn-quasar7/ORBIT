@@ -111,5 +111,15 @@ builds a contingency table from sensitivity probes. Metrics: decision quality
 (prepared decision = safe decision) and unsafe pre-commitment rate. Implemented in
 `backend/app/evaluation/counterfactual_eval.py`; reported in `latest.md`.
 
+## 8. Experiment F2 — decision-aware vs uncertainty-driven perception
+
+Task T12 resumed a day after interruption; its critical facts were re-observed
+recently (fresh), eight unrelated shelf objects are two days stale. Hidden truth:
+future A — the valve was reopened; future B — nothing changed. Each policy gets k
+looks in a closed loop (each look reveals the true state of what it covers), then the
+resume preview decides. Metrics: unsafe continuation (A), safe work kept (B), stale
+claims refreshed, looks spent on decision-critical facts. Implemented in
+`backend/app/evaluation/decision_perception_eval.py`.
+
 Known gaps: randomised futures for Experiment H, AR utility (G), latency on
 real perception, and larger randomised scene generators for statistical power.

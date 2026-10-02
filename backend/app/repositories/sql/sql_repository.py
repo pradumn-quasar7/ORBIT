@@ -69,6 +69,10 @@ class SqlRepository(Repository):
             finally:
                 self._local.conn = None
 
+    @property
+    def in_transaction(self) -> bool:
+        return getattr(self._local, "conn", None) is not None
+
     @contextmanager
     def _connection(self) -> Iterator[Connection]:
         conn = getattr(self._local, "conn", None)

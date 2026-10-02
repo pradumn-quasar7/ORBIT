@@ -118,9 +118,13 @@ def build_summary(svc, at: datetime) -> DashboardSummary:
         if t.status != TaskStatus.ABANDONED
     ]
 
-    plan = svc.perception.plan(at, k=5)
+    from backend.app.services.active_perception import DecisionAwarePolicy
+
+    plan = svc.perception.plan(at, DecisionAwarePolicy(), k=5)
+    critical = {f"{c.entity_id}.{c.attribute}" for c in plan.uncertain_claims if c.decision_critical}
     requests = [
-        {"instruction": a.instruction, "resolves": a.resolves, "score": a.score, "action_type": a.action_type.value}
+        {"instruction": a.instruction, "resolves": a.resolves, "score": a.score, "action_type": a.action_type.value,
+         "decision_critical": bool(critical & set(a.resolves))}
         for a in plan.actions
     ]
     return DashboardSummary(
@@ -133,7 +137,8 @@ def build_summary(svc, at: datetime) -> DashboardSummary:
         requested_observations=requests,
         counts={
             "entities": len(rows),
-            "uncertain_claims": len(plan.uncertain_claims),
+            "uncertain_claims": sum(1 for c in plan.uncertain_claims if c.weight > 0),
+            "decision_critical_checks": sum(1 for c in plan.uncertain_claims if c.decision_critical and c.weight == 0),
             "open_conflicts": len(conflicts),
             "open_tasks": sum(1 for t in tasks if t.status not in ("COMPLETED",)),
         },

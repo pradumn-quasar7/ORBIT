@@ -203,6 +203,15 @@ def resume_task(task_id: str, body: TaskResume, svc: OrbitServices = Depends(get
         _task_error(exc)
 
 
+@router.post("/tasks/{task_id}/preview", response_model=ResumePlan)
+def preview_task(task_id: str, body: TaskResume, svc: OrbitServices = Depends(get_services)):
+    """What "Continue." would decide right now — nothing is changed."""
+    try:
+        return svc.tasks.preview(task_id, body.at or svc.clock.now())
+    except TaskError as exc:
+        _task_error(exc)
+
+
 @router.post("/tasks/{task_id}/procedure/acknowledge", response_model=Task)
 def acknowledge_revision(task_id: str, body: RevisionAck, svc: OrbitServices = Depends(get_services)):
     try:
