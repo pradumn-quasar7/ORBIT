@@ -465,4 +465,16 @@ def to_markdown(report: BenchReport) -> str:
                   f"- Unsafe pre-commitments ↓: static replay **{un['static_replay']:.2f}**, counterfactual **{un['counterfactual']:.2f}**",
                   f"- Decision-critical claims found by sensitivity analysis: {', '.join(h['decision_critical_claims'])}",
                   "- Caveat: futures are hand-specified; this measures contingency planning in a controlled world."]
+    f2 = report.experiments.get("F2")
+    if f2:
+        ks = [str(k) for k in f2["ks"]]
+        lines += ["", "## Experiment F2 — decision-aware vs uncertainty-driven perception", "",
+                  f"Valve secretly reopened while {f2['clutter_objects']} unrelated stale objects sit on a shelf; k looks, then resume.", "",
+                  "| Policy | " + " | ".join(f"unsafe@{k} ↓" for k in ks) + " | " + " | ".join(f"stale refreshed@{k}" for k in ks) + " | safe work kept |",
+                  "|---|" + "---|" * (2 * len(ks) + 1)]
+        for name, row in f2["summary"].items():
+            row = {str(k): v for k, v in row.items()}
+            lines.append(f"| {name} | " + " | ".join(f"{row[k]['unsafe_continuation']:.2f}" for k in ks) + " | "
+                         + " | ".join(f"{row[k]['stale_refreshed']:.1f}" for k in ks) + f" | {row[ks[-1]]['safe_work_kept']:.2f} |")
+        lines += ["", "- Random is averaged over 5 seeds. Fixed and random rank uncertain claims only, like information gain."]
     return "\n".join(lines) + "\n"

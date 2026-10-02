@@ -47,4 +47,7 @@ tests, updated `PROJECT_STATUS.md` / `DECISIONS.md`, and a merge to `main`.
 - [x] **Phase 10 — Replay and counterfactual sandbox** (step 19 backend)
   - World projection at any instant, replay frames, isolated what-if sandboxes, decision comparison, sensitivity analysis, Experiment H.
 
+- [x] **Phase 11 — Decision-aware active perception**
+  - Value-of-information policy, resume preview, pre-action checks, Experiment F2.
+
 - [ ] **Later** — AR client (step 18), VR rendering of replay/counterfactuals (step 19 front-end), wearable clients, pilot study.

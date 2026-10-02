@@ -90,6 +90,10 @@ class InMemoryRepository(Repository):
         finally:
             self._depth -= 1
 
+    @property
+    def in_transaction(self) -> bool:
+        return self._depth > 0
+
     def _put(self, store: Dict[str, M], model: M) -> M:
         store[model.id] = _copy(model)  # type: ignore[attr-defined]
         return model

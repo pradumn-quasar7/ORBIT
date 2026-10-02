@@ -35,6 +35,10 @@ class Repository(ABC):
         """Group writes atomically. Nested transactions join the outer one."""
         yield
 
+    @property
+    def in_transaction(self) -> bool:
+        return False
+
     # Entities
     @abstractmethod
     def save_entity(self, entity: Entity) -> Entity: ...

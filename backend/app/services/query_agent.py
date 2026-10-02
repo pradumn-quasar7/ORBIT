@@ -349,12 +349,18 @@ class QueryAgent:
                     )
                 )
         answer = None
+        summary = plan.message
+        requests = list(plan.requested_observations)
         if plan.next_step is not None:
             verb = "Re-verify" if plan.next_step.status.value == "NEEDS_REVERIFICATION" else "Next"
             answer = f"{verb}: step {plan.next_step.step_order} — {plan.next_step.description}."
+            if plan.recommended_checks:
+                # Supported but unverified facts the step rests on: worth one look first.
+                summary += " Before you start, confirm: " + " ".join(r.instruction for r in plan.recommended_checks)
+                requests += plan.recommended_checks
         return self._respond(
-            intent, at, plan.message, answer,
-            claims=claims, changes=plan.world_changes, resume_plan=plan, requested_observations=plan.requested_observations,
+            intent, at, summary, answer,
+            claims=claims, changes=plan.world_changes, resume_plan=plan, requested_observations=requests,
         )
 
     # -------------------------------------------------------- what happened

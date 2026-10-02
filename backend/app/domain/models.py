@@ -521,6 +521,10 @@ class ResumePlan(BaseModel):
     procedure_revision: Optional[Dict[str, Any]] = None
     steps: List[StepAssessment] = Field(default_factory=list)
     next_step: Optional[StepAssessment] = None
+    # Facts the next step rests on, and those worth confirming before acting because
+    # they are supported but not verified (decision-aware perception, Phase 11).
+    decision_critical: List[ConditionCheck] = Field(default_factory=list)
+    recommended_checks: List[ObservationRequest] = Field(default_factory=list)
     can_continue: bool
     task_status: TaskStatus
     message: str
@@ -605,8 +609,11 @@ class UncertainClaim(BaseModel):
     reason: str
     last_known_value: Any = None
     region: Optional[str] = None  # where looking would help
-    weight: float  # uncertainty × relevance
+    weight: float  # uncertainty × task relevance (information gain)
     blocking_steps: List[str] = Field(default_factory=list)
+    decision_critical: bool = False  # the next step of an open task rests on this claim
+    decision_weight: float = 0.0  # value of information for the next decision
+    critical_for_steps: List[str] = Field(default_factory=list)
 
 
 class PlannedObservation(BaseModel):
@@ -624,6 +631,7 @@ class PlannedObservation(BaseModel):
 class PerceptionPlan(BaseModel):
     as_of: UTCDateTime
     policy: str
+    weighting: str = "uncertainty"  # uncertainty | decision_value
     uncertain_claims: List[UncertainClaim]
     total_uncertainty: float
     actions: List[PlannedObservation]

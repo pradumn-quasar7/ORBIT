@@ -43,8 +43,8 @@ def _see(svc, minutes: float, cid: str, type: str, n: List[int], **attributes) -
     ))
 
 
-def build_t12_world() -> OrbitServices:
-    svc = OrbitServices.build(InMemoryRepository())
+def build_t12_world(repository=None) -> OrbitServices:
+    svc = OrbitServices.build(repository if repository is not None else InMemoryRepository())
     n = [0]
     _see(svc, 0, "valve", "valve", n, state="open")
     _see(svc, 0, "pump_old", "pump", n, installed=True)
