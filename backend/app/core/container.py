@@ -17,6 +17,7 @@ from backend.app.services.counterfactual import SandboxRegistry
 from backend.app.services.query_agent import QueryAgent
 from backend.app.services.replay import ReplayService
 from backend.app.services.relations import RelationService
+from backend.app.services.risk import RiskPolicy
 from backend.app.services.evidence_policy import EvidencePolicy
 from backend.app.services.freshness import FreshnessPolicyRegistry
 from backend.app.services.search import SearchPolicy, SearchService
@@ -38,6 +39,7 @@ class OrbitConfig:
     search_policy_enabled: bool = True  # False: any missing search target is "absent"
     treat_unobserved_as_removed: bool = False  # True: not seen ⇒ removed
     gate_evidence: bool = True  # False: answer from memory regardless of evidence
+    risk_grading_enabled: bool = True  # False: HIGH-risk steps accept any supportable evidence
 
 
 @dataclass
@@ -82,11 +84,11 @@ class OrbitServices:
             sandbox=sandbox,
         )
         memory = MemoryService(repo, engine.claims, relations, anchors)
-        tasks = TaskService(repo, engine)
+        tasks = TaskService(repo, engine, RiskPolicy(enabled=config.risk_grading_enabled))
         hypotheses = HypothesisService(repo, engine)
         diff = WorldDiffService(repo, memory, tasks, treat_unobserved_as_removed=config.treat_unobserved_as_removed)
         perception = ActivePerceptionPlanner(repo, engine.claims, anchors, tasks)
-        actions = ActionSafetyService(repo, tasks.conditions)
+        actions = ActionSafetyService(repo, tasks.conditions, tasks)
         actions.ensure_agent_principal(clock.now())
         return cls(
             repo=repo,

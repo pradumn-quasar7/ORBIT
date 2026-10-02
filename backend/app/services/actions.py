@@ -17,7 +17,7 @@ from backend.app.domain.models import (
     Principal,
     StateCondition,
 )
-from backend.app.domain.types import ActionStatus, ConditionState, EventType, OutcomeResult, PrincipalKind, Scope
+from backend.app.domain.types import ActionStatus, ConditionState, EventType, OutcomeResult, PrincipalKind, RiskLevel, Scope
 from backend.app.repositories.base import Repository
 from backend.app.services.conditions import ConditionEvaluator
 
@@ -42,9 +42,10 @@ class InvalidTransition(ActionError):
 
 
 class ActionSafetyService:
-    def __init__(self, repository: Repository, conditions: ConditionEvaluator):
+    def __init__(self, repository: Repository, conditions: ConditionEvaluator, tasks=None):
         self.repo = repository
         self.conditions = conditions
+        self.tasks = tasks  # TaskService: lets an action inherit its task step's prerequisites
 
     # ------------------------------------------------------------ principals
     def ensure_agent_principal(self, at: datetime) -> Principal:
@@ -89,9 +90,14 @@ class ActionSafetyService:
         consequential: bool = True,
         task_id: Optional[str] = None,
         step_id: Optional[str] = None,
+        risk: Optional[RiskLevel] = None,
     ) -> ActionRequest:
         targets = list(target_entity_ids or [])
         self._require(requested_by, Scope.RECOMMEND, targets)
+        inherited, step_risk = self._step_prerequisites(task_id, step_id)
+        if prerequisites is None:
+            prerequisites = inherited
+        risk = risk or step_risk or RiskLevel.MEDIUM
         request = ActionRequest(
             action=action,
             target_entity_ids=targets,
@@ -99,6 +105,7 @@ class ActionSafetyService:
             prerequisites=list(prerequisites or []),
             expected_outcome=list(expected_outcome or []),
             requested_by=requested_by,
+            risk=risk,
             status=ActionStatus.AWAITING_AUTHORIZATION,
             task_id=task_id,
             step_id=step_id,
@@ -122,25 +129,71 @@ class ActionSafetyService:
             self._audit(request, before, at, "prerequisites re-checked")
         return request
 
-    def authorize(self, action_id: str, principal_id: str, approve: bool, at: datetime, reason: Optional[str] = None) -> ActionRequest:
+    def authorize(
+        self,
+        action_id: str,
+        principal_id: str,
+        approve: bool,
+        at: datetime,
+        reason: Optional[str] = None,
+        waive: Optional[List[str]] = None,
+    ) -> ActionRequest:
+        """Approve or deny. Prerequisites are re-verified now. A person may knowingly
+        approve despite *risk shortfalls* (fresh but unverified evidence for a HIGH-risk
+        action) by naming each one in ``waive`` with a reason; stale, unknown,
+        contradicted or violated prerequisites can never be waived."""
         request = self._get(action_id)
         self._require(principal_id, Scope.AUTHORIZE, request.target_entity_ids)
-        if request.status != ActionStatus.AWAITING_AUTHORIZATION:
-            raise InvalidTransition(f"cannot authorize in status {request.status.value}")
+        started = request.status
+        if started not in (ActionStatus.AWAITING_AUTHORIZATION, ActionStatus.PREREQUISITES_FAILED):
+            raise InvalidTransition(f"cannot authorize in status {started.value}")
+        if not approve:
+            return self._decide(request, principal_id, False, at, reason, [], f"denied by {principal_id}")
+
+        self._verify_prerequisites(request, at)  # evidence may have changed while waiting
+        failing = [c for c in request.prerequisite_checks if c.state != ConditionState.SATISFIED]
+        hard = [c for c in failing if not c.risk_shortfall]
+        shortfalls = sorted({f"{c.condition.entity_id}.{c.condition.attribute}" for c in failing if c.risk_shortfall})
+        unwaived = [k for k in shortfalls if k not in set(waive or [])]
+        if hard or unwaived:
+            if started == ActionStatus.PREREQUISITES_FAILED:
+                detail = "; ".join(f"{c.condition.entity_id}.{c.condition.attribute}: {c.reason}" for c in hard) if hard else (
+                    "below the risk bar — verify, re-observe or explicitly waive: " + ", ".join(unwaived))
+                raise InvalidTransition(f"cannot authorize: {detail}")
+            with self.repo.transaction():  # was awaiting; evidence no longer meets the bar
+                self.repo.save_action(request)
+                self._audit(request, started, at, f"approval by {principal_id} blocked: prerequisites no longer met")
+            return request
+        if shortfalls and not (reason or "").strip():
+            raise InvalidTransition("waiving a high-risk prerequisite requires a reason")
+        note = f"approved by {principal_id}" + (f"; waived {', '.join(shortfalls)}: {reason}" if shortfalls else "")
+        return self._decide(request, principal_id, True, at, reason, shortfalls, note, started)
+
+    def _decide(self, request, principal_id, approve, at, reason, waived, note, before=None) -> ActionRequest:
         with self.repo.transaction():
-            before = request.status
-            request.authorization = Authorization(principal_id=principal_id, approved=approve, at=at, reason=reason)
-            if not approve:
-                request.status = ActionStatus.DENIED
-            else:
-                # Evidence may have gone stale while the request waited: verify again.
-                self._verify_prerequisites(request, at)
-                if request.status == ActionStatus.AWAITING_AUTHORIZATION:
-                    request.status = ActionStatus.AUTHORIZED
+            before = before or request.status
+            request.authorization = Authorization(principal_id=principal_id, approved=approve, at=at, reason=reason, waived=waived)
+            request.status = ActionStatus.AUTHORIZED if approve else ActionStatus.DENIED
+            if approve and waived:
+                request.requested_observations = []
             request.updated_at = at
             self.repo.save_action(request)
-            self._audit(request, before, at, f"{'approved' if approve else 'denied'} by {principal_id}")
+            self._audit(request, before, at, note)
         return request
+
+    def _step_prerequisites(self, task_id: Optional[str], step_id: Optional[str]):
+        """An action for a task step inherits what that step rests on (Phase 11)."""
+        if self.tasks is None or not task_id or not step_id:
+            return [], None
+        task = self.repo.get_task(task_id)
+        step = next((s for s in task.steps if s.id == step_id), None) if task else None
+        if step is None:
+            raise ActionError(f"step {step_id} not found in task {task_id}")
+        conditions = list(step.preconditions)
+        for anc in self.tasks.ancestors(task, step):
+            conditions += anc.postconditions
+        unique = {(c.entity_id, c.attribute): c for c in conditions}
+        return list(unique.values()), step.risk
 
     def report_performed(self, action_id: str, principal_id: str, at: datetime, notes: Optional[str] = None) -> ActionRequest:
         request = self._get(action_id)
@@ -217,7 +270,7 @@ class ActionSafetyService:
         return request
 
     def _verify_prerequisites(self, request: ActionRequest, at: datetime) -> None:
-        checks = [self.conditions.check(c, at) for c in request.prerequisites]
+        checks = [self.conditions.check(c, at, request.risk) for c in request.prerequisites]
         request.prerequisite_checks = checks
         failing = [c for c in checks if c.state != ConditionState.SATISFIED]
         request.requested_observations = [self.conditions.request_for(c) for c in failing if c.state == ConditionState.UNSUPPORTED]

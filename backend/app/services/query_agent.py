@@ -8,6 +8,7 @@ The reasoning provider only maps language to an intent. Every fact in a response
 comes from structured state through the evidence gate; similarity scores are
 returned as recall aids, never as support.
 """
+import re
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -96,6 +97,7 @@ class QueryAgent:
             QueryKind.CONTINUE: self._continue,
             QueryKind.WHAT_HAPPENED: self._what_happened,
             QueryKind.WHY: self._why,
+            QueryKind.SAFETY: self._safety,
         }.get(intent.kind, self._unknown)
         return self._finish(handler(intent, at))
 
@@ -362,6 +364,65 @@ class QueryAgent:
             intent, at, summary, answer,
             claims=claims, changes=plan.world_changes, resume_plan=plan, requested_observations=requests,
         )
+
+    # ---------------------------------------------------------------- safety
+    def _match_step(self, intent: QueryIntent, at: datetime):
+        """The unfinished step the question is about (by wording), else the next step."""
+        from backend.app.providers.embedding import tokens
+
+        wanted = set(tokens(intent.raw)) - {"safe", "ok", "okay", "start", "begin", "now", "go", "ahead", "can", "i", "it"}
+        best, best_score = None, 0
+        for task in self.repo.list_tasks():
+            if task.status in (TaskStatus.COMPLETED, TaskStatus.ABANDONED) or (intent.task_id and task.id != intent.task_id):
+                continue
+            for step in task.steps:
+                if step.status.value in ("COMPLETED", "SKIPPED"):
+                    continue
+                score = len(wanted & set(tokens(step.description)))
+                if score > best_score:
+                    best, best_score = (task, step), score
+        if best is not None:
+            return best
+        if re.search(r"\b(continue|next)\b", intent.raw.lower()):
+            open_tasks = [t for t in self.repo.list_tasks() if t.status not in (TaskStatus.COMPLETED, TaskStatus.ABANDONED)]
+            for task in sorted(open_tasks, key=lambda t: t.updated_at, reverse=True):
+                plan = self.tasks.preview(task.id, at)
+                if plan.next_step is not None:
+                    return task, next(s for s in task.steps if s.id == plan.next_step.step_id)
+        return None
+
+    def _safety(self, intent: QueryIntent, at: datetime) -> GroundedResponse:
+        """Readiness of a step at its risk bar. ORBIT vouches only for the facts it
+        tracks and never authorises a physical action itself."""
+        match = self._match_step(intent, at)
+        if match is None:
+            return self._respond(intent, at, "I couldn't tell which task step you mean.")
+        task, step = match
+        intent.task_id = task.id
+        a = self.tasks.assess_step(task, step, at)
+        checks = self.tasks.decision_critical(task, step, at)
+        label = f"step {step.step_order} ({step.description}, {step.risk.value} risk)"
+        claims = [
+            GroundedClaim(
+                claim=f"{c.condition.entity_id}.{c.condition.attribute} {c.condition.operator} {c.condition.expected!r}: "
+                      f"{c.state.value} ({c.status.value})",
+                entity_id=c.condition.entity_id,
+                attribute=c.condition.attribute,
+                value=c.observed_value,
+                status=c.status,
+                supportable=c.state.value == "SATISFIED",
+                evidence_refs=c.evidence_refs,
+            )
+            for c in checks
+        ]
+        caveat = " ORBIT can only vouch for the conditions it tracks, and it does not authorise physical actions."
+        if a.ready:
+            facts = "; ".join(f"{c.condition.entity_id}.{c.condition.attribute} = {c.observed_value!r} ({c.status.value})" for c in checks)
+            answer = f"All prerequisites ORBIT tracks for {label} are met" + (f": {facts}." if facts else ".")
+            return self._respond(intent, at, answer + caveat, answer, claims=claims)
+        requests = [self.tasks.conditions.request_for(c, [step.id]) for c in checks if c.state.value == "UNSUPPORTED"]
+        summary = f"Not yet for {label}: " + "; ".join(a.blockers) + "." + caveat
+        return self._respond(intent, at, summary, claims=claims, requested_observations=requests)
 
     # -------------------------------------------------------- what happened
     def _what_happened(self, intent: QueryIntent, at: datetime) -> GroundedResponse:

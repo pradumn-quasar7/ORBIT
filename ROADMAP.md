@@ -50,4 +50,7 @@ tests, updated `PROJECT_STATUS.md` / `DECISIONS.md`, and a merge to `main`.
 - [x] **Phase 11 — Decision-aware active perception**
   - Value-of-information policy, resume preview, pre-action checks, Experiment F2.
 
+- [x] **Phase 12 — Risk-graded verification**
+  - Risk levels, recency bar for HIGH-risk prerequisites, explicit waivers, inherited action prerequisites, safety questions.
+
 - [ ] **Later** — AR client (step 18), VR rendering of replay/counterfactuals (step 19 front-end), wearable clients, pilot study.

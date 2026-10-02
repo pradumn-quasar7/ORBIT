@@ -1,9 +1,10 @@
 # ORBIT Project Status
 
 ## Current Phase
-**Phase 11 — Decision-aware active perception (COMPLETE).** ORBIT v0.1 (Phases 0–9) is
-complete; Phase 10 added replay and counterfactual sandboxes; Phase 11 makes perception
-decision-aware. All spec §36 MVP acceptance criteria are covered by passing tests.
+**Phase 12 — Risk-graded verification (COMPLETE).** ORBIT v0.1 (Phases 0–9) is complete;
+Phase 10 added replay and counterfactual sandboxes; Phase 11 decision-aware perception;
+Phase 12 risk-graded verification before consequential steps and actions. All spec §36
+MVP acceptance criteria are covered by passing tests.
 
 ## Phase Log
 
@@ -165,6 +166,18 @@ decision-aware. All spec §36 MVP acceptance criteria are covered by passing tes
 - `evaluation/decision_perception_eval.py` (Experiment F2), included in the bench report. ADR-031, ADR-032. Tests: `test_decision_aware_perception.py`.
 - **Result (Experiment F2):** unsafe continuation 0.00 decision-aware vs 1.00 information gain / fixed / random (k = 1–3); safe work kept 1.00 for all; stale clutter refreshed after one look 1 vs 8 (decision-aware catches up at k = 2).
 
+### Phase 12 — Risk-graded verification before consequential steps and actions
+**Planned**
+- Risk levels on steps and actions; HIGH-risk prerequisites need recent evidence; explicit recorded waivers (never for stale/contradicted/violated facts); actions inherit task-step prerequisites; "Is it safe to …?" questions; bench scenario + ablation.
+- Exit: a HIGH-risk step or action never proceeds on old unverified evidence unless a person explicitly waives that specific shortfall with a reason.
+
+**Implemented**
+- `RiskLevel`; `services/risk.py` (`RiskPolicy`: observed ≤ 10 min or verified ≤ 60 min for HIGH); risk-aware `ConditionEvaluator.check`; `ConditionCheck.risk` / `risk_shortfall` / `last_supported_at`; `TaskStep.risk`, `StepSpec.risk`, `ActionRequest.risk`, `Authorization.waived`; `QueryKind.SAFETY`.
+- `ActionSafetyService`: inherited prerequisites, risk-aware verification, waiver rules, audit notes. Agent `_safety`. `OrbitConfig.risk_grading_enabled`.
+- API: `risk` on steps/actions, `waive` on authorisation, prerequisites inherited when omitted. Migration `0008`.
+- Bench: scenario `high_risk_stale_premise`, variant `no_risk_grading`. ADR-033, ADR-034. Tests: `test_risk_graded_verification.py`.
+- Design correction during the phase: VERIFIED evidence initially exempted HIGH-risk steps forever; it now ages out after 60 min.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -208,10 +221,10 @@ decision-aware. All spec §36 MVP acceptance criteria are covered by passing tes
 2. Randomised scenario generator for ORBIT-BENCH (and for Experiment H futures) with seeds and confidence intervals.
 3. Real detector integration (e.g. OWL-ViT/YOLO) behind the adapter + latency measurement on real frames.
 4. API authentication and workspace separation.
-5. Use decision-critical checks in the action-safety flow (recommend verification before authorising a consequential action).
+5. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 378 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 414 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
 ## Architecture Decisions
@@ -228,6 +241,7 @@ decision-aware. All spec §36 MVP acceptance criteria are covered by passing tes
 - ADR-027 ORBIT-BENCH design and metric definitions
 - ADR-028 World projection · ADR-012 amendment (no future evidence in as-of reads) · ADR-029 Sandbox isolation / SIMULATION evidence · ADR-030 Sensitivity analysis + Experiment H
 - ADR-031 Decision-aware perception (value of information) · ADR-032 Rolled-back preview
+- ADR-033 Risk-graded verification · ADR-034 Explicit waivers, inherited prerequisites
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.
@@ -236,4 +250,4 @@ decision-aware. All spec §36 MVP acceptance criteria are covered by passing tes
 - G (AR utility) — deferred (needs an AR client).
 
 ## Last Updated
-- 2026-10-02
+- 2026-10-02 (Phase 12)

@@ -1,12 +1,13 @@
 """Evaluate task pre/postconditions against the evidence gate, and phrase the
 targeted observation that would resolve an unsupported one (spec §13)."""
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from backend.app.domain.models import ConditionCheck, ObservationRequest, StateCondition
-from backend.app.domain.types import ConditionState, EpistemicStatus
+from backend.app.domain.types import ConditionState, EpistemicStatus, RiskLevel
 from backend.app.repositories.base import Repository
 from backend.app.services.claims import ClaimEvaluator
+from backend.app.services.risk import RiskPolicy
 
 STATUS_RANK = {EpistemicStatus.OBSERVED: 1, EpistemicStatus.VERIFIED: 2}
 
@@ -25,13 +26,22 @@ def _holds(condition: StateCondition, value: Any) -> bool:
 
 
 class ConditionEvaluator:
-    def __init__(self, repository: Repository, claims: ClaimEvaluator):
+    def __init__(self, repository: Repository, claims: ClaimEvaluator, risk_policy: Optional[RiskPolicy] = None):
         self.repo = repository
         self.claims = claims
+        self.risk_policy = risk_policy or RiskPolicy()
 
-    def check(self, condition: StateCondition, as_of: datetime) -> ConditionCheck:
+    def check(self, condition: StateCondition, as_of: datetime, risk: RiskLevel = RiskLevel.LOW) -> ConditionCheck:
+        return self.risk_policy.apply(self._check(condition, as_of), risk, as_of)
+
+    def _check(self, condition: StateCondition, as_of: datetime) -> ConditionCheck:
         a = self.claims.assess_attribute(condition.entity_id, condition.attribute, as_of)
-        base = dict(condition=condition, status=a.status, evidence_refs=a.evidence_refs)
+        base = dict(
+            condition=condition,
+            status=a.status,
+            evidence_refs=a.evidence_refs,
+            last_supported_at=a.freshness.last_supported_at if a.freshness else None,
+        )
         if not a.supportable:
             return ConditionCheck(state=ConditionState.UNSUPPORTED, observed_value=a.last_known_value, reason=a.reason, **base)
         if STATUS_RANK.get(a.status, 0) < STATUS_RANK.get(condition.min_status, 1):

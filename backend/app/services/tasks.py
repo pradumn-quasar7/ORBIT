@@ -25,11 +25,12 @@ from backend.app.domain.models import (
     TaskStep,
     generate_id,
 )
-from backend.app.domain.types import ConditionState, EpistemicStatus, EventType, SourceType, StepStatus, TaskStatus
+from backend.app.domain.types import ConditionState, EpistemicStatus, EventType, RiskLevel, SourceType, StepStatus, TaskStatus
 from backend.app.repositories.base import Repository
 from backend.app.services.conditions import ConditionEvaluator
 from backend.app.services.evidence_policy import grade, infer_source_type, is_verification
 from backend.app.services.memory import MemoryService
+from backend.app.services.risk import RiskPolicy
 from backend.app.services.world_diff import WorldDiffService
 from backend.app.services.world_state_engine import WorldStateEngine
 
@@ -75,16 +76,17 @@ class StepSpec(BaseModel):
     id: Optional[str] = None
     step_order: Optional[int] = None  # defaults to position; set to keep a procedure's own numbering
     description: str
+    risk: RiskLevel = RiskLevel.MEDIUM
     dependencies: List[str] = Field(default_factory=list)
     preconditions: List[StateCondition] = Field(default_factory=list)
     postconditions: List[StateCondition] = Field(default_factory=list)
 
 
 class TaskService:
-    def __init__(self, repository: Repository, engine: WorldStateEngine):
+    def __init__(self, repository: Repository, engine: WorldStateEngine, risk_policy: Optional[RiskPolicy] = None):
         self.repo = repository
         self.engine = engine
-        self.conditions = ConditionEvaluator(repository, engine.claims)
+        self.conditions = ConditionEvaluator(repository, engine.claims, risk_policy)
         memory = MemoryService(repository, engine.claims, engine.relations, engine.anchors)
         self._diff = WorldDiffService(repository, memory)
 
@@ -111,6 +113,7 @@ class TaskService:
                 dependencies=list(spec.dependencies),
                 preconditions=list(spec.preconditions),
                 postconditions=list(spec.postconditions),
+                risk=spec.risk,
             )
             for i, spec in enumerate(steps)
         ]
@@ -286,7 +289,8 @@ class TaskService:
 
     def assess_step(self, task: Task, step: TaskStep, as_of: datetime, revision: Optional[ConditionCheck] = None) -> StepAssessment:
         revision = revision if revision is not None else self.revision_check(task, as_of)
-        pre = [self.conditions.check(c, as_of) for c in step.preconditions]
+        # Prerequisites are judged at this step's risk bar; its own outcome at the plain bar.
+        pre = [self.conditions.check(c, as_of, step.risk) for c in step.preconditions]
         post = [self.conditions.check(c, as_of) for c in step.postconditions] if step.status in DONE else []
         blockers: List[str] = []
         if step.status not in DONE:
@@ -299,7 +303,7 @@ class TaskService:
                 elif anc.status not in DONE:
                     blockers.append(f"waits on {label}")
                 else:
-                    for chk in (self.conditions.check(c, as_of) for c in anc.postconditions):
+                    for chk in (self.conditions.check(c, as_of, step.risk) for c in anc.postconditions):
                         if chk.state != ConditionState.SATISFIED:
                             blockers.append(
                                 f"{label} outcome not supported: {chk.condition.entity_id}.{chk.condition.attribute} {chk.reason}"
@@ -395,7 +399,7 @@ class TaskService:
                     need(chk, step.id)
                 for anc in self.ancestors(task, step):
                     if anc.status in DONE:
-                        for chk in (self.conditions.check(c, at) for c in anc.postconditions):
+                        for chk in (self.conditions.check(c, at, step.risk) for c in anc.postconditions):
                             need(chk, step.id)
 
             # (7) only now: the next supported step (re-verification first)
@@ -491,10 +495,10 @@ class TaskService:
     ) -> List[ConditionCheck]:
         """Facts the decision to do ``step`` next rests on: its preconditions, the
         outcomes of its completed prerequisite steps, and the procedure revision."""
-        checks = [self.conditions.check(c, as_of) for c in step.preconditions]
+        checks = [self.conditions.check(c, as_of, step.risk) for c in step.preconditions]
         for anc in self.ancestors(task, step):
             if anc.status in DONE:
-                checks += [self.conditions.check(c, as_of) for c in anc.postconditions]
+                checks += [self.conditions.check(c, as_of, step.risk) for c in anc.postconditions]
         revision = revision if revision is not None else self.revision_check(task, as_of)
         if revision is not None:
             checks.append(revision)

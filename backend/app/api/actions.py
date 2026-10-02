@@ -8,7 +8,7 @@ from backend.app.api.deps import get_services
 from backend.app.core.container import OrbitServices
 from backend.app.core.time import UTCDateTime
 from backend.app.domain.models import ActionRequest, OutcomeRecord, PerceptionPlan, Principal, StateCondition
-from backend.app.domain.types import PrincipalKind, Scope
+from backend.app.domain.types import PrincipalKind, RiskLevel, Scope
 from backend.app.services.actions import ActionError, InvalidTransition, PermissionDenied
 from backend.app.services.active_perception import POLICIES, RandomPolicy
 
@@ -60,9 +60,10 @@ class ActionPropose(BaseModel):
     action: str
     requested_by: str = "orbit-agent"
     target_entity_ids: List[str] = Field(default_factory=list)
-    prerequisites: List[StateCondition] = Field(default_factory=list)
+    prerequisites: Optional[List[StateCondition]] = None  # None: inherit from task_id/step_id
     expected_outcome: List[StateCondition] = Field(default_factory=list)
     consequential: bool = True
+    risk: Optional[RiskLevel] = None  # None: the task step's risk, else MEDIUM
     task_id: Optional[str] = None
     step_id: Optional[str] = None
     at: Optional[UTCDateTime] = None
@@ -72,6 +73,7 @@ class ActionDecision(BaseModel):
     principal_id: str
     approve: bool
     reason: Optional[str] = None
+    waive: List[str] = Field(default_factory=list)  # "entity.attribute" risk shortfalls knowingly accepted
     at: Optional[UTCDateTime] = None
 
 
@@ -90,7 +92,7 @@ def propose_action(body: ActionPropose, svc: OrbitServices = Depends(get_service
     try:
         return svc.actions.propose(
             body.action, body.requested_by, body.at or svc.clock.now(), body.target_entity_ids,
-            body.prerequisites, body.expected_outcome, body.consequential, body.task_id, body.step_id,
+            body.prerequisites, body.expected_outcome, body.consequential, body.task_id, body.step_id, body.risk,
         )
     except ActionError as exc:
         _action_error(exc)
@@ -120,7 +122,9 @@ def recheck(action_id: str, body: AtOnly, svc: OrbitServices = Depends(get_servi
 @router.post("/actions/{action_id}/authorize", response_model=ActionRequest)
 def authorize(action_id: str, body: ActionDecision, svc: OrbitServices = Depends(get_services)):
     try:
-        return svc.actions.authorize(action_id, body.principal_id, body.approve, body.at or svc.clock.now(), body.reason)
+        return svc.actions.authorize(
+            action_id, body.principal_id, body.approve, body.at or svc.clock.now(), body.reason, body.waive
+        )
     except ActionError as exc:
         _action_error(exc)
 

@@ -15,6 +15,7 @@ from backend.app.domain.types import QueryKind
 from backend.app.providers.base import ReasoningProvider, Vocabulary
 
 _KIND_RULES: List[Tuple[QueryKind, re.Pattern]] = [
+    (QueryKind.SAFETY, re.compile(r"\b(is it safe|safe to|is it ok(ay)? to|ok(ay)? to|can i (now )?(start|begin|go ahead))\b")),
     (QueryKind.CONTINUE, re.compile(r"\b(continue|resume|carry on|what'?s next|what is next|next step)\b")),
     (QueryKind.WHAT_CHANGED, re.compile(r"\b(what (has |have )?changed|what'?s different|what is different|any changes)\b")),
     (QueryKind.WHY, re.compile(r"\b(why|what caused|cause of|because of what)\b")),
