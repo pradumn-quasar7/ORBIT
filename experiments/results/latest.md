@@ -1,7 +1,7 @@
 # ORBIT-BENCH results
 
-- **run_at**: `2026-10-01T21:22:29+00:00`
-- **git_commit**: `15bdf5e`
+- **run_at**: `2026-10-02T13:23:00+00:00`
+- **git_commit**: `fce4886`
 - **schema_revision**: `0007`
 - **scenario_catalog**: `v0.1`
 - **scenarios**: `12`
@@ -65,13 +65,13 @@
 
 | Variant | observation_ms_p50 | observation_ms_p95 | query_ms_p50 | query_ms_p95 |
 |---|---|---|---|---|
-| orbit | 0.58 | 1.21 | 0.33 | 0.40 |
-| no_freshness | 0.56 | 1.09 | 0.24 | 0.30 |
-| last_writer_wins | 0.56 | 1.07 | 0.26 | 0.29 |
-| unobserved_removed | 0.57 | 1.07 | 0.27 | 0.31 |
-| no_evidence_gate | 0.57 | 1.08 | 0.27 | 0.29 |
-| event_log_diff | 0.56 | 1.06 | 0.25 | 0.29 |
-| naive_resume | 0.57 | 1.15 | 0.25 | 0.30 |
+| orbit | 0.58 | 1.11 | 0.31 | 0.38 |
+| no_freshness | 0.57 | 1.08 | 0.25 | 0.29 |
+| last_writer_wins | 0.57 | 1.30 | 0.26 | 0.31 |
+| unobserved_removed | 0.60 | 1.10 | 0.28 | 0.32 |
+| no_evidence_gate | 0.72 | 1.59 | 0.31 | 0.53 |
+| event_log_diff | 0.62 | 1.28 | 0.29 | 0.37 |
+| naive_resume | 0.57 | 1.11 | 0.31 | 0.36 |
 
 ## Experiment H — counterfactual decisions vs static replay
 
@@ -87,3 +87,16 @@
 - Unsafe pre-commitments ↓: static replay **0.80**, counterfactual **0.00**
 - Decision-critical claims found by sensitivity analysis: pump_old.installed, sop.procedure_revision, valve.state, pump_new.model_number
 - Caveat: futures are hand-specified; this measures contingency planning in a controlled world.
+
+## Experiment F2 — decision-aware vs uncertainty-driven perception
+
+Valve secretly reopened while 8 unrelated stale objects sit on a shelf; k looks, then resume.
+
+| Policy | unsafe@1 ↓ | unsafe@2 ↓ | unsafe@3 ↓ | stale refreshed@1 | stale refreshed@2 | stale refreshed@3 | safe work kept |
+|---|---|---|---|---|---|---|---|
+| decision_aware | 0.00 | 0.00 | 0.00 | 1.0 | 9.0 | 9.0 | 1.00 |
+| information_gain | 1.00 | 1.00 | 1.00 | 8.0 | 9.0 | 9.0 | 1.00 |
+| fixed | 1.00 | 1.00 | 1.00 | 1.0 | 2.0 | 3.0 | 1.00 |
+| random | 1.00 | 1.00 | 1.00 | 1.0 | 2.0 | 3.0 | 1.00 |
+
+- Random is averaged over 5 seeds. Fixed and random rank uncertain claims only, like information gain.
