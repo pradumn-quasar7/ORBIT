@@ -1,31 +1,31 @@
 # ORBIT-BENCH results
 
-- **run_at**: `2026-10-02T13:23:00+00:00`
-- **git_commit**: `fce4886`
-- **schema_revision**: `0007`
+- **run_at**: `2026-10-02T18:05:10+00:00`
+- **git_commit**: `9c74948`
+- **schema_revision**: `0008`
 - **scenario_catalog**: `v0.1`
-- **scenarios**: `12`
+- **scenarios**: `13`
 - **reasoning_provider**: `rule-based-v1`
 - **embedding_provider**: `hashing-bow-v1`
 - **retrieval_provider**: `in-memory-cosine-v1`
 - **python**: `3.9.6`
 
-| Metric | orbit | no_freshness | last_writer_wins | unobserved_removed | no_evidence_gate | event_log_diff | naive_resume |
-|---|---|---|---|---|---|---|---|
-| entity_persistence_accuracy | 0.97 | 0.97 | 0.97 | 0.97 | 0.97 | 0.97 | 0.97 |
-| false_merge_rate ↓ | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| diff_precision | 1.00 | 1.00 | 1.00 | 0.62 | 1.00 | 0.60 | 1.00 |
-| diff_recall | 1.00 | 1.00 | 1.00 | 0.62 | 1.00 | 0.38 | 1.00 |
-| stale_claim_rate ↓ | 0.00 | 0.20 | 0.25 | 0.00 | 0.18 | 0.00 | 0.00 |
-| evidence_backed_claim_rate | 1.00 | 1.00 | 1.00 | 1.00 | 0.64 | 1.00 | 1.00 |
-| correct_abstention_rate | 1.00 | 0.50 | 0.83 | 1.00 | 0.17 | 1.00 | 1.00 |
-| useful_answer_rate | 1.00 | 1.00 | 0.86 | 0.86 | 1.00 | 1.00 | 1.00 |
-| conflict_detection_rate | 1.00 | 1.00 | 0.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| task_resumption_success | 1.00 | 0.67 | 1.00 | 1.00 | 1.00 | 1.00 | 0.33 |
-| blocked_step_detection | 1.00 | 0.67 | 1.00 | 1.00 | 1.00 | 1.00 | 0.00 |
-| unsafe_continuation_rate ↓ | 0.00 | 0.33 | 0.00 | 0.00 | 0.00 | 0.00 | 0.67 |
-| unsupported_causal_claim_rate ↓ | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 |
-| search_coverage_precision | 1.00 | 1.00 | 1.00 | 0.67 | 1.00 | 1.00 | 1.00 |
+| Metric | orbit | no_freshness | last_writer_wins | unobserved_removed | no_evidence_gate | event_log_diff | naive_resume | no_risk_grading |
+|---|---|---|---|---|---|---|---|---|
+| entity_persistence_accuracy | 0.98 | 0.98 | 0.98 | 0.98 | 0.98 | 0.98 | 0.98 | 0.98 |
+| false_merge_rate ↓ | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| diff_precision | 1.00 | 1.00 | 1.00 | 0.62 | 1.00 | 0.60 | 1.00 | 1.00 |
+| diff_recall | 1.00 | 1.00 | 1.00 | 0.62 | 1.00 | 0.38 | 1.00 | 1.00 |
+| stale_claim_rate ↓ | 0.00 | 0.20 | 0.25 | 0.00 | 0.18 | 0.00 | 0.00 | 0.00 |
+| evidence_backed_claim_rate | 1.00 | 1.00 | 1.00 | 1.00 | 0.64 | 1.00 | 1.00 | 1.00 |
+| correct_abstention_rate | 1.00 | 0.57 | 0.86 | 1.00 | 0.29 | 1.00 | 1.00 | 0.86 |
+| useful_answer_rate | 1.00 | 1.00 | 0.86 | 0.86 | 1.00 | 1.00 | 1.00 | 1.00 |
+| conflict_detection_rate | 1.00 | 1.00 | 0.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| task_resumption_success | 1.00 | 0.80 | 1.00 | 1.00 | 1.00 | 1.00 | 0.20 | 0.80 |
+| blocked_step_detection | 1.00 | 0.80 | 1.00 | 1.00 | 1.00 | 1.00 | 0.00 | 0.80 |
+| unsafe_continuation_rate ↓ | 0.00 | 0.20 | 0.00 | 0.00 | 0.00 | 0.00 | 0.80 | 0.20 |
+| unsupported_causal_claim_rate ↓ | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 | 0.00 |
+| search_coverage_precision | 1.00 | 1.00 | 1.00 | 0.67 | 1.00 | 1.00 | 1.00 | 1.00 |
 
 ↓ = lower is better. Each ablation removes one component (spec §28).
 
@@ -60,18 +60,20 @@
 - `object_replaced` — Notebook replaced by a different notebook (primary: diff_recall)
 - `multi_user_handoff` — Task handed from Ana to Bob (primary: task_resumption_success)
 - `adversarial_memory` — Misleading low-authority evidence (primary: stale_claim_rate)
+- `high_risk_stale_premise` — High-risk step resting on an old (but unexpired) observation (primary: unsafe_continuation_rate)
 
 ## Latency (ms)
 
 | Variant | observation_ms_p50 | observation_ms_p95 | query_ms_p50 | query_ms_p95 |
 |---|---|---|---|---|
-| orbit | 0.58 | 1.11 | 0.31 | 0.38 |
-| no_freshness | 0.57 | 1.08 | 0.25 | 0.29 |
-| last_writer_wins | 0.57 | 1.30 | 0.26 | 0.31 |
-| unobserved_removed | 0.60 | 1.10 | 0.28 | 0.32 |
-| no_evidence_gate | 0.72 | 1.59 | 0.31 | 0.53 |
-| event_log_diff | 0.62 | 1.28 | 0.29 | 0.37 |
-| naive_resume | 0.57 | 1.11 | 0.31 | 0.36 |
+| orbit | 0.57 | 1.64 | 0.32 | 0.61 |
+| no_freshness | 0.55 | 1.05 | 0.25 | 0.31 |
+| last_writer_wins | 0.55 | 1.07 | 0.25 | 0.29 |
+| unobserved_removed | 0.59 | 1.17 | 0.26 | 0.33 |
+| no_evidence_gate | 0.57 | 1.09 | 0.28 | 0.32 |
+| event_log_diff | 0.56 | 1.06 | 0.26 | 0.30 |
+| naive_resume | 0.55 | 1.06 | 0.26 | 0.30 |
+| no_risk_grading | 0.56 | 1.06 | 0.26 | 0.29 |
 
 ## Experiment H — counterfactual decisions vs static replay
 
