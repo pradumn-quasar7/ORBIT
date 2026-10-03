@@ -1,10 +1,10 @@
 # ORBIT Project Status
 
 ## Current Phase
-**Phase 13 — Identity curation (COMPLETE).** ORBIT v0.1 (Phases 0–9) is complete; Phase 10
-added replay and counterfactual sandboxes; Phase 11 decision-aware perception; Phase 12
-risk-graded verification; Phase 13 human-confirmed identity correction. All spec §36 MVP
-acceptance criteria are covered by passing tests.
+**Phase 14 — Generated benchmark with confidence intervals (COMPLETE).** ORBIT v0.1
+(Phases 0–9) is complete; Phases 10–13 added counterfactual sandboxes, decision-aware
+perception, risk-graded verification and identity curation; Phase 14 evaluates ORBIT on
+randomly generated worlds with bootstrap intervals and paired ablation comparisons.
 
 ## Phase Log
 
@@ -191,6 +191,17 @@ acceptance criteria are covered by passing tests.
 - API: `GET /identity/suggestions`, `POST /identity/merge`, `GET /identity/merges`, `POST /identity/merges/{id}/undo`, `POST /identity/distinct`. Migration `0009`.
 - Bench: `ConfirmIdentity` step, alias-aware identity metric, scenario `identity_correction` (14 scenarios). ADR-035…037. Tests: `test_identity_curation.py`.
 
+### Phase 14 — Generated worlds, confidence intervals, paired comparisons
+**Planned**
+- Seeded world generator with simulator ground truth (scene, task, conflict families); bootstrap 95 % intervals; paired ORBIT-vs-ablation differences; a progress metric; report any failure modes the random worlds reveal.
+
+**Implemented**
+- `evaluation/generator.py`, `evaluation/stats.py`, `evaluation/generated.py`, `experiments/runners/run_generated_bench.py`, `experiments/results/generated.{md,json}`.
+- Bench extensions: `expect="either"`, truth-based resume checks + `progress_rate`, `truth:` ids, search frames with detections, field of view on observations, typed anchors.
+- **Failure modes found by random worlds and fixed:** (1) a single compatible candidate elsewhere was merged without evidence that it had left its old place; (2) two surfaces in a room counted as "near". False merges over 300 worlds: 0.5 %, all irreducible without identifiers (ADR-038). Also a bug in my own first generator draft (searches reported seeing nothing) was caught by an implausible 0.10 search precision.
+- ADR-038. Tests: `test_generated_bench.py`.
+- **Result (40 worlds per family, 95 % CI):** every ablation significantly worse on its target metric; ORBIT: diff P/R 0.88 [0.78, 0.96] / 0.96 [0.93, 0.99]; stale claims 0.13 [0.07, 0.20] (objects moved while unobserved); unsafe continuation 0.10 [0.02, 0.20] vs 0.28 without risk grading and 0.68 with naive resume; progress 0.65 [0.50, 0.80].
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -229,13 +240,14 @@ acceptance criteria are covered by passing tests.
 - Sandboxes are process-local and disposable (not persisted); each probe copies the world, which is fine for small workspaces but not optimised.
 
 ## Next (candidates)
-1. Randomised scenario generator for ORBIT-BENCH (and for Experiment H futures) with seeds and confidence intervals.
+1. Generated futures for Experiment H and generated perception worlds for Experiment F2.
 2. Real detector integration (e.g. OWL-ViT/YOLO) behind the adapter + latency measurement on real frames.
 3. API authentication and workspace separation.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 443 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 468 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
 ## Architecture Decisions
@@ -254,6 +266,7 @@ acceptance criteria are covered by passing tests.
 - ADR-031 Decision-aware perception (value of information) · ADR-032 Rolled-back preview
 - ADR-033 Risk-graded verification · ADR-034 Explicit waivers, inherited prerequisites
 - ADR-035 Merge by evidence replay (bitemporal) · ADR-036 Ambiguity casts doubt · ADR-037 Region-scoped absence
+- ADR-038 Generated worlds with bootstrap CIs; relocation needs evidence of leaving
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.
@@ -262,4 +275,4 @@ acceptance criteria are covered by passing tests.
 - G (AR utility) — deferred (needs an AR client).
 
 ## Last Updated
-- 2026-10-03 (Phase 13)
+- 2026-10-03 (Phase 14)

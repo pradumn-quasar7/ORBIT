@@ -78,7 +78,7 @@ backend/app/
     sandbox.py            fork a world into an isolated sandbox
     counterfactual.py     what-if premises, decision comparison, sensitivity analysis
     replay.py             frame-by-frame history
-  evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner), counterfactual_eval.py (Experiment H), decision_perception_eval.py (Experiment F2)
+  evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner), counterfactual_eval.py (Experiment H), decision_perception_eval.py (Experiment F2), generator.py + generated.py + stats.py (generated worlds, bootstrap CIs)
   api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual)
   main.py          create_app(repository, clock) factory; lazy module-level `app`
 database/          Alembic migrations 0001–0007, migrate.py

@@ -69,7 +69,9 @@ class AnchorRegistry:
         return out
 
     def proximity(self, a: Optional[str], b: Optional[str]) -> float:
-        """1.0 same anchor, 0.8 nested, 0.6 siblings, 0.3 shared ancestor, 0.0 unrelated/unknown."""
+        """1.0 same anchor, 0.8 nested, 0.6 sibling regions of one surface, 0.3 same room
+        (or other shared ancestor), 0.0 unrelated/unknown. Two surfaces in a room are
+        separate places, not "near" each other."""
         if a is None or b is None:
             return 0.0
         if a == b:
@@ -78,7 +80,10 @@ class AnchorRegistry:
         if a in lb or b in la:
             return 0.8
         if len(la) > 1 and len(lb) > 1 and la[1] == lb[1]:
-            return 0.6
+            parent = self.repo.get_anchor(la[1])
+            if parent is None or parent.anchor_type != "room":
+                return 0.6
+            return 0.3
         if set(la) & set(lb):
             return 0.3
         return 0.0

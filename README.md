@@ -50,6 +50,13 @@ Then open http://localhost:8765/ui/ and ask "What changed?" or "Continue.".
 Runs 12 ground-truth scenarios against ORBIT and six single-component ablations and
 writes `experiments/results/latest.md`.
 
+```bash
+.venv/bin/python experiments/runners/run_generated_bench.py --per-family 40
+```
+Runs ORBIT and its ablations on randomly generated worlds (ground truth from a
+simulator) and reports 95 % confidence intervals and paired differences in
+`experiments/results/generated.md`.
+
 ### Documentation
 `ORBIT_PROJECT_INIT.md` (spec) · `ARCHITECTURE.md` · `DECISIONS.md` · `ROADMAP.md` ·
 `PROJECT_STATUS.md` · `docs/experiments/BENCHMARK_PROTOCOL.md`

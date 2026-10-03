@@ -155,7 +155,7 @@ class WorldStateEngine:
             resolved_ids: Dict[str, str] = {}
             resolutions: List[EntityResolution] = []
             for idx, observed in enumerate(observation.observed_entities):
-                res = self.registry.resolve(observed, exclude=matched)
+                res = self.registry.resolve(observed, exclude=matched, context=observation)
                 if res.is_match:
                     entity_id, new_events = self._update_entity(res.entity_id, observed, observation, evidence)  # type: ignore[arg-type]
                 else:
