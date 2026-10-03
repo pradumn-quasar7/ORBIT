@@ -34,6 +34,7 @@ from backend.app.services.relations import RelationService
 from backend.app.services.spatial import AnchorRegistry
 
 LOCATION_DECISIONS = frozenset({ClaimDecision.NEW, ClaimDecision.SUPERSEDE, ClaimDecision.RESOLVE})
+AMBIGUITY_TAG = "ambiguous:"  # marks invalidations caused by an unresolved identity
 
 
 class DuplicateObservationError(ValueError):
@@ -267,6 +268,16 @@ class WorldStateEngine:
             ResolutionMethod.NEW_AMBIGUOUS: EventType.IDENTITY_AMBIGUOUS,
             ResolutionMethod.NEW_IDENTITY_CONFLICT: EventType.IDENTITY_CONFLICT,
         }.get(resolution.method)
+        if resolution.method == ResolutionMethod.NEW_AMBIGUOUS:
+            # Any of the candidates may be the object just seen elsewhere: their location
+            # claims are now in doubt until a look or a person resolves the ambiguity.
+            where = observed.location or "elsewhere"
+            for candidate in resolution.candidates:
+                events += self.belief.invalidate(
+                    candidate, [LOCATION], observation.timestamp,
+                    f"an indistinguishable {observed.type} was seen at {where} ({AMBIGUITY_TAG}{entity.id})",
+                    evidence_refs=[evidence.id],
+                )
         if identity_event is not None:
             events.append(
                 self.repo.save_event(

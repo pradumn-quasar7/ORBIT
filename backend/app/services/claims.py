@@ -27,11 +27,24 @@ from backend.app.services.grading import status_from_supports
 SUPPORTABLE = frozenset({EpistemicStatus.OBSERVED, EpistemicStatus.VERIFIED})
 
 
+def known_at(version: StateVersion, as_of: datetime) -> bool:
+    """Transaction time: was this version part of ORBIT's belief at ``as_of``?"""
+    if version.recorded_at is not None and version.recorded_at > as_of:
+        return False
+    return version.retired_at is None or version.retired_at > as_of
+
+
 def valid_at(version: StateVersion, as_of: datetime) -> bool:
-    return version.valid_from <= as_of and (version.valid_to is None or version.valid_to > as_of)
+    return (
+        known_at(version, as_of)
+        and version.valid_from <= as_of
+        and (version.valid_to is None or version.valid_to > as_of)
+    )
 
 
 def conflict_open_at(conflict: Conflict, as_of: datetime) -> bool:
+    if conflict.recorded_at is not None and conflict.recorded_at > as_of:
+        return False
     return conflict.opened_at <= as_of and (conflict.resolved_at is None or conflict.resolved_at > as_of)
 
 
@@ -93,7 +106,10 @@ class ClaimEvaluator:
             closed = [
                 v
                 for v in self.repo.get_state_versions_for_entity(entity_id, attribute)
-                if v.disposition == ClaimDisposition.ACCEPTED and v.valid_to is not None and v.valid_to <= as_of
+                if known_at(v, as_of)
+                and v.disposition == ClaimDisposition.ACCEPTED
+                and v.valid_to is not None
+                and v.valid_to <= as_of
             ]
             last = max(closed, key=lambda v: v.valid_to) if closed else None
             return ClaimAssessment(

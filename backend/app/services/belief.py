@@ -7,7 +7,7 @@ passed by the caller; the caller calls ``materialize`` and saves it.
 """
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Iterable, List, Optional, Set, Tuple
+from typing import Any, Callable, Iterable, List, Optional, Set, Tuple
 
 from backend.app.domain.models import Conflict, Entity, Event, StateVersion, SupportRef
 from backend.app.domain.status import aggregate_status
@@ -51,13 +51,17 @@ class BeliefUpdater:
         self.freshness = freshness
         self.policy = policy
         self.evaluator = evaluator
+        # Replay mode (identity merges): rebuild one entity's belief from its evidence
+        # without re-emitting historical events or cascading into other entities.
+        self.silent = False
+        self.recorded_at: Optional[datetime] = None
 
     # ----------------------------------------------------------------- queries
     def open_versions(self, entity_id: str, attribute: str) -> List[StateVersion]:
         return [
             v
             for v in self.repo.get_state_versions_for_entity(entity_id, attribute)
-            if v.valid_to is None and v.disposition in OPEN_DISPOSITIONS
+            if v.valid_to is None and v.retired_at is None and v.disposition in OPEN_DISPOSITIONS
         ]
 
     def open_conflict(self, entity_id: str, attribute: str) -> Optional[Conflict]:
@@ -117,7 +121,8 @@ class BeliefUpdater:
         self.repo.save_state_version(cur)
         v = self._new_version(entity, attr, claim, ClaimDisposition.CONFLICTING)
         new_conflict = self.repo.save_conflict(
-            Conflict(entity_id=entity.id, attribute=attr, version_ids=[cur.id, v.id], opened_at=claim.at)
+            Conflict(entity_id=entity.id, attribute=attr, version_ids=[cur.id, v.id], opened_at=claim.at,
+                     recorded_at=self.recorded_at)
         )
         events = [self._conflict_event(entity, attr, cur.value, claim, new_conflict, d.reason)]
         events += self.propagate(entity.id, attr, claim.at, f"dependency {entity.id}.{attr} contradicted", inflight=entity)
@@ -176,7 +181,7 @@ class BeliefUpdater:
         v = self._new_version(entity, attr, claim, ClaimDisposition.UNCONFIRMED, valid_to=claim.at)
         v.invalidation_reason = d.reason
         self.repo.save_state_version(v)
-        event = self.repo.save_event(
+        event = self._emit(
             Event(
                 timestamp=claim.at,
                 event_type=EventType.UNCONFIRMED_CHANGE,
@@ -221,7 +226,7 @@ class BeliefUpdater:
                 conflict.resolution_reason = f"invalidated: {reason}"
                 self.repo.save_conflict(conflict)
             events.append(
-                self.repo.save_event(
+                self._emit(
                     Event(
                         timestamp=at,
                         event_type=EventType.STATE_INVALIDATED,
@@ -251,6 +256,8 @@ class BeliefUpdater:
         inflight: Optional[Entity] = None,
         visited: Optional[Set[Tuple[str, str]]] = None,
     ) -> List[Event]:
+        if self.silent:
+            return []  # a replay must not rewrite other entities' history
         visited = visited if visited is not None else {(entity_id, attribute)}
         targets = [
             (d.dependent_entity_id, d.dependent_attribute)
@@ -270,12 +277,25 @@ class BeliefUpdater:
         return events
 
     # ----------------------------------------------------------------- absence
-    def apply_absence(self, entity: Entity, region: str, at: datetime, evidence_id: str, coverage_id: str) -> List[Event]:
-        """Coverage-validated absence: close the location claim without inventing a new
-        location. Whereabouts become UNKNOWN; the closed claim records why."""
-        opens = self.open_versions(entity.id, LOCATION)
+    def apply_absence(
+        self,
+        entity: Entity,
+        region: str,
+        at: datetime,
+        evidence_id: str,
+        coverage_id: str,
+        within: Optional[Callable[[Any, str], bool]] = None,
+    ) -> List[Event]:
+        """Coverage-validated absence: close the location claims *inside the searched
+        region* without inventing a new location. A claim placing the object elsewhere
+        is not refuted: if one survives, an open conflict resolves in its favour;
+        otherwise whereabouts become UNKNOWN and the closed claim records why."""
+        inside = within or (lambda value, reg: value == reg)
+        all_open = self.open_versions(entity.id, LOCATION)
+        opens = [v for v in all_open if inside(v.value, region)]
         if not opens:
             return []
+        survivors = [v for v in all_open if v not in opens]
         reason = f"confirmed absent from {region} by search {coverage_id}"
         before = entity.current_state.get(LOCATION)
         for v in opens:
@@ -284,13 +304,19 @@ class BeliefUpdater:
             v.invalidation_reason = reason
             self.repo.save_state_version(v)
         conflict = self.open_conflict(entity.id, LOCATION)
+        if evidence_id not in entity.evidence_refs:
+            entity.evidence_refs.append(evidence_id)
+        if survivors:
+            if conflict is not None and len({repr(v.value) for v in survivors}) == 1:
+                winner = max(survivors, key=lambda v: v.valid_from)
+                entity.current_state[LOCATION] = winner.value
+                return [self._resolve_conflict(entity, conflict, at, winner, reason, evidence_id)]
+            return []
         if conflict is not None:
             conflict.resolved_at = at
             conflict.resolution_reason = reason
             self.repo.save_conflict(conflict)
-        if evidence_id not in entity.evidence_refs:
-            entity.evidence_refs.append(evidence_id)
-        event = self.repo.save_event(
+        event = self._emit(
             Event(
                 timestamp=at,
                 event_type=EventType.OBJECT_REMOVED_OR_UNOBSERVED,
@@ -325,7 +351,8 @@ class BeliefUpdater:
                 c.disposition = ClaimDisposition.CONFLICTING
                 self.repo.save_state_version(c)
             conflict = Conflict(
-                entity_id=entity.id, attribute=attr, version_ids=[c.id for c in current] + [v.id], opened_at=claim.at
+                entity_id=entity.id, attribute=attr, version_ids=[c.id for c in current] + [v.id], opened_at=claim.at,
+                recorded_at=self.recorded_at,
             )
         else:
             conflict.version_ids.append(v.id)
@@ -335,6 +362,9 @@ class BeliefUpdater:
         return self._conflict_event(entity, attr, entity.current_state.get(attr), claim, conflict, "reported contradiction")
 
     # ----------------------------------------------------------------- helpers
+    def _emit(self, event: Event) -> Event:
+        return event if self.silent else self.repo.save_event(event)
+
     @staticmethod
     def _support_ref(claim: Claim) -> SupportRef:
         return SupportRef(
@@ -367,6 +397,7 @@ class BeliefUpdater:
             last_supported_at=claim.at,
             last_validated_at=claim.at if claim.is_verification else None,
             volatility_class=self.freshness.policy_for(entity, attr).volatility,
+            recorded_at=self.recorded_at,
         )
         self.repo.save_state_version(v)
         entity.history_refs.append(v.id)
@@ -418,7 +449,7 @@ class BeliefUpdater:
             fresh.disposition = ClaimDisposition.ACCEPTED
             self.repo.save_state_version(fresh)
         self.repo.save_conflict(conflict)
-        return self.repo.save_event(
+        return self._emit(
             Event(
                 timestamp=at,
                 event_type=EventType.CONFLICT_RESOLVED,
@@ -433,7 +464,7 @@ class BeliefUpdater:
     def _change_event(self, entity: Entity, attr: str, before: Any, claim: Claim) -> Event:
         etype = change_event_type(attr)
         verb = "moved from" if etype == EventType.OBJECT_MOVED else f"'{attr}' changed from"
-        return self.repo.save_event(
+        return self._emit(
             Event(
                 timestamp=claim.at,
                 event_type=etype,
@@ -446,7 +477,7 @@ class BeliefUpdater:
         )
 
     def _conflict_event(self, entity: Entity, attr: str, existing: Any, claim: Claim, conflict: Conflict, reason: str) -> Event:
-        return self.repo.save_event(
+        return self._emit(
             Event(
                 timestamp=claim.at,
                 event_type=EventType.EVIDENCE_CONFLICT,

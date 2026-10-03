@@ -10,6 +10,7 @@ from typing import Iterator, List, Optional
 
 from backend.app.domain.models import (
     ActionRequest,
+    IdentityMerge,
     Anchor,
     CausalHypothesis,
     ClaimDependency,
@@ -203,3 +204,13 @@ class Repository(ABC):
 
     @abstractmethod
     def list_outcomes(self, action_id: Optional[str] = None) -> List[OutcomeRecord]: ...
+
+    # Identity merges (human-confirmed identity corrections)
+    @abstractmethod
+    def save_merge(self, merge: IdentityMerge) -> IdentityMerge: ...
+
+    @abstractmethod
+    def get_merge(self, merge_id: str) -> Optional[IdentityMerge]: ...
+
+    @abstractmethod
+    def list_merges(self) -> List[IdentityMerge]: ...

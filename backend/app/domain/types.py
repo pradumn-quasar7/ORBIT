@@ -26,6 +26,10 @@ class EventType(str, Enum):
     STATE_INVALIDATED = "STATE_INVALIDATED"
     # Action safety (Phase 7): every transition of a consequential action is audited.
     ACTION_STATUS_CHANGED = "ACTION_STATUS_CHANGED"
+    # Identity curation (Phase 13): human-confirmed corrections of who-is-who.
+    IDENTITY_MERGED = "IDENTITY_MERGED"
+    IDENTITY_UNMERGED = "IDENTITY_UNMERGED"
+    IDENTITY_DISTINCT = "IDENTITY_DISTINCT"
 
 class VolatilityClass(str, Enum):
     LOW = "LOW"        # e.g., wall color, equipment serial
@@ -178,6 +182,7 @@ class Scope(str, Enum):
     RECOMMEND = "recommend"  # may propose an action
     AUTHORIZE = "authorize"  # may approve/deny a consequential action (humans only)
     ACTUATE = "actuate"  # may physically perform an action (humans only in v0.1)
+    CURATE = "curate"  # may correct identity (merge / undo / confirm distinct) (humans only)
 
 
 class ActionStatus(str, Enum):

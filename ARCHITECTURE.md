@@ -52,7 +52,8 @@ backend/app/
   providers/       replaceable boundaries: embedding, retrieval, reasoning, perception
   services/
     spatial.py            anchor hierarchy
-    entity_registry.py    re-identification
+    entity_registry.py    re-identification (follows merge aliases)
+    identity.py           identity curation: merge / undo / distinct by evidence replay
     relations.py          relation intervals
     world_state_engine.py observation/claim/intervention orchestration
     evidence_policy.py    source typing, grading, integrity, decision table

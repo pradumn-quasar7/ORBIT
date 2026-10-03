@@ -12,6 +12,7 @@ from backend.app.repositories.base import Repository
 from backend.app.services.actions import ActionSafetyService
 from backend.app.services.active_perception import ActivePerceptionPlanner
 from backend.app.services.hypotheses import HypothesisService
+from backend.app.services.identity import IdentityService
 from backend.app.services.memory import MemoryService
 from backend.app.services.counterfactual import SandboxRegistry
 from backend.app.services.query_agent import QueryAgent
@@ -59,6 +60,7 @@ class OrbitServices:
     actions: ActionSafetyService
     replay: ReplayService
     sandboxes: SandboxRegistry
+    identity: IdentityService
 
     config: OrbitConfig = OrbitConfig()
 
@@ -106,6 +108,7 @@ class OrbitServices:
             actions=actions,
             replay=ReplayService(repo, diff),
             sandboxes=SandboxRegistry(),
+            identity=IdentityService(repo, engine),
             config=config,
         )
 

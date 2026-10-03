@@ -75,6 +75,21 @@ def signature_conflict(entity: Entity, observed: ObservedEntity) -> Optional[str
     return None
 
 
+def identity_conflict_between(a: Entity, b: Entity) -> Optional[str]:
+    for key, value in a.canonical_attributes.items():
+        other = b.canonical_attributes.get(key)
+        if other is not None and other != value:
+            return f"{key} {value!r} != {other!r}"
+    return None
+
+
+def signature_conflict_between(a: Entity, b: Entity) -> Optional[str]:
+    for key in SIGNATURE_ATTRIBUTES & a.current_state.keys() & b.current_state.keys():
+        if a.current_state[key] is not None and b.current_state[key] is not None and a.current_state[key] != b.current_state[key]:
+            return f"{key} {a.current_state[key]!r} != {b.current_state[key]!r}"
+    return None
+
+
 class EntityRegistry:
     def __init__(self, repository: Repository, anchors: AnchorRegistry):
         self.repo = repository
@@ -83,6 +98,10 @@ class EntityRegistry:
     def resolve(self, observed: ObservedEntity, exclude: Set[str]) -> Resolution:
         cid = observed.candidate_entity_id
         claimed = self.repo.get_entity(cid) if cid else None
+        hops = 0
+        while claimed is not None and claimed.merged_into and hops < 16:  # a merged id is an alias (Phase 13)
+            claimed = self.repo.get_entity(claimed.merged_into)
+            hops += 1
 
         if claimed is not None:
             if claimed.id in exclude:
@@ -95,7 +114,8 @@ class EntityRegistry:
                 )
             conflict = identity_conflict(claimed, observed)
             if conflict is None:
-                return Resolution(ResolutionMethod.EXPLICIT_ID, 1.0, entity_id=claimed.id, reason="explicit id")
+                why = "explicit id" if claimed.id == cid else f"explicit id {cid} (alias of {claimed.id})"
+                return Resolution(ResolutionMethod.EXPLICIT_ID, 1.0, entity_id=claimed.id, reason=why)
             return Resolution(
                 ResolutionMethod.NEW_IDENTITY_CONFLICT,
                 0.9,
@@ -104,7 +124,10 @@ class EntityRegistry:
                 reason=f"claimed id {cid} but {conflict}",
             )
 
-        pool = [e for e in self.repo.list_entities() if e.id not in exclude and e.type == observed.type]
+        pool = [
+            e for e in self.repo.list_entities()
+            if e.id not in exclude and e.type == observed.type and not e.merged_into
+        ]
 
         if observed.identifiers:
             hits = [

@@ -79,10 +79,22 @@ class WorldProjector:
                 dst.save_session(s)
                 count("sessions")
 
+            # Identity merges as known at T (Phase 13).
+            merges = []
+            for m in src.list_merges():
+                if m.merged_at > T:
+                    continue
+                if m.undone_at and m.undone_at > T:
+                    m.status, m.undone_at, m.undone_by, m.undo_reason = "ACTIVE", None, None, None
+                dst.save_merge(m)
+                merges.append(m)
+            alias_of = {m.source_id: m.target_id for m in merges if m.status == "ACTIVE"}
+            alias_since = {m.source_id: m.merged_at for m in merges if m.status == "ACTIVE"}
+
             # Conflicts open at T (re-opened if they were resolved later).
             in_open_conflict: Set[str] = set()
             for c in src.list_conflicts():
-                if c.opened_at > T:
+                if c.opened_at > T or (c.recorded_at is not None and c.recorded_at > T):
                     continue
                 if c.resolved_at and c.resolved_at > T:
                     c.resolved_at = None
@@ -97,8 +109,10 @@ class WorldProjector:
                 if entity.created_at > T:
                     continue
                 for v in src.get_state_versions_for_entity(entity.id):
-                    if v.valid_from > T:
+                    if v.valid_from > T or (v.recorded_at is not None and v.recorded_at > T):
                         continue
+                    if v.retired_at is not None and v.retired_at > T:
+                        v.retired_at = None
                     v.support = [s for s in v.support if s.at <= T]
                     v.supported_by = [s.evidence_id for s in v.support]
                     v.last_supported_at = max([v.valid_from] + [s.at for s in v.support if s.strength >= WEAK_SUPPORT])
@@ -134,8 +148,15 @@ class WorldProjector:
                         identifiers.setdefault(k, val)
                     if detection.geometry is not None:
                         geometry = detection.geometry
+                for alias, target in alias_of.items():  # identifiers absorbed through merges
+                    if target == entity.id:
+                        for o, r in ((o, r) for o in observations for r in o.resolutions if r.entity_id == alias):
+                            for k, val in o.observed_entities[r.observed_index].identifiers.items():
+                                identifiers.setdefault(k, val)
                 entity.canonical_attributes = identifiers
                 entity.geometry = geometry
+                self._identity_at(entity, observations, src.get_events_for_entity(entity.id), alias_of, T)
+                entity.merged_at = alias_since.get(entity.id)
                 entity.evidence_refs = [e for e in entity.evidence_refs if e in evidence]
                 entity.history_refs = [h for h in entity.history_refs if h in versions_kept]
                 entity.observed_at = max([o.timestamp for o, _ in seen], default=entity.created_at)
@@ -197,6 +218,37 @@ class WorldProjector:
                 if out.recorded_at <= T:
                     dst.save_outcome(out)
         return stats
+
+    @staticmethod
+    def _identity_at(entity, observations, events, alias_of: Dict[str, str], T: datetime) -> None:
+        """Identity status, candidates, aliasing and distinctness as known at T."""
+        from backend.app.domain.types import IdentityStatus, ResolutionMethod
+
+        entity.merged_into = alias_of.get(entity.id)
+        created = next((r for o in observations for r in o.resolutions if r.entity_id == entity.id), None)
+        if created is not None and created.method == ResolutionMethod.NEW_AMBIGUOUS:
+            entity.identity_status, entity.identity_candidates = IdentityStatus.AMBIGUOUS, list(created.candidates)
+        elif created is not None and created.method == ResolutionMethod.NEW_IDENTITY_CONFLICT:
+            entity.identity_status, entity.identity_candidates = IdentityStatus.POSSIBLE_REPLACEMENT, list(created.candidates)
+        elif created is not None:
+            entity.identity_status, entity.identity_candidates = IdentityStatus.ESTABLISHED, []
+        distinct: Set[str] = set()
+        for e in events:
+            if e.timestamp > T:
+                continue
+            if e.event_type == EventType.IDENTITY_DISTINCT:
+                other = (e.after_state or {}).get("distinct_from")
+                distinct.add(other)
+                entity.identity_candidates = [c for c in entity.identity_candidates if c != other]
+            elif e.event_type == EventType.IDENTITY_MERGED and "absorbed" in (e.before_state or {}):
+                absorbed = e.before_state["absorbed"]
+                if alias_of.get(absorbed) == entity.id:
+                    entity.identity_candidates = [c for c in entity.identity_candidates if c != absorbed]
+                    entity.identity_status = IdentityStatus.ESTABLISHED
+        if entity.identity_status == IdentityStatus.AMBIGUOUS and not entity.identity_candidates and created is not None \
+                and created.candidates:
+            entity.identity_status = IdentityStatus.ESTABLISHED
+        entity.distinct_from = sorted(d for d in distinct if d)
 
     # ------------------------------------------------------------------ tasks
     def _task_at(self, task: Task, all_events, T: datetime) -> Task:

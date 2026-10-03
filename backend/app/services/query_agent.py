@@ -73,8 +73,15 @@ class QueryAgent:
     # ----------------------------------------------------------------- entry
     def vocabulary(self) -> Vocabulary:
         entities, types, attributes = {}, {}, set()
-        for e in self.repo.list_entities():
-            forms = [e.id]
+        everything = self.repo.list_entities()
+        aliases: Dict[str, List[str]] = {}
+        for e in everything:
+            if e.merged_into:
+                aliases.setdefault(e.merged_into, []).append(e.id)
+        for e in everything:
+            if e.merged_into:
+                continue
+            forms = [e.id] + aliases.get(e.id, [])
             if e.name and e.name != e.type:
                 forms.append(e.name)
             entities[e.id] = forms
@@ -282,6 +289,8 @@ class QueryAgent:
             return f"{n} is no longer {c.attribute.replace('_', ' ')} {c.before}."
         if t == EventType.EVIDENCE_CONFLICT:
             return f"Sources now disagree about {n}'s {c.attribute}: {', '.join(repr(v) for v in c.after)}."
+        if t == EventType.IDENTITY_MERGED:
+            return f"{c.entity_id} was confirmed to be {self._name(c.after)} (identity corrected by a person)."
         if t == EventType.TASK_PROGRESS_CHANGED:
             target = f"step {c.attribute}" if c.attribute else "task"
             return f"Task {c.entity_id} {target}: {c.before} → {c.after}."

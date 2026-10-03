@@ -1,10 +1,10 @@
 # ORBIT Project Status
 
 ## Current Phase
-**Phase 12 — Risk-graded verification (COMPLETE).** ORBIT v0.1 (Phases 0–9) is complete;
-Phase 10 added replay and counterfactual sandboxes; Phase 11 decision-aware perception;
-Phase 12 risk-graded verification before consequential steps and actions. All spec §36
-MVP acceptance criteria are covered by passing tests.
+**Phase 13 — Identity curation (COMPLETE).** ORBIT v0.1 (Phases 0–9) is complete; Phase 10
+added replay and counterfactual sandboxes; Phase 11 decision-aware perception; Phase 12
+risk-graded verification; Phase 13 human-confirmed identity correction. All spec §36 MVP
+acceptance criteria are covered by passing tests.
 
 ## Phase Log
 
@@ -178,6 +178,19 @@ MVP acceptance criteria are covered by passing tests.
 - Bench: scenario `high_risk_stale_premise`, variant `no_risk_grading`. ADR-033, ADR-034. Tests: `test_risk_graded_verification.py`.
 - Design correction during the phase: VERIFIED evidence initially exempted HIGH-risk steps forever; it now ages out after 60 min.
 
+### Phase 13 — Identity curation (merge, undo, confirm distinct)
+**Planned**
+- Human-confirmed merge of a duplicate/ambiguous record into its true entity, re-deriving belief from both evidence histories; undo; "distinct" judgments; merge suggestions; aliases; bitemporal history; bench scenario.
+- Exit: a person can resolve an identity ORBIT could not decide, the merged belief follows the normal evidence policy, earlier "as known at" answers are unchanged, and the merge can be undone.
+
+**Implemented**
+- `services/identity.py` (`IdentityService`: `merge`, `undo`, `confirm_distinct`, `suggestions`, `rebuild`, `resolve_alias`); `IdentityMerge`, `MergeSuggestion`; `Scope.CURATE`; events `IDENTITY_MERGED/UNMERGED/DISTINCT`.
+- Bitemporal fields: `StateVersion.recorded_at/retired_at`, `Conflict.recorded_at`; `Entity.merged_into/merged_at/distinct_from`; silent replay mode in `BeliefUpdater`; transaction-time-aware reads, snapshots, projection.
+- Aliases in re-identification, search, agent vocabulary; merged records hidden from views; world diff reports `IDENTITY_MERGED`; `GET /entities?include_merged`.
+- Epistemic fixes found while writing ground truth: ambiguity now casts doubt on candidates (ADR-036); a search refutes only claims inside its region (ADR-037).
+- API: `GET /identity/suggestions`, `POST /identity/merge`, `GET /identity/merges`, `POST /identity/merges/{id}/undo`, `POST /identity/distinct`. Migration `0009`.
+- Bench: `ConfirmIdentity` step, alias-aware identity metric, scenario `identity_correction` (14 scenarios). ADR-035…037. Tests: `test_identity_curation.py`.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -207,7 +220,6 @@ MVP acceptance criteria are covered by passing tests.
 | Important claims are auditable | `test_evidence_engine.py::test_tampered_evidence_fails_integrity`, action audit events |
 
 ## Known Issues / Limitations
-- Ambiguous entities cannot yet be merged into their true identity after verification.
 - No multi-workspace / multi-tenant separation or authentication on the API (spec §17 access control is principal-scoped for actions only).
 - Reasoning provider is rule-based; free-form language coverage is limited to the supported question types. An LLM provider can be added behind `ReasoningProvider`.
 - Real camera perception requires plugging a detector into `DetectionPerceptionProvider`; none is bundled.
@@ -217,14 +229,13 @@ MVP acceptance criteria are covered by passing tests.
 - Sandboxes are process-local and disposable (not persisted); each probe copies the world, which is fine for small workspaces but not optimised.
 
 ## Next (candidates)
-1. Identity merge workflow (verify an AMBIGUOUS entity → merge histories with provenance).
-2. Randomised scenario generator for ORBIT-BENCH (and for Experiment H futures) with seeds and confidence intervals.
-3. Real detector integration (e.g. OWL-ViT/YOLO) behind the adapter + latency measurement on real frames.
-4. API authentication and workspace separation.
-5. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
+1. Randomised scenario generator for ORBIT-BENCH (and for Experiment H futures) with seeds and confidence intervals.
+2. Real detector integration (e.g. OWL-ViT/YOLO) behind the adapter + latency measurement on real frames.
+3. API authentication and workspace separation.
+4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 414 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 443 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
 ## Architecture Decisions
@@ -242,6 +253,7 @@ MVP acceptance criteria are covered by passing tests.
 - ADR-028 World projection · ADR-012 amendment (no future evidence in as-of reads) · ADR-029 Sandbox isolation / SIMULATION evidence · ADR-030 Sensitivity analysis + Experiment H
 - ADR-031 Decision-aware perception (value of information) · ADR-032 Rolled-back preview
 - ADR-033 Risk-graded verification · ADR-034 Explicit waivers, inherited prerequisites
+- ADR-035 Merge by evidence replay (bitemporal) · ADR-036 Ambiguity casts doubt · ADR-037 Region-scoped absence
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.
@@ -250,4 +262,4 @@ MVP acceptance criteria are covered by passing tests.
 - G (AR utility) — deferred (needs an AR client).
 
 ## Last Updated
-- 2026-10-02 (Phase 12)
+- 2026-10-03 (Phase 13)
