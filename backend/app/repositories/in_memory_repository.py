@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from backend.app.domain.models import (
     ActionRequest,
+    IdentityMerge,
     Anchor,
     CausalHypothesis,
     ClaimDependency,
@@ -44,6 +45,7 @@ _STORES = (
     "principals",
     "actions",
     "outcomes",
+    "merges",
 )
 
 
@@ -72,6 +74,7 @@ class InMemoryRepository(Repository):
         self.principals: Dict[str, Principal] = {}
         self.actions: Dict[str, ActionRequest] = {}
         self.outcomes: Dict[str, OutcomeRecord] = {}
+        self.merges: Dict[str, IdentityMerge] = {}
         self._depth = 0
 
     @contextmanager
@@ -289,3 +292,13 @@ class InMemoryRepository(Repository):
     def list_outcomes(self, action_id: Optional[str] = None) -> List[OutcomeRecord]:
         found = [_copy(o) for o in self.outcomes.values() if action_id is None or o.action_id == action_id]
         return sorted(found, key=lambda o: o.recorded_at)
+
+    # Identity merges
+    def save_merge(self, merge: IdentityMerge) -> IdentityMerge:
+        return self._put(self.merges, merge)
+
+    def get_merge(self, merge_id: str) -> Optional[IdentityMerge]:
+        return self._get(self.merges, merge_id)
+
+    def list_merges(self) -> List[IdentityMerge]:
+        return sorted((_copy(m) for m in self.merges.values()), key=lambda m: m.merged_at)

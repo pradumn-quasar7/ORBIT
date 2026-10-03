@@ -63,6 +63,9 @@ entities = Table(
     Column("permissions", JSON, nullable=False),
     Column("identity_status", String(32), nullable=False, server_default="ESTABLISHED"),
     Column("identity_candidates", JSON, nullable=False, server_default="[]"),
+    Column("merged_into", String(128), index=True),
+    Column("merged_at", UTCDateTimeType),
+    Column("distinct_from", JSON, nullable=False, server_default="[]"),
     Column("created_at", UTCDateTimeType, nullable=False),
     Column("updated_at", UTCDateTimeType, nullable=False),
 )
@@ -122,6 +125,8 @@ state_versions = Table(
     Column("volatility_class", String(16)),
     Column("invalidated_at", UTCDateTimeType),
     Column("invalidation_reason", Text),
+    Column("recorded_at", UTCDateTimeType),
+    Column("retired_at", UTCDateTimeType),
 )
 
 events = Table(
@@ -263,6 +268,7 @@ conflicts = Table(
     Column("resolution_version_id", String(128)),
     Column("resolution_evidence", String(128)),
     Column("resolution_reason", Text),
+    Column("recorded_at", UTCDateTimeType),
 )
 
 claim_dependencies = Table(
@@ -345,4 +351,26 @@ outcomes = Table(
     Column("evidence_refs", JSON, nullable=False),
     Column("performed_by", String(128)),
     Column("recorded_at", UTCDateTimeType, nullable=False),
+)
+
+identity_merges = Table(
+    "identity_merges",
+    metadata,
+    Column("id", String(128), primary_key=True),
+    _seq(),
+    Column("source_id", String(128), nullable=False, index=True),
+    Column("target_id", String(128), nullable=False, index=True),
+    Column("merged_at", UTCDateTimeType, nullable=False),
+    Column("principal_id", String(128), nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("evidence_id", String(128), nullable=False),
+    Column("status", String(16), nullable=False),
+    Column("source_version_ids", JSON, nullable=False),
+    Column("target_version_ids", JSON, nullable=False),
+    Column("source_identity_status", String(32), nullable=False),
+    Column("source_identity_candidates", JSON, nullable=False),
+    Column("moved_relation_ids", JSON, nullable=False),
+    Column("undone_at", UTCDateTimeType),
+    Column("undone_by", String(128)),
+    Column("undo_reason", Text),
 )

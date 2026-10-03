@@ -62,12 +62,15 @@ class SearchService:
                 wanted = item.split(":", 1)[1]
                 for e in self.repo.list_entities():
                     loc = self._last_location(e.id, at)
-                    if e.type == wanted and e.created_at <= at and self.engine.anchors.is_within(loc, region):
+                    if e.type == wanted and e.created_at <= at and not e.merged_into and self.engine.anchors.is_within(loc, region):
                         targets.append(e.id)
             else:
-                if self.repo.get_entity(item) is None:
+                entity = self.repo.get_entity(item)
+                if entity is None:
                     raise EntityNotFoundError(f"Entity {item} not found")
-                targets.append(item)
+                while entity.merged_into:  # an alias: search for the real entity
+                    entity = self.repo.get_entity(entity.merged_into)
+                targets.append(entity.id)
         return list(dict.fromkeys(targets))
 
     def record_search(
@@ -129,7 +132,7 @@ class SearchService:
                 if validated and (inside or not self.policy.enabled):
                     coverage.confirmed_absent.append(target)
                     entity = self.repo.get_entity(target)
-                    self.engine.belief.apply_absence(entity, region, at, evidence.id, coverage.id)
+                    self.engine.belief.apply_absence(entity, region, at, evidence.id, coverage.id, within=self.engine.anchors.is_within)
                     entity.updated_at = max(entity.updated_at, at)
                     self.engine.belief.materialize(entity, entity.updated_at)
                     self.repo.save_entity(entity)

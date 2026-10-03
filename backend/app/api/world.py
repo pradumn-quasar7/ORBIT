@@ -85,8 +85,10 @@ def create_entity(body: EntityRegistration, svc: OrbitServices = Depends(get_ser
 
 
 @router.get("/entities", response_model=List[Entity])
-def list_entities(svc: OrbitServices = Depends(get_services)):
-    return svc.repo.list_entities()
+def list_entities(include_merged: bool = False, svc: OrbitServices = Depends(get_services)):
+    """Live entities. Records merged into another entity are aliases; pass include_merged to see them."""
+    entities = svc.repo.list_entities()
+    return entities if include_merged else [e for e in entities if not e.merged_into]
 
 
 @router.get("/entities/{entity_id}", response_model=Entity)

@@ -15,6 +15,7 @@ from backend.app.domain.types import RiskLevel
 from backend.app.evaluation.bench import (
     Claim,
     CompleteStep,
+    ConfirmIdentity,
     ConflictCheck,
     CreateTask,
     DiffCheck,
@@ -272,5 +273,24 @@ SCENARIOS: List[Scenario] = [
         resumes=[ResumeCheck(at=120, task_id="T3", expected_next=None, expected_blocked=["c2"], unsafe_steps=["c2"]),
                  ResumeCheck(at=126, task_id="T3", expected_next="c1", expected_blocked=["c2"], unsafe_steps=["c2"])],
         queries=[QueryCheck(at=121, text="Is it safe to cut the coolant line?", expect="abstain", category="other")],
+    ),
+    Scenario(
+        id="identity_correction",
+        title="A person resolves an ambiguous identity",
+        description="Two identical bottles; a third sighting cannot be attributed. A person confirms it is bottle A.",
+        primary_metric="entity_persistence_accuracy",
+        anchors=LAB,
+        steps=[
+            Observe(at=0, detections=[d("bottle_a", "desk_left", "bottle", color="blue"), d("bottle_b", "desk_right", "bottle", color="blue")]),
+            Observe(at=60, detections=[d("bottle_a", "kitchen", "bottle", anonymous=True, attributes={"color": "blue"})]),
+            ConfirmIdentity(at=70, target="bottle_a", reason="label on the cap reads A"),
+            Observe(at=90, detections=[d("bottle_a", "kitchen", "bottle", anonymous=True, attributes={"color": "blue"})]),
+        ],
+        # True world: bottle A really is in the kitchen from minute 60. Before the person
+        # resolves the sighting, ORBIT must not keep asserting the old desk location.
+        queries=[QueryCheck(at=61, text="Where is bottle_a?", expect="abstain", truth="kitchen"),
+                 QueryCheck(at=61, text="Where is bottle_b?", expect="abstain", truth="desk_right"),
+                 QueryCheck(at=71, text="Where is bottle_a?", expect="answer", truth="kitchen"),
+                 QueryCheck(at=71, text="Where is bottle_b?", expect="answer", truth="desk_right")],
     ),
 ]

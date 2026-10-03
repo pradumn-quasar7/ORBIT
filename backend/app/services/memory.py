@@ -28,6 +28,17 @@ from backend.app.services.spatial import AnchorRegistry
 CONTAINMENT_RELATIONS = ("on", "inside")
 
 
+def merged_by(entity: Entity, as_of: datetime, merges=None) -> bool:
+    """Was the record an alias of another entity at ``as_of``? Decided from the merge
+    records, so a merge that was later undone still hides the alias for its period."""
+    if merges is not None:
+        return any(
+            m.source_id == entity.id and m.merged_at <= as_of and (m.undone_at is None or m.undone_at > as_of)
+            for m in merges
+        )
+    return entity.merged_at is not None and entity.merged_at <= as_of
+
+
 class MemoryService:
     def __init__(
         self,
@@ -71,7 +82,8 @@ class MemoryService:
 
     def world_snapshot(self, as_of: datetime, entity_ids: Optional[List[str]] = None) -> WorldSnapshot:
         """B_t — the structured belief state at ``as_of``."""
-        entities = [e for e in self.repo.list_entities() if e.created_at <= as_of]
+        merges = self.repo.list_merges()
+        entities = [e for e in self.repo.list_entities() if e.created_at <= as_of and not merged_by(e, as_of, merges)]
         if entity_ids is not None:
             entities = [e for e in entities if e.id in set(entity_ids)]
         return WorldSnapshot(as_of=as_of, entities={e.id: self.entity_snapshot(e, as_of) for e in entities})
@@ -105,8 +117,9 @@ class MemoryService:
         """What is (believed to be) at an anchor. Stale positions are included but carry
         their status; callers must not present them as current (spec §2.7)."""
         found: Dict[str, AnchorContent] = {}
+        merges = self.repo.list_merges()
         for entity in self.repo.list_entities():
-            if entity.created_at > as_of:
+            if entity.created_at > as_of or merged_by(entity, as_of, merges):
                 continue
             a = self.claims.assess_attribute(entity.id, LOCATION, as_of)
             where = a.value if a.supportable else a.last_known_value

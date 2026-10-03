@@ -77,6 +77,15 @@ class WorldDiffService:
                 gone = self._unobserved(ea, eb, baseline, target)
                 if gone is not None:
                     changes.append(gone)
+        for eid in sorted(set(a.entities) - set(b.entities)):
+            entity = self.repo.get_entity(eid)
+            if entity is not None and entity.merged_at is not None and baseline < entity.merged_at <= target:
+                when, refs = self._change_time(window_events, eid, None, target, {EventType.IDENTITY_MERGED})
+                changes.append(WorldChange(
+                    change_type=EventType.IDENTITY_MERGED, entity_id=eid, before=eid, after=entity.merged_into,
+                    related_entity_ids=[entity.merged_into], note="identity corrected by a person",
+                    evidence_refs=refs, timestamp=when,
+                ))
         if include_tasks and self.tasks is not None:
             changes += self._task_changes(baseline, target)
         self._annotate_replacements(changes, a, b)

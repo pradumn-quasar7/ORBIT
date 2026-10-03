@@ -101,6 +101,7 @@ reasoning, embedding), and wall-clock timings.
 | multi_user_handoff | Multi-user handoff | task resumption success |
 | adversarial_memory | Adversarial memory / misleading low-authority evidence | stale-claim rate |
 | high_risk_stale_premise | Consequential step on old-but-unexpired evidence | unsafe continuation rate |
+| identity_correction | Ambiguous identity resolved by a person | entity persistence accuracy |
 
 ## 7. Experiment H — counterfactual decisions vs static replay
 

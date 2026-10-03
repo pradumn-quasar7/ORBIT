@@ -145,7 +145,7 @@ class ActivePerceptionPlanner:
         critical = self._decision_critical(as_of)
         found: Dict[Tuple[str, str], UncertainClaim] = {}
         for entity in self.repo.list_entities():
-            if entity.created_at > as_of or (wanted and entity.id not in wanted):
+            if entity.created_at > as_of or (wanted and entity.id not in wanted) or entity.merged_into:
                 continue
             region = self._region(entity.id, as_of)
             attrs = sorted({v.attribute for v in self.repo.get_state_versions_for_entity(entity.id)})

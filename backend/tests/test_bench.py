@@ -14,10 +14,10 @@ def report():
 
 def test_catalog_covers_spec_scenarios():
     ids = {s.id for s in SCENARIOS}
-    assert len(SCENARIOS) == 13
+    assert len(SCENARIOS) == 14
     assert {"object_relocation", "configuration_change", "partial_observation", "contradiction", "stale_state",
             "negative_search", "task_interruption", "causal_temptation", "same_looking_objects", "object_replaced",
-            "multi_user_handoff", "adversarial_memory", "high_risk_stale_premise"} == ids
+            "multi_user_handoff", "adversarial_memory", "high_risk_stale_premise", "identity_correction"} == ids
 
 
 def test_full_orbit_meets_ground_truth(report):
@@ -28,6 +28,8 @@ def test_full_orbit_meets_ground_truth(report):
         if target is not None:
             assert r[metric] == pytest.approx(target), metric
     assert r["entity_persistence_accuracy"] >= 0.95 and r["false_merge_rate"] == 0.0
+    per = {x.scenario_id: x for x in report.per_scenario if x.variant == "orbit"}
+    assert per["identity_correction"].metrics["entity_persistence_accuracy"].value == 1.0
 
 
 @pytest.mark.parametrize(

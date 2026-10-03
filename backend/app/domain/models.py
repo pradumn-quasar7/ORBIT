@@ -100,6 +100,12 @@ class StateVersion(BaseModel):
     volatility_class: Optional[VolatilityClass] = None
     invalidated_at: Optional[UTCDateTime] = None
     invalidation_reason: Optional[str] = None
+    # Transaction time (Phase 13). A version re-derived by an identity merge is only
+    # part of belief from ``recorded_at`` on; a version replaced by one is retired from
+    # ``retired_at`` on. Both None for ordinary versions. This keeps "as known at t"
+    # answers for t before a merge exactly as they were.
+    recorded_at: Optional[UTCDateTime] = None
+    retired_at: Optional[UTCDateTime] = None
 
     @model_validator(mode="after")
     def _default_support_time(self) -> "StateVersion":
@@ -120,6 +126,7 @@ class Conflict(BaseModel):
     resolution_version_id: Optional[str] = None
     resolution_evidence: Optional[str] = None
     resolution_reason: Optional[str] = None
+    recorded_at: Optional[UTCDateTime] = None  # set when created by an identity-merge replay
 
 
 class ClaimDependency(BaseModel):
@@ -178,6 +185,9 @@ class Entity(BaseModel):
     permissions: Dict[str, Any] = Field(default_factory=dict)
     identity_status: IdentityStatus = IdentityStatus.ESTABLISHED
     identity_candidates: List[str] = Field(default_factory=list)
+    merged_into: Optional[str] = None  # this record is an alias of that entity since merged_at
+    merged_at: Optional[UTCDateTime] = None
+    distinct_from: List[str] = Field(default_factory=list)  # confirmed by a person to be different objects
     created_at: UTCDateTime
     updated_at: UTCDateTime
 
@@ -772,3 +782,32 @@ class SensitivityReport(BaseModel):
     items: List[SensitivityItem]
     critical: List[str]  # "entity.attribute" whose failure changes the decision
     recommended_checks: List[ObservationRequest]
+
+
+# ------------------------------------------------------------ identity curation
+class IdentityMerge(BaseModel):
+    """A human-confirmed identity correction: ``source`` was ``target`` all along."""
+
+    id: str = Field(default_factory=lambda: generate_id("merge"))
+    source_id: str
+    target_id: str
+    merged_at: UTCDateTime
+    principal_id: str
+    reason: str
+    evidence_id: str
+    status: str = "ACTIVE"  # ACTIVE | UNDONE
+    source_version_ids: List[str] = Field(default_factory=list)  # retired originals, for undo
+    target_version_ids: List[str] = Field(default_factory=list)
+    source_identity_status: IdentityStatus = IdentityStatus.ESTABLISHED
+    source_identity_candidates: List[str] = Field(default_factory=list)
+    moved_relation_ids: List[str] = Field(default_factory=list)
+    undone_at: Optional[UTCDateTime] = None
+    undone_by: Optional[str] = None
+    undo_reason: Optional[str] = None
+
+
+class MergeSuggestion(BaseModel):
+    source_id: str
+    target_id: str
+    score: float
+    reasons: List[str]

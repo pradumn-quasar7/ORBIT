@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app.domain.models import (
     ActionRequest,
+    IdentityMerge,
     Anchor,
     CausalHypothesis,
     ClaimDependency,
@@ -348,6 +349,17 @@ class SqlRepository(Repository):
     def list_outcomes(self, action_id: Optional[str] = None) -> List[OutcomeRecord]:
         cond = t.outcomes.c.action_id == action_id if action_id is not None else None
         return self._list(t.outcomes, OutcomeRecord, [t.outcomes.c.recorded_at], cond)
+
+    # ----------------------------------------------------------- identity merges
+    def save_merge(self, merge: IdentityMerge) -> IdentityMerge:
+        self._upsert(t.identity_merges, merge)
+        return merge
+
+    def get_merge(self, merge_id: str) -> Optional[IdentityMerge]:
+        return self._get_one(t.identity_merges, IdentityMerge, merge_id)
+
+    def list_merges(self) -> List[IdentityMerge]:
+        return self._list(t.identity_merges, IdentityMerge, [t.identity_merges.c.merged_at])
 
 
 __all__ = ["SqlRepository", "make_engine"]

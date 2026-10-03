@@ -97,7 +97,15 @@ class Hypothesize(BaseModel):
     effect: Tuple[str, str]
 
 
-Step = Union[Observe, Claim, Intervene, Search, CreateTask, CompleteStep, InterruptTask, EndSession, Hypothesize]
+class ConfirmIdentity(BaseModel):
+    """A person confirms that the ambiguous record created for ``truth`` is ``target``."""
+
+    at: float
+    target: str
+    reason: str = "confirmed on site"
+
+
+Step = Union[Observe, Claim, Intervene, Search, CreateTask, CompleteStep, InterruptTask, EndSession, Hypothesize, ConfirmIdentity]
 
 
 # ------------------------------------------------------------------ checks
@@ -283,6 +291,15 @@ class ScenarioRunner:
         session.ended_at = _at(st.at)
         self.repo.save_session(session)
 
+    def _do_confirmidentity(self, st: ConfirmIdentity):
+        from backend.app.domain.types import PrincipalKind, Scope
+
+        if self.repo.get_principal("bench_curator") is None:
+            self.svc.actions.register_principal("bench_curator", PrincipalKind.HUMAN, [Scope.CURATE], T0)
+        source = next(e.id for e in self.repo.list_entities()
+                      if st.target in e.identity_candidates and not e.merged_into)
+        self.svc.identity.merge(source, st.target, "bench_curator", _at(st.at), st.reason)
+
     def _do_hypothesize(self, st: Hypothesize):
         def latest(entity, attr):
             hits = [e for e in self.repo.get_events_for_entity(entity) if attr in (e.after_state or {})]
@@ -370,11 +387,14 @@ class ScenarioRunner:
                 truth = self.truth_of.get(f"{obs.id}:{r.observed_index}")
                 if truth is None:
                     continue
-                entity = self.repo.get_entity(r.entity_id)
-                first.setdefault(truth, r.entity_id)
-                owner.setdefault(r.entity_id, truth)
-                correct = r.entity_id == first[truth] and owner[r.entity_id] == truth
-                merged_wrongly = owner[r.entity_id] != truth
+                # Identity is judged by what ORBIT ends up believing: a record a person
+                # merged into another entity counts as that entity.
+                resolved = self.svc.identity.resolve_alias(r.entity_id)
+                entity = self.repo.get_entity(resolved)
+                first.setdefault(truth, resolved)
+                owner.setdefault(resolved, truth)
+                correct = resolved == first[truth] and owner[resolved] == truth
+                merged_wrongly = owner[resolved] != truth
                 # A deliberately ambiguous (unmerged) detection is not a wrong merge.
                 if not correct and entity is not None and entity.identity_status == IdentityStatus.AMBIGUOUS:
                     self.notes.append(f"identity abstained for {truth} ({r.entity_id})")
