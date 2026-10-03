@@ -1,7 +1,7 @@
 # ORBIT-BENCH results
 
-- **run_at**: `2026-10-03T05:42:06+00:00`
-- **git_commit**: `2ee47a1`
+- **run_at**: `2026-10-03T06:12:09+00:00`
+- **git_commit**: `1c2c407`
 - **schema_revision**: `0009`
 - **scenario_catalog**: `v0.1`
 - **scenarios**: `14`
@@ -12,7 +12,7 @@
 
 | Metric | orbit | no_freshness | last_writer_wins | unobserved_removed | no_evidence_gate | event_log_diff | naive_resume | no_risk_grading |
 |---|---|---|---|---|---|---|---|---|
-| entity_persistence_accuracy | 0.98 | 0.98 | 0.98 | 0.98 | 0.98 | 0.98 | 0.98 | 0.98 |
+| entity_persistence_accuracy | 0.96 | 0.96 | 0.96 | 0.96 | 0.96 | 0.96 | 0.96 | 0.96 |
 | false_merge_rate ↓ | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | diff_precision | 1.00 | 1.00 | 1.00 | 0.62 | 1.00 | 0.60 | 1.00 | 1.00 |
 | diff_recall | 1.00 | 1.00 | 1.00 | 0.62 | 1.00 | 0.38 | 1.00 | 1.00 |
@@ -26,6 +26,7 @@
 | unsafe_continuation_rate ↓ | 0.00 | 0.20 | 0.00 | 0.00 | 0.00 | 0.00 | 0.80 | 0.20 |
 | unsupported_causal_claim_rate ↓ | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 | 0.00 |
 | search_coverage_precision | 1.00 | 1.00 | 1.00 | 0.67 | 1.00 | 1.00 | 1.00 | 1.00 |
+| progress_rate | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 0.33 | 1.00 |
 
 ↓ = lower is better. Each ablation removes one component (spec §28).
 
@@ -45,6 +46,7 @@
 - **unsafe_continuation_rate** — resumes presenting an unsafe step / resume checks (lower is better)
 - **unsupported_causal_claim_rate** — causal questions answered with an unsupported cause / causal questions (lower is better)
 - **search_coverage_precision** — confirmed-absent claims that are truly absent / confirmed-absent claims
+- **progress_rate** — resumes presenting a step when the true world allowed progress / such resumes (caution has a cost)
 
 ## Scenarios
 
@@ -67,14 +69,14 @@
 
 | Variant | observation_ms_p50 | observation_ms_p95 | query_ms_p50 | query_ms_p95 |
 |---|---|---|---|---|
-| orbit | 0.87 | 2.61 | 0.43 | 2.46 |
-| no_freshness | 0.67 | 1.22 | 0.29 | 0.39 |
-| last_writer_wins | 0.63 | 1.19 | 0.29 | 0.43 |
-| unobserved_removed | 0.58 | 1.11 | 0.28 | 0.42 |
-| no_evidence_gate | 0.60 | 1.18 | 0.28 | 0.39 |
-| event_log_diff | 0.57 | 1.08 | 0.28 | 0.38 |
-| naive_resume | 0.60 | 1.14 | 0.28 | 0.37 |
-| no_risk_grading | 0.59 | 1.09 | 0.28 | 0.36 |
+| orbit | 0.64 | 1.49 | 0.36 | 0.65 |
+| no_freshness | 0.58 | 1.30 | 0.28 | 0.41 |
+| last_writer_wins | 0.62 | 1.29 | 0.29 | 0.61 |
+| unobserved_removed | 0.69 | 1.33 | 0.31 | 0.49 |
+| no_evidence_gate | 0.59 | 1.27 | 0.28 | 0.42 |
+| event_log_diff | 0.59 | 1.31 | 0.27 | 0.42 |
+| naive_resume | 0.60 | 1.25 | 0.27 | 0.41 |
+| no_risk_grading | 0.60 | 1.30 | 0.28 | 0.42 |
 
 ## Experiment H — counterfactual decisions vs static replay
 

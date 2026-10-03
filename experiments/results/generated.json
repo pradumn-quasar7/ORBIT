@@ -1,0 +1,1196 @@
+{
+  "metadata": {
+    "run_at": "2026-10-03T06:12:13+00:00",
+    "git_commit": "1c2c407+dirty",
+    "schema_revision": "0009",
+    "reasoning_provider": "rule-based-v1",
+    "embedding_provider": "hashing-bow-v1",
+    "retrieval_provider": "in-memory-cosine-v1",
+    "python": "3.9.6",
+    "generator": "v1 (scene, task, conflict)"
+  },
+  "per_family": 40,
+  "seed": 0,
+  "variants": [
+    "orbit",
+    "no_freshness",
+    "last_writer_wins",
+    "unobserved_removed",
+    "no_evidence_gate",
+    "event_log_diff",
+    "naive_resume",
+    "no_risk_grading"
+  ],
+  "results": {
+    "orbit": {
+      "entity_persistence_accuracy": {
+        "estimate": 0.9612277867528272,
+        "low": 0.9322381930184805,
+        "high": 0.9871794871794872,
+        "scenarios": 40.0
+      },
+      "false_merge_rate": {
+        "estimate": 0.0032310177705977385,
+        "low": 0.0,
+        "high": 0.010033444816053512,
+        "scenarios": 40.0
+      },
+      "diff_precision": {
+        "estimate": 0.8754716981132076,
+        "low": 0.7813504823151125,
+        "high": 0.9644268774703557,
+        "scenarios": 40.0
+      },
+      "diff_recall": {
+        "estimate": 0.9626556016597511,
+        "low": 0.9294605809128631,
+        "high": 0.9910313901345291,
+        "scenarios": 40.0
+      },
+      "stale_claim_rate": {
+        "estimate": 0.13333333333333333,
+        "low": 0.07453416149068323,
+        "high": 0.1958762886597938,
+        "scenarios": 70.0
+      },
+      "evidence_backed_claim_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 70.0
+      },
+      "correct_abstention_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 50.0
+      },
+      "useful_answer_rate": {
+        "estimate": 0.948905109489051,
+        "low": 0.896774193548387,
+        "high": 0.992,
+        "scenarios": 68.0
+      },
+      "conflict_detection_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 34.0
+      },
+      "unsafe_continuation_rate": {
+        "estimate": 0.1,
+        "low": 0.022727272727272728,
+        "high": 0.2,
+        "scenarios": 40.0
+      },
+      "search_coverage_precision": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 5.0
+      },
+      "progress_rate": {
+        "estimate": 0.65,
+        "low": 0.5,
+        "high": 0.8,
+        "scenarios": 40.0
+      }
+    },
+    "no_freshness": {
+      "entity_persistence_accuracy": {
+        "estimate": 0.9612277867528272,
+        "low": 0.9322381930184805,
+        "high": 0.9871794871794872,
+        "scenarios": 40.0
+      },
+      "false_merge_rate": {
+        "estimate": 0.0032310177705977385,
+        "low": 0.0,
+        "high": 0.010033444816053512,
+        "scenarios": 40.0
+      },
+      "diff_precision": {
+        "estimate": 0.8754716981132076,
+        "low": 0.7813504823151125,
+        "high": 0.9644268774703557,
+        "scenarios": 40.0
+      },
+      "diff_recall": {
+        "estimate": 0.9626556016597511,
+        "low": 0.9294605809128631,
+        "high": 0.9910313901345291,
+        "scenarios": 40.0
+      },
+      "stale_claim_rate": {
+        "estimate": 0.1780821917808219,
+        "low": 0.11956521739130435,
+        "high": 0.23555555555555555,
+        "scenarios": 74.0
+      },
+      "evidence_backed_claim_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 74.0
+      },
+      "correct_abstention_rate": {
+        "estimate": 0.7019230769230769,
+        "low": 0.5529411764705883,
+        "high": 0.8484848484848485,
+        "scenarios": 50.0
+      },
+      "useful_answer_rate": {
+        "estimate": 0.9781021897810219,
+        "low": 0.9483870967741935,
+        "high": 1.0,
+        "scenarios": 68.0
+      },
+      "conflict_detection_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 34.0
+      },
+      "unsafe_continuation_rate": {
+        "estimate": 0.1,
+        "low": 0.022727272727272728,
+        "high": 0.2,
+        "scenarios": 40.0
+      },
+      "search_coverage_precision": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 5.0
+      },
+      "progress_rate": {
+        "estimate": 0.65,
+        "low": 0.5,
+        "high": 0.8,
+        "scenarios": 40.0
+      }
+    },
+    "last_writer_wins": {
+      "entity_persistence_accuracy": {
+        "estimate": 0.9612277867528272,
+        "low": 0.9322381930184805,
+        "high": 0.9871794871794872,
+        "scenarios": 40.0
+      },
+      "false_merge_rate": {
+        "estimate": 0.0032310177705977385,
+        "low": 0.0,
+        "high": 0.010033444816053512,
+        "scenarios": 40.0
+      },
+      "diff_precision": {
+        "estimate": 0.8754716981132076,
+        "low": 0.7813504823151125,
+        "high": 0.9644268774703557,
+        "scenarios": 40.0
+      },
+      "diff_recall": {
+        "estimate": 0.9626556016597511,
+        "low": 0.9294605809128631,
+        "high": 0.9910313901345291,
+        "scenarios": 40.0
+      },
+      "stale_claim_rate": {
+        "estimate": 0.24193548387096775,
+        "low": 0.18974358974358974,
+        "high": 0.30115830115830117,
+        "scenarios": 76.0
+      },
+      "evidence_backed_claim_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 76.0
+      },
+      "correct_abstention_rate": {
+        "estimate": 0.34615384615384615,
+        "low": 0.19444444444444445,
+        "high": 0.49382716049382713,
+        "scenarios": 50.0
+      },
+      "useful_answer_rate": {
+        "estimate": 0.948905109489051,
+        "low": 0.896774193548387,
+        "high": 0.992,
+        "scenarios": 68.0
+      },
+      "conflict_detection_rate": {
+        "estimate": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "scenarios": 34.0
+      },
+      "unsafe_continuation_rate": {
+        "estimate": 0.1,
+        "low": 0.022727272727272728,
+        "high": 0.2,
+        "scenarios": 40.0
+      },
+      "search_coverage_precision": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 5.0
+      },
+      "progress_rate": {
+        "estimate": 0.65,
+        "low": 0.5,
+        "high": 0.8,
+        "scenarios": 40.0
+      }
+    },
+    "unobserved_removed": {
+      "entity_persistence_accuracy": {
+        "estimate": 0.9612277867528272,
+        "low": 0.9322381930184805,
+        "high": 0.9871794871794872,
+        "scenarios": 40.0
+      },
+      "false_merge_rate": {
+        "estimate": 0.0032310177705977385,
+        "low": 0.0,
+        "high": 0.010033444816053512,
+        "scenarios": 40.0
+      },
+      "diff_precision": {
+        "estimate": 0.24150943396226415,
+        "low": 0.16149068322981366,
+        "high": 0.34105960264900664,
+        "scenarios": 40.0
+      },
+      "diff_recall": {
+        "estimate": 0.26556016597510373,
+        "low": 0.18067226890756302,
+        "high": 0.3652694610778443,
+        "scenarios": 40.0
+      },
+      "stale_claim_rate": {
+        "estimate": 0.10857142857142857,
+        "low": 0.05737704918032787,
+        "high": 0.1702127659574468,
+        "scenarios": 70.0
+      },
+      "evidence_backed_claim_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 70.0
+      },
+      "correct_abstention_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 50.0
+      },
+      "useful_answer_rate": {
+        "estimate": 0.948905109489051,
+        "low": 0.896774193548387,
+        "high": 0.992,
+        "scenarios": 68.0
+      },
+      "conflict_detection_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 34.0
+      },
+      "unsafe_continuation_rate": {
+        "estimate": 0.1,
+        "low": 0.022727272727272728,
+        "high": 0.2,
+        "scenarios": 40.0
+      },
+      "search_coverage_precision": {
+        "estimate": 0.43243243243243246,
+        "low": 0.21428571428571427,
+        "high": 0.7027027027027027,
+        "scenarios": 18.0
+      },
+      "progress_rate": {
+        "estimate": 0.65,
+        "low": 0.5,
+        "high": 0.8,
+        "scenarios": 40.0
+      }
+    },
+    "no_evidence_gate": {
+      "entity_persistence_accuracy": {
+        "estimate": 0.9612277867528272,
+        "low": 0.9322381930184805,
+        "high": 0.9871794871794872,
+        "scenarios": 40.0
+      },
+      "false_merge_rate": {
+        "estimate": 0.0032310177705977385,
+        "low": 0.0,
+        "high": 0.010033444816053512,
+        "scenarios": 40.0
+      },
+      "diff_precision": {
+        "estimate": 0.8754716981132076,
+        "low": 0.7813504823151125,
+        "high": 0.9644268774703557,
+        "scenarios": 40.0
+      },
+      "diff_recall": {
+        "estimate": 0.9626556016597511,
+        "low": 0.9294605809128631,
+        "high": 0.9910313901345291,
+        "scenarios": 40.0
+      },
+      "stale_claim_rate": {
+        "estimate": 0.2602739726027397,
+        "low": 0.21003134796238246,
+        "high": 0.3129251700680272,
+        "scenarios": 80.0
+      },
+      "evidence_backed_claim_rate": {
+        "estimate": 0.6164383561643836,
+        "low": 0.5384615384615384,
+        "high": 0.6947791164658634,
+        "scenarios": 80.0
+      },
+      "correct_abstention_rate": {
+        "estimate": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "scenarios": 50.0
+      },
+      "useful_answer_rate": {
+        "estimate": 0.9781021897810219,
+        "low": 0.9483870967741935,
+        "high": 1.0,
+        "scenarios": 68.0
+      },
+      "conflict_detection_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 34.0
+      },
+      "unsafe_continuation_rate": {
+        "estimate": 0.1,
+        "low": 0.022727272727272728,
+        "high": 0.2,
+        "scenarios": 40.0
+      },
+      "search_coverage_precision": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 5.0
+      },
+      "progress_rate": {
+        "estimate": 0.65,
+        "low": 0.5,
+        "high": 0.8,
+        "scenarios": 40.0
+      }
+    },
+    "event_log_diff": {
+      "entity_persistence_accuracy": {
+        "estimate": 0.9612277867528272,
+        "low": 0.9322381930184805,
+        "high": 0.9871794871794872,
+        "scenarios": 40.0
+      },
+      "false_merge_rate": {
+        "estimate": 0.0032310177705977385,
+        "low": 0.0,
+        "high": 0.010033444816053512,
+        "scenarios": 40.0
+      },
+      "diff_precision": {
+        "estimate": 0.3431952662721893,
+        "low": 0.18779342723004694,
+        "high": 0.6964285714285714,
+        "scenarios": 30.0
+      },
+      "diff_recall": {
+        "estimate": 0.24066390041493776,
+        "low": 0.16666666666666666,
+        "high": 0.3305785123966942,
+        "scenarios": 40.0
+      },
+      "stale_claim_rate": {
+        "estimate": 0.13333333333333333,
+        "low": 0.07453416149068323,
+        "high": 0.1958762886597938,
+        "scenarios": 70.0
+      },
+      "evidence_backed_claim_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 70.0
+      },
+      "correct_abstention_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 50.0
+      },
+      "useful_answer_rate": {
+        "estimate": 0.948905109489051,
+        "low": 0.896774193548387,
+        "high": 0.992,
+        "scenarios": 68.0
+      },
+      "conflict_detection_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 34.0
+      },
+      "unsafe_continuation_rate": {
+        "estimate": 0.1,
+        "low": 0.022727272727272728,
+        "high": 0.2,
+        "scenarios": 40.0
+      },
+      "search_coverage_precision": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 5.0
+      },
+      "progress_rate": {
+        "estimate": 0.65,
+        "low": 0.5,
+        "high": 0.8,
+        "scenarios": 40.0
+      }
+    },
+    "naive_resume": {
+      "entity_persistence_accuracy": {
+        "estimate": 0.9612277867528272,
+        "low": 0.9322381930184805,
+        "high": 0.9871794871794872,
+        "scenarios": 40.0
+      },
+      "false_merge_rate": {
+        "estimate": 0.0032310177705977385,
+        "low": 0.0,
+        "high": 0.010033444816053512,
+        "scenarios": 40.0
+      },
+      "diff_precision": {
+        "estimate": 0.8754716981132076,
+        "low": 0.7813504823151125,
+        "high": 0.9644268774703557,
+        "scenarios": 40.0
+      },
+      "diff_recall": {
+        "estimate": 0.9626556016597511,
+        "low": 0.9294605809128631,
+        "high": 0.9910313901345291,
+        "scenarios": 40.0
+      },
+      "stale_claim_rate": {
+        "estimate": 0.13333333333333333,
+        "low": 0.07453416149068323,
+        "high": 0.1958762886597938,
+        "scenarios": 70.0
+      },
+      "evidence_backed_claim_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 70.0
+      },
+      "correct_abstention_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 50.0
+      },
+      "useful_answer_rate": {
+        "estimate": 0.948905109489051,
+        "low": 0.896774193548387,
+        "high": 0.992,
+        "scenarios": 68.0
+      },
+      "conflict_detection_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 34.0
+      },
+      "unsafe_continuation_rate": {
+        "estimate": 0.675,
+        "low": 0.5227272727272727,
+        "high": 0.8064516129032258,
+        "scenarios": 40.0
+      },
+      "search_coverage_precision": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 5.0
+      },
+      "progress_rate": {
+        "estimate": 0.325,
+        "low": 0.19047619047619047,
+        "high": 0.47619047619047616,
+        "scenarios": 40.0
+      }
+    },
+    "no_risk_grading": {
+      "entity_persistence_accuracy": {
+        "estimate": 0.9612277867528272,
+        "low": 0.9322381930184805,
+        "high": 0.9871794871794872,
+        "scenarios": 40.0
+      },
+      "false_merge_rate": {
+        "estimate": 0.0032310177705977385,
+        "low": 0.0,
+        "high": 0.010033444816053512,
+        "scenarios": 40.0
+      },
+      "diff_precision": {
+        "estimate": 0.8754716981132076,
+        "low": 0.7813504823151125,
+        "high": 0.9644268774703557,
+        "scenarios": 40.0
+      },
+      "diff_recall": {
+        "estimate": 0.9626556016597511,
+        "low": 0.9294605809128631,
+        "high": 0.9910313901345291,
+        "scenarios": 40.0
+      },
+      "stale_claim_rate": {
+        "estimate": 0.13333333333333333,
+        "low": 0.07453416149068323,
+        "high": 0.1958762886597938,
+        "scenarios": 70.0
+      },
+      "evidence_backed_claim_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 70.0
+      },
+      "correct_abstention_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 50.0
+      },
+      "useful_answer_rate": {
+        "estimate": 0.948905109489051,
+        "low": 0.896774193548387,
+        "high": 0.992,
+        "scenarios": 68.0
+      },
+      "conflict_detection_rate": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 34.0
+      },
+      "unsafe_continuation_rate": {
+        "estimate": 0.275,
+        "low": 0.13793103448275862,
+        "high": 0.41025641025641024,
+        "scenarios": 40.0
+      },
+      "search_coverage_precision": {
+        "estimate": 1.0,
+        "low": 1.0,
+        "high": 1.0,
+        "scenarios": 5.0
+      },
+      "progress_rate": {
+        "estimate": 0.725,
+        "low": 0.5882352941176471,
+        "high": 0.8604651162790697,
+        "scenarios": 40.0
+      }
+    }
+  },
+  "deltas": {
+    "no_freshness": {
+      "entity_persistence_accuracy": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "false_merge_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_precision": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_recall": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "stale_claim_rate": {
+        "delta": 0.044748858447488576,
+        "low": 0.018455228981544766,
+        "high": 0.07656565656565657,
+        "verdict": "worse"
+      },
+      "evidence_backed_claim_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "correct_abstention_rate": {
+        "delta": -0.29807692307692313,
+        "low": -0.44705882352941173,
+        "high": -0.1515151515151515,
+        "verdict": "worse"
+      },
+      "useful_answer_rate": {
+        "delta": 0.02919708029197088,
+        "low": 0.0,
+        "high": 0.05882352941176472,
+        "verdict": "n.s."
+      },
+      "conflict_detection_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "unsafe_continuation_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "search_coverage_precision": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "progress_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      }
+    },
+    "last_writer_wins": {
+      "entity_persistence_accuracy": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "false_merge_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_precision": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_recall": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "stale_claim_rate": {
+        "delta": 0.10860215053763442,
+        "low": 0.06111111111111109,
+        "high": 0.16166228138059124,
+        "verdict": "worse"
+      },
+      "evidence_backed_claim_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "correct_abstention_rate": {
+        "delta": -0.6538461538461539,
+        "low": -0.8055555555555556,
+        "high": -0.5061728395061729,
+        "verdict": "worse"
+      },
+      "useful_answer_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "conflict_detection_rate": {
+        "delta": -1.0,
+        "low": -1.0,
+        "high": -1.0,
+        "verdict": "worse"
+      },
+      "unsafe_continuation_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "search_coverage_precision": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "progress_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      }
+    },
+    "unobserved_removed": {
+      "entity_persistence_accuracy": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "false_merge_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_precision": {
+        "delta": -0.6339622641509435,
+        "low": -0.7378640776699029,
+        "high": -0.5278810408921933,
+        "verdict": "worse"
+      },
+      "diff_recall": {
+        "delta": -0.6970954356846473,
+        "low": -0.7862903225806452,
+        "high": -0.5925925925925926,
+        "verdict": "worse"
+      },
+      "stale_claim_rate": {
+        "delta": -0.024761904761904763,
+        "low": -0.057194852463278295,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "evidence_backed_claim_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "correct_abstention_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "useful_answer_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "conflict_detection_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "unsafe_continuation_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "search_coverage_precision": {
+        "delta": -0.5675675675675675,
+        "low": -0.7777777777777778,
+        "high": -0.29729729729729726,
+        "verdict": "worse"
+      },
+      "progress_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      }
+    },
+    "no_evidence_gate": {
+      "entity_persistence_accuracy": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "false_merge_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_precision": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_recall": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "stale_claim_rate": {
+        "delta": 0.12694063926940638,
+        "low": 0.07993831531574061,
+        "high": 0.17791177748804865,
+        "verdict": "worse"
+      },
+      "evidence_backed_claim_rate": {
+        "delta": -0.3835616438356164,
+        "low": -0.46153846153846156,
+        "high": -0.30522088353413657,
+        "verdict": "worse"
+      },
+      "correct_abstention_rate": {
+        "delta": -1.0,
+        "low": -1.0,
+        "high": -1.0,
+        "verdict": "worse"
+      },
+      "useful_answer_rate": {
+        "delta": 0.02919708029197088,
+        "low": 0.0,
+        "high": 0.05882352941176472,
+        "verdict": "n.s."
+      },
+      "conflict_detection_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "unsafe_continuation_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "search_coverage_precision": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "progress_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      }
+    },
+    "event_log_diff": {
+      "entity_persistence_accuracy": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "false_merge_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_precision": {
+        "delta": -0.5322764318410182,
+        "low": -0.6291291291291291,
+        "high": -0.26264147499087254,
+        "verdict": "worse"
+      },
+      "diff_recall": {
+        "delta": -0.7219917012448133,
+        "low": -0.803088803088803,
+        "high": -0.6224899598393574,
+        "verdict": "worse"
+      },
+      "stale_claim_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "evidence_backed_claim_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "correct_abstention_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "useful_answer_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "conflict_detection_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "unsafe_continuation_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "search_coverage_precision": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "progress_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      }
+    },
+    "naive_resume": {
+      "entity_persistence_accuracy": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "false_merge_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_precision": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_recall": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "stale_claim_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "evidence_backed_claim_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "correct_abstention_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "useful_answer_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "conflict_detection_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "unsafe_continuation_rate": {
+        "delta": 0.5750000000000001,
+        "low": 0.42424242424242425,
+        "high": 0.7222222222222222,
+        "verdict": "worse"
+      },
+      "search_coverage_precision": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "progress_rate": {
+        "delta": -0.325,
+        "low": -0.5217391304347826,
+        "high": -0.125,
+        "verdict": "worse"
+      }
+    },
+    "no_risk_grading": {
+      "entity_persistence_accuracy": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "false_merge_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_precision": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "diff_recall": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "stale_claim_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "evidence_backed_claim_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "correct_abstention_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "useful_answer_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "conflict_detection_rate": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "unsafe_continuation_rate": {
+        "delta": 0.17500000000000002,
+        "low": 0.06060606060606061,
+        "high": 0.3023255813953488,
+        "verdict": "worse"
+      },
+      "search_coverage_precision": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "verdict": "n.s."
+      },
+      "progress_rate": {
+        "delta": 0.07499999999999996,
+        "low": 0.0,
+        "high": 0.16216216216216217,
+        "verdict": "n.s."
+      }
+    }
+  },
+  "family_results": {
+    "scene": {
+      "entity_persistence_accuracy": 0.9612277867528272,
+      "false_merge_rate": 0.0032310177705977385,
+      "diff_precision": 0.8754716981132076,
+      "diff_recall": 0.9626556016597511,
+      "stale_claim_rate": 0.20689655172413793,
+      "evidence_backed_claim_rate": 1.0,
+      "correct_abstention_rate": 1.0,
+      "useful_answer_rate": 0.9041095890410958,
+      "conflict_detection_rate": null,
+      "unsafe_continuation_rate": null,
+      "search_coverage_precision": 1.0,
+      "progress_rate": null
+    },
+    "task": {
+      "entity_persistence_accuracy": null,
+      "false_merge_rate": null,
+      "diff_precision": null,
+      "diff_recall": null,
+      "stale_claim_rate": null,
+      "evidence_backed_claim_rate": null,
+      "correct_abstention_rate": null,
+      "useful_answer_rate": null,
+      "conflict_detection_rate": null,
+      "unsafe_continuation_rate": 0.1,
+      "search_coverage_precision": null,
+      "progress_rate": 0.65
+    },
+    "conflict": {
+      "entity_persistence_accuracy": null,
+      "false_merge_rate": null,
+      "diff_precision": null,
+      "diff_recall": null,
+      "stale_claim_rate": 0.0,
+      "evidence_backed_claim_rate": 1.0,
+      "correct_abstention_rate": 1.0,
+      "useful_answer_rate": 1.0,
+      "conflict_detection_rate": 1.0,
+      "unsafe_continuation_rate": null,
+      "search_coverage_precision": null,
+      "progress_rate": null
+    }
+  },
+  "examples": [
+    "gen-scene-19: diff FP: OBJECT_REMOVED_OR_UNOBSERVED cable_10 location NOT_FOUND_PARTIAL_COVERAGE",
+    "gen-scene-19: diff FP: OBJECT_REMOVED_OR_UNOBSERVED cable_11 location NOT_REOBSERVED",
+    "gen-scene-19: diff FP: OBJECT_REMOVED_OR_UNOBSERVED cable_8 location NOT_FOUND_PARTIAL_COVERAGE",
+    "gen-scene-19: diff FP: OBJECT_ADDED entity_cable_0dadceebff None None",
+    "gen-scene-19: diff FP: OBJECT_ADDED entity_cable_39d9162549 None None",
+    "gen-scene-19: diff FP: OBJECT_ADDED entity_cable_67baa9958d None None",
+    "gen-scene-19: diff FP: OBJECT_ADDED entity_cable_84c2e8c6f6 None None",
+    "gen-scene-19: diff FP: OBJECT_ADDED entity_cable_ef2633b64b None None",
+    "gen-scene-19: diff FP: OBJECT_ADDED entity_cable_f20231fbdf None None",
+    "gen-scene-19: diff FN: OBJECT_MOVED cable_11 location None",
+    "gen-scene-19: query 'Where is cable_10?' @243.0: expected answer, got abstain: cable_10 was last seen at s5 (2026-09-30 09:00 UTC), but that is stale (an indistinguishable cable was seen at s5 (ambig",
+    "gen-scene-27: diff FP: OBJECT_ADDED entity_notebook_0c0cc8f3eb None None"
+  ]
+}
