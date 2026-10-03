@@ -1,7 +1,7 @@
 # ORBIT-BENCH results
 
-- **run_at**: `2026-10-03T06:12:09+00:00`
-- **git_commit**: `1c2c407`
+- **run_at**: `2026-10-03T06:12:59+00:00`
+- **git_commit**: `c79195a`
 - **schema_revision**: `0009`
 - **scenario_catalog**: `v0.1`
 - **scenarios**: `14`
@@ -69,14 +69,14 @@
 
 | Variant | observation_ms_p50 | observation_ms_p95 | query_ms_p50 | query_ms_p95 |
 |---|---|---|---|---|
-| orbit | 0.64 | 1.49 | 0.36 | 0.65 |
-| no_freshness | 0.58 | 1.30 | 0.28 | 0.41 |
-| last_writer_wins | 0.62 | 1.29 | 0.29 | 0.61 |
-| unobserved_removed | 0.69 | 1.33 | 0.31 | 0.49 |
-| no_evidence_gate | 0.59 | 1.27 | 0.28 | 0.42 |
-| event_log_diff | 0.59 | 1.31 | 0.27 | 0.42 |
-| naive_resume | 0.60 | 1.25 | 0.27 | 0.41 |
-| no_risk_grading | 0.60 | 1.30 | 0.28 | 0.42 |
+| orbit | 0.61 | 1.35 | 0.32 | 0.63 |
+| no_freshness | 0.58 | 1.32 | 0.26 | 0.38 |
+| last_writer_wins | 0.62 | 1.35 | 0.27 | 0.44 |
+| unobserved_removed | 0.58 | 1.24 | 0.30 | 0.39 |
+| no_evidence_gate | 0.60 | 1.32 | 0.27 | 0.43 |
+| event_log_diff | 0.58 | 1.21 | 0.28 | 0.40 |
+| naive_resume | 0.58 | 1.30 | 0.27 | 0.38 |
+| no_risk_grading | 0.57 | 1.29 | 0.28 | 0.39 |
 
 ## Experiment H — counterfactual decisions vs static replay
 

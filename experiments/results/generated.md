@@ -1,7 +1,7 @@
 # ORBIT-BENCH — generated worlds
 
-- **run_at**: `2026-10-03T06:12:13+00:00`
-- **git_commit**: `1c2c407+dirty`
+- **run_at**: `2026-10-03T06:13:02+00:00`
+- **git_commit**: `c79195a`
 - **schema_revision**: `0009`
 - **reasoning_provider**: `rule-based-v1`
 - **embedding_provider**: `hashing-bow-v1`
@@ -70,12 +70,12 @@ Ground truth comes from a simulated true world; ORBIT only sees observations of 
 - gen-scene-19: diff FP: OBJECT_REMOVED_OR_UNOBSERVED cable_10 location NOT_FOUND_PARTIAL_COVERAGE
 - gen-scene-19: diff FP: OBJECT_REMOVED_OR_UNOBSERVED cable_11 location NOT_REOBSERVED
 - gen-scene-19: diff FP: OBJECT_REMOVED_OR_UNOBSERVED cable_8 location NOT_FOUND_PARTIAL_COVERAGE
-- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_0dadceebff None None
-- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_39d9162549 None None
-- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_67baa9958d None None
-- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_84c2e8c6f6 None None
-- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_ef2633b64b None None
-- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_f20231fbdf None None
+- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_08745f7b57 None None
+- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_593812e889 None None
+- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_64f3a88389 None None
+- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_6b8229c196 None None
+- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_7bac7ab2c7 None None
+- gen-scene-19: diff FP: OBJECT_ADDED entity_cable_c841c0b4bc None None
 - gen-scene-19: diff FN: OBJECT_MOVED cable_11 location None
 - gen-scene-19: query 'Where is cable_10?' @243.0: expected answer, got abstain: cable_10 was last seen at s5 (2026-09-30 09:00 UTC), but that is stale (an indistinguishable cable was seen at s5 (ambig
-- gen-scene-27: diff FP: OBJECT_ADDED entity_notebook_0c0cc8f3eb None None
+- gen-scene-27: diff FP: OBJECT_ADDED entity_notebook_0b6c4fa9fe None None
