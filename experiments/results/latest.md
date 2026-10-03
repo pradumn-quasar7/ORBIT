@@ -1,10 +1,10 @@
 # ORBIT-BENCH results
 
-- **run_at**: `2026-10-02T18:05:10+00:00`
-- **git_commit**: `9c74948`
-- **schema_revision**: `0008`
+- **run_at**: `2026-10-03T05:42:06+00:00`
+- **git_commit**: `2ee47a1`
+- **schema_revision**: `0009`
 - **scenario_catalog**: `v0.1`
-- **scenarios**: `13`
+- **scenarios**: `14`
 - **reasoning_provider**: `rule-based-v1`
 - **embedding_provider**: `hashing-bow-v1`
 - **retrieval_provider**: `in-memory-cosine-v1`
@@ -16,10 +16,10 @@
 | false_merge_rate ↓ | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | diff_precision | 1.00 | 1.00 | 1.00 | 0.62 | 1.00 | 0.60 | 1.00 | 1.00 |
 | diff_recall | 1.00 | 1.00 | 1.00 | 0.62 | 1.00 | 0.38 | 1.00 | 1.00 |
-| stale_claim_rate ↓ | 0.00 | 0.20 | 0.25 | 0.00 | 0.18 | 0.00 | 0.00 | 0.00 |
-| evidence_backed_claim_rate | 1.00 | 1.00 | 1.00 | 1.00 | 0.64 | 1.00 | 1.00 | 1.00 |
-| correct_abstention_rate | 1.00 | 0.57 | 0.86 | 1.00 | 0.29 | 1.00 | 1.00 | 0.86 |
-| useful_answer_rate | 1.00 | 1.00 | 0.86 | 0.86 | 1.00 | 1.00 | 1.00 | 1.00 |
+| stale_claim_rate ↓ | 0.00 | 0.21 | 0.20 | 0.00 | 0.20 | 0.00 | 0.00 | 0.00 |
+| evidence_backed_claim_rate | 1.00 | 1.00 | 1.00 | 1.00 | 0.60 | 1.00 | 1.00 | 1.00 |
+| correct_abstention_rate | 1.00 | 0.44 | 0.89 | 1.00 | 0.22 | 1.00 | 1.00 | 0.89 |
+| useful_answer_rate | 1.00 | 1.00 | 0.89 | 0.89 | 1.00 | 1.00 | 1.00 | 1.00 |
 | conflict_detection_rate | 1.00 | 1.00 | 0.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
 | task_resumption_success | 1.00 | 0.80 | 1.00 | 1.00 | 1.00 | 1.00 | 0.20 | 0.80 |
 | blocked_step_detection | 1.00 | 0.80 | 1.00 | 1.00 | 1.00 | 1.00 | 0.00 | 0.80 |
@@ -61,19 +61,20 @@
 - `multi_user_handoff` — Task handed from Ana to Bob (primary: task_resumption_success)
 - `adversarial_memory` — Misleading low-authority evidence (primary: stale_claim_rate)
 - `high_risk_stale_premise` — High-risk step resting on an old (but unexpired) observation (primary: unsafe_continuation_rate)
+- `identity_correction` — A person resolves an ambiguous identity (primary: entity_persistence_accuracy)
 
 ## Latency (ms)
 
 | Variant | observation_ms_p50 | observation_ms_p95 | query_ms_p50 | query_ms_p95 |
 |---|---|---|---|---|
-| orbit | 0.57 | 1.64 | 0.32 | 0.61 |
-| no_freshness | 0.55 | 1.05 | 0.25 | 0.31 |
-| last_writer_wins | 0.55 | 1.07 | 0.25 | 0.29 |
-| unobserved_removed | 0.59 | 1.17 | 0.26 | 0.33 |
-| no_evidence_gate | 0.57 | 1.09 | 0.28 | 0.32 |
-| event_log_diff | 0.56 | 1.06 | 0.26 | 0.30 |
-| naive_resume | 0.55 | 1.06 | 0.26 | 0.30 |
-| no_risk_grading | 0.56 | 1.06 | 0.26 | 0.29 |
+| orbit | 0.87 | 2.61 | 0.43 | 2.46 |
+| no_freshness | 0.67 | 1.22 | 0.29 | 0.39 |
+| last_writer_wins | 0.63 | 1.19 | 0.29 | 0.43 |
+| unobserved_removed | 0.58 | 1.11 | 0.28 | 0.42 |
+| no_evidence_gate | 0.60 | 1.18 | 0.28 | 0.39 |
+| event_log_diff | 0.57 | 1.08 | 0.28 | 0.38 |
+| naive_resume | 0.60 | 1.14 | 0.28 | 0.37 |
+| no_risk_grading | 0.59 | 1.09 | 0.28 | 0.36 |
 
 ## Experiment H — counterfactual decisions vs static replay
 
