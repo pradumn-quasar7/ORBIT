@@ -31,6 +31,7 @@ T0 = datetime(2026, 9, 30, 9, 0, tzinfo=timezone.utc)
 class Observe(BaseModel):
     at: float  # minutes since T0
     detections: List[Dict[str, Any]]  # ObservedEntity fields + optional "truth" (physical object id)
+    view: List[str] = Field(default_factory=list)  # anchors the camera looked at (field of view)
     source: str = "camera"
     session: Optional[str] = None
     quality: float = 1.0
@@ -59,6 +60,7 @@ class Search(BaseModel):
     targets: List[str]
     coverage: float = 1.0
     visibility: Dict[str, Any] = Field(default_factory=dict)
+    detections: List[Dict[str, Any]] = Field(default_factory=list)  # what the search frame actually saw
 
 
 class CreateTask(BaseModel):
@@ -112,7 +114,9 @@ Step = Union[Observe, Claim, Intervene, Search, CreateTask, CompleteStep, Interr
 class QueryCheck(BaseModel):
     at: float
     text: str
-    expect: str  # "answer" | "abstain"
+    # "answer" | "abstain" | "either" — "either" when ORBIT's information cannot settle
+    # it (e.g. moved while unobserved, memory not yet expired): only judged against truth.
+    expect: str
     category: str = "current_state"  # current_state | causal | other
     truth: Any = None  # true value for current-state questions (ground truth W_t)
     contains: Optional[str] = None  # an expected answer must contain this text
@@ -129,9 +133,11 @@ class ResumeCheck(BaseModel):
     at: float
     task_id: str
     actor: Optional[str] = None
-    expected_next: Optional[str]  # None = must not continue
+    expected_next: Optional[str] = None  # None = must not continue
+    check_next: bool = True  # False: judge only safety/progress against the true world
     expected_blocked: List[str] = Field(default_factory=list)
     unsafe_steps: List[str] = Field(default_factory=list)  # presenting any of these is unsafe
+    progress_possible: Optional[bool] = None  # true world allows a step now (for progress_rate)
 
 
 class ConflictCheck(BaseModel):
@@ -146,7 +152,7 @@ class Scenario(BaseModel):
     description: str
     primary_metric: str
     seed: int = 0
-    anchors: List[Tuple[str, Optional[str]]] = Field(default_factory=list)
+    anchors: List[Tuple] = Field(default_factory=list)  # (id, parent) or (id, parent, anchor_type)
     steps: List[Step] = Field(default_factory=list)
     queries: List[QueryCheck] = Field(default_factory=list)
     diffs: List[DiffCheck] = Field(default_factory=list)
@@ -194,6 +200,7 @@ METRICS = {
     "unsafe_continuation_rate": "resumes presenting an unsafe step / resume checks (lower is better)",
     "unsupported_causal_claim_rate": "causal questions answered with an unsupported cause / causal questions (lower is better)",
     "search_coverage_precision": "confirmed-absent claims that are truly absent / confirmed-absent claims",
+    "progress_rate": "resumes presenting a step when the true world allowed progress / such resumes (caution has a cost)",
 }
 LOWER_IS_BETTER = {"false_merge_rate", "stale_claim_rate", "unsafe_continuation_rate", "unsupported_causal_claim_rate"}
 
@@ -238,8 +245,8 @@ class ScenarioRunner:
         self._n = 0
 
     def run(self) -> ScenarioResult:
-        for anchor, parent in self.s.anchors:
-            self.svc.anchors.register(anchor, T0, parent_id=parent)
+        for anchor, parent, *kind in self.s.anchors:
+            self.svc.anchors.register(anchor, T0, parent_id=parent, anchor_type=kind[0] if kind else "region")
         timeline: List[Tuple[float, int, Any]] = [(st.at, 0, st) for st in self.s.steps]
         timeline += [(c.at, 1, c) for c in self.s.queries + self.s.resumes + self.s.conflicts]
         timeline += [(d.target, 1, d) for d in self.s.diffs]
@@ -251,17 +258,21 @@ class ScenarioRunner:
         return ScenarioResult(scenario_id=self.s.id, variant=self.v.name, metrics=dict(self.metrics), latency_ms=dict(self.latency), notes=self.notes)
 
     # ----- steps
-    def _do_observe(self, st: Observe):
+    def _observation(self, at: float, detections, source="camera", session=None, quality=1.0, view=None) -> Observation:
         self._n += 1
         dets = []
-        for d in st.detections:
+        for d in detections:
             d = dict(d)
             truth = d.pop("truth", None)
             dets.append(ObservedEntity(**d))
             if truth:
                 self.truth_of[f"o{self._n}:{len(dets) - 1}"] = truth
-        obs = Observation(id=f"o{self._n}", timestamp=_at(st.at), source=st.source, session_id=st.session,
-                          quality=st.quality, observed_entities=dets)
+        return Observation(id=f"o{self._n}", timestamp=_at(at), source=source, session_id=session,
+                           quality=quality, observed_entities=dets,
+                           spatial_context={"field_of_view": list(view)} if view else {})
+
+    def _do_observe(self, st: Observe):
+        obs = self._observation(st.at, st.detections, st.source, st.session, st.quality, st.view)
         t = time.perf_counter()
         self.svc.engine.record_observation(obs)
         self.latency["observation_ms"].append((time.perf_counter() - t) * 1000)
@@ -274,8 +285,9 @@ class ScenarioRunner:
         self.svc.engine.record_intervention(st.entity, _at(st.at), st.description, st.attributes)
 
     def _do_search(self, st: Search):
-        self.svc.search.record_search(st.region, _at(st.at), st.targets, coverage_fraction=st.coverage,
-                                      visibility_conditions=st.visibility)
+        frame = self._observation(st.at, st.detections, view=[st.region]) if st.detections else None
+        self.svc.search.record_search(st.region, _at(st.at), st.targets, observation=frame,
+                                      coverage_fraction=st.coverage, visibility_conditions=st.visibility)
 
     def _do_createtask(self, st: CreateTask):
         self.svc.tasks.create_task(st.goal, st.steps, _at(st.at), task_id=st.task_id)
@@ -314,7 +326,7 @@ class ScenarioRunner:
         answered = not r.abstained
         if q.expect == "abstain":
             self.metrics["correct_abstention_rate"].add(0 if answered else 1)
-        else:
+        elif q.expect == "answer":
             correct = answered and (q.contains is None or q.contains in (r.answer or ""))
             if q.truth is not None and answered:
                 correct = correct and any(c.value == q.truth for c in r.claims)
@@ -331,7 +343,7 @@ class ScenarioRunner:
                     self.metrics["evidence_backed_claim_rate"].add(1 if c.supportable and c.evidence_refs else 0)
         if q.category == "causal":
             self.metrics["unsupported_causal_claim_rate"].add(1 if answered and "causal-test" not in (r.answer or "") else 0)
-        if (q.expect == "answer") != answered:
+        if q.expect != "either" and (q.expect == "answer") != answered:
             self.notes.append(f"query {q.text!r} @{q.at}: expected {q.expect}, got {'answer' if answered else 'abstain'}: {r.summary[:120]}")
 
     def _do_diffcheck(self, d: DiffCheck):
@@ -346,7 +358,11 @@ class ScenarioRunner:
         else:
             diff = self.svc.diff.diff(baseline, target, save=False)
         reported = [c for c in diff.changes if c.change_type not in (EventType.IDENTITY_AMBIGUOUS, EventType.IDENTITY_CONFLICT) or self.v.diff_mode == "event_log"]
-        score = diff_precision_recall(reported, d.expected)
+        expected = [
+            e.model_copy(update={"entity_id": self._truth_entity(e.entity_id[6:])}) if e.entity_id.startswith("truth:") else e
+            for e in d.expected
+        ]
+        score = diff_precision_recall(reported, expected)
         self.metrics["diff_precision"].add(score.true_positives, len(reported))
         self.metrics["diff_recall"].add(score.true_positives, len(d.expected))
         for fp in score.false_positives:
@@ -364,17 +380,28 @@ class ScenarioRunner:
             plan = self.svc.tasks.resume(rc.task_id, _at(rc.at), rc.actor)
             next_step = plan.next_step.step_id if plan.next_step else None
             blocked = plan.blocked_steps
-        self.metrics["task_resumption_success"].add(1 if next_step == rc.expected_next else 0)
+        if rc.check_next:
+            self.metrics["task_resumption_success"].add(1 if next_step == rc.expected_next else 0)
         self.metrics["unsafe_continuation_rate"].add(1 if next_step in rc.unsafe_steps else 0)
+        if rc.progress_possible:
+            self.metrics["progress_rate"].add(1 if next_step is not None and next_step not in rc.unsafe_steps else 0)
         for step in rc.expected_blocked:
             self.metrics["blocked_step_detection"].add(1 if step in blocked else 0)
-        if next_step != rc.expected_next:
+        if rc.check_next and next_step != rc.expected_next:
             self.notes.append(f"resume {rc.task_id} @{rc.at}: next {next_step}, expected {rc.expected_next}")
 
     def _do_conflictcheck(self, c: ConflictCheck):
         open_ = [x for x in self.repo.list_conflicts(entity_id=c.entity, attribute=c.attribute) if x.opened_at <= _at(c.at)
                  and (x.resolved_at is None or x.resolved_at > _at(c.at))]
         self.metrics["conflict_detection_rate"].add(1 if open_ else 0)
+
+    def _truth_entity(self, truth: str) -> str:
+        """The entity ORBIT (currently) believes is the physical object ``truth``."""
+        for obs in self.repo.list_observations():
+            for r in obs.resolutions:
+                if self.truth_of.get(f"{obs.id}:{r.observed_index}") == truth:
+                    return self.svc.identity.resolve_alias(r.entity_id)
+        return f"<never seen: {truth}>"
 
     # ----- end-of-run metrics
     def _identity_metrics(self):

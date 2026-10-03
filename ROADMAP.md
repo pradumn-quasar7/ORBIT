@@ -56,4 +56,7 @@ tests, updated `PROJECT_STATUS.md` / `DECISIONS.md`, and a merge to `main`.
 - [x] **Phase 13 — Identity curation**
   - Human-confirmed merge/undo/distinct with evidence replay, aliases, bitemporal history, suggestions.
 
+- [x] **Phase 14 — Generated benchmark**
+  - Seeded random worlds with simulator ground truth, bootstrap intervals, paired ablation deltas, progress metric.
+
 - [ ] **Later** — AR client (step 18), VR rendering of replay/counterfactuals (step 19 front-end), wearable clients, pilot study.

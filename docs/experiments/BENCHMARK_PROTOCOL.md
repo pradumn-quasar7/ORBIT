@@ -123,5 +123,14 @@ resume preview decides. Metrics: unsafe continuation (A), safe work kept (B), st
 claims refreshed, looks spent on decision-critical facts. Implemented in
 `backend/app/evaluation/decision_perception_eval.py`.
 
+## 9. Generated worlds and statistics
+
+`backend/app/evaluation/generator.py` keeps a hidden true world per seed and derives
+every expectation from it (families: *scene*, *task*, *conflict*). Questions whose
+answer ORBIT's information cannot settle are judged only against the truth. Metrics
+are ratios of sums over worlds with 95 % percentile-bootstrap intervals; ablations are
+compared *paired* on the same worlds. Use ≥ 40 worlds per family: task worlds yield one
+resume decision each. Run `experiments/runners/run_generated_bench.py`.
+
 Known gaps: randomised futures for Experiment H, AR utility (G), latency on
 real perception, and larger randomised scene generators for statistical power.

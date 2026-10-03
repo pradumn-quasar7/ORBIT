@@ -52,7 +52,8 @@ def test_anchor_lineage_and_proximity(engine):
     assert set(a.descendants("bench_3")) == {"bench_3", "bench_3_left", "bench_3_right"}
     assert a.proximity("bench_3_left", "bench_3_left") == 1.0
     assert a.proximity("bench_3_left", "bench_3") == 0.8
-    assert a.proximity("bench_3_left", "bench_3_right") == 0.6
+    assert a.proximity("bench_3_left", "bench_3_right") == 0.6  # two halves of one surface
+    assert a.proximity("bench_3", "shelf_a") == 0.3  # two surfaces in a room: separate places
     assert a.proximity("bench_3_left", "shelf_a") == 0.3
     assert a.proximity("bench_3_left", "elsewhere") == 0.0
 
