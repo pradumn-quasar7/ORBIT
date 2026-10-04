@@ -63,6 +63,9 @@ class PerceptionProvider(ABC):
         )
 
 
+# Classes never forwarded into world memory (spec §17 privacy: no identity of people).
+EXCLUDED_LABELS = frozenset({"person"})
+
 # --------------------------------------------------------------- detector adapter
 class Detection(BaseModel):
     label: str
@@ -71,6 +74,9 @@ class Detection(BaseModel):
     text: Optional[str] = None  # OCR'd label text, if any
     attributes: Dict[str, Any] = Field(default_factory=dict)
     track_id: Optional[str] = None  # detector-local; NOT a persistent identity
+    # A fiducial marker (e.g. a printed QR code "orbit:<id>") read on the object: a
+    # deliberate, stable identity, so it is used as the explicit entity id (ADR-039).
+    marker_id: Optional[str] = None
 
 
 IDENTIFIER_PATTERNS: Dict[str, re.Pattern] = {
@@ -121,11 +127,14 @@ class DetectionPerceptionProvider(PerceptionProvider):
     def perceive(self, frame: RawFrame) -> Observation:
         entities = []
         for d in self.detector(frame):
-            if d.confidence < self.min_confidence:
+            if d.confidence < self.min_confidence or d.label.lower() in EXCLUDED_LABELS:
                 continue
             identifiers, attrs = parse_identifiers(d.text)
+            if d.marker_id:
+                identifiers["marker"] = d.marker_id
             entities.append(
                 ObservedEntity(
+                    candidate_entity_id=d.marker_id,
                     type=d.label,
                     location=self._anchor(d.bbox, frame),
                     identifiers=identifiers,

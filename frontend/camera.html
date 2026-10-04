@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ORBIT Live Camera</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="camera.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◎</span>
+      <div>
+        <h1>ORBIT</h1>
+        <p class="tagline">Live camera — detection runs in this browser; only detected facts are sent</p>
+      </div>
+    </div>
+    <div class="meta">
+      <a href="./" class="navlink">← Inspector</a>
+    </div>
+  </header>
+
+  <main class="cam-layout">
+    <section class="card cam-stage" aria-labelledby="stage-h">
+      <div class="card-head">
+        <h2 id="stage-h">Camera</h2>
+        <span class="hint" id="model-status">model not loaded</span>
+      </div>
+      <div class="stage" id="stage">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay" aria-label="Detections and regions"></canvas>
+        <div class="stage-empty" id="stage-empty">
+          <p>Camera is off.</p>
+          <p class="hint">Your browser will ask for permission. Video never leaves this page.</p>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="start" type="button" class="primary">Start camera</button>
+        <button id="stop" type="button" disabled>Stop</button>
+        <button id="draw" type="button" disabled>Draw a region</button>
+        <label class="toggle"><input type="checkbox" id="auto" checked> Send changes automatically</label>
+        <button id="send" type="button" disabled>Send now</button>
+      </div>
+      <form id="region-form" class="region-form" hidden>
+        <label>Name this region <input id="region-name" type="text" placeholder="desk_left" autocomplete="off" required pattern="[A-Za-z0-9_\-]+"></label>
+        <button type="submit" class="primary">Save region</button>
+        <button type="button" id="region-cancel">Cancel</button>
+      </form>
+    </section>
+
+    <aside class="cam-side">
+      <section class="card" aria-labelledby="setup-h">
+        <div class="card-head"><h2 id="setup-h">Setup</h2></div>
+        <div class="field-row">
+          <label>Camera id <input id="device" type="text" value="webcam" autocomplete="off"></label>
+          <label>Camera looks at <input id="view" type="text" value="desk" autocomplete="off"></label>
+        </div>
+        <p class="hint">Draw boxes on the picture for the places you care about (e.g. desk_left, shelf). Each becomes an ORBIT place.</p>
+        <ul id="regions" class="list"></ul>
+        <div class="scan-row">
+          <select id="scan-region" aria-label="Region to scan"></select>
+          <button id="scan" type="button" disabled>Scan region</button>
+        </div>
+        <p class="hint">Scan = "look carefully here": anything ORBIT expects in that region but cannot see becomes a confirmed absence.</p>
+      </section>
+
+      <section class="card" aria-labelledby="status-h">
+        <div class="card-head"><h2 id="status-h">Status</h2><span class="hint" id="fps"></span></div>
+        <dl class="kv">
+          <dt>Stable objects</dt><dd id="stable-count">0</dd>
+          <dt>QR reader</dt><dd id="qr-status">—</dd>
+          <dt>Last sent</dt><dd id="last-sent">never</dd>
+          <dt>Session</dt><dd id="session" class="mono"></dd>
+        </dl>
+        <ul id="log" class="list log"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="seen-h">
+        <div class="card-head"><h2 id="seen-h">ORBIT identified</h2></div>
+        <ul id="seen" class="list"><li class="empty">Nothing sent yet.</li></ul>
+      </section>
+
+      <section class="card" aria-labelledby="privacy-h">
+        <div class="card-head"><h2 id="privacy-h">Privacy</h2></div>
+        <p class="hint">People are never sent. Frames are processed on this device and discarded; ORBIT stores object type, colour, place and time only. Optional QR tags <code>orbit:&lt;id&gt;</code> or <code>orbit:&lt;type&gt;:&lt;id&gt;</code> give objects a permanent identity.</p>
+      </section>
+    </aside>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="camera_core.js"></script>
+  <script src="camera.js"></script>
+</body>
+</html>

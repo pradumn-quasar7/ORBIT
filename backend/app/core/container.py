@@ -14,6 +14,7 @@ from backend.app.services.active_perception import ActivePerceptionPlanner
 from backend.app.services.hypotheses import HypothesisService
 from backend.app.services.identity import IdentityService
 from backend.app.services.memory import MemoryService
+from backend.app.services.camera import CameraService
 from backend.app.services.counterfactual import SandboxRegistry
 from backend.app.services.query_agent import QueryAgent
 from backend.app.services.replay import ReplayService
@@ -61,6 +62,7 @@ class OrbitServices:
     replay: ReplayService
     sandboxes: SandboxRegistry
     identity: IdentityService
+    camera: CameraService
 
     config: OrbitConfig = OrbitConfig()
 
@@ -90,6 +92,7 @@ class OrbitServices:
         hypotheses = HypothesisService(repo, engine)
         diff = WorldDiffService(repo, memory, tasks, treat_unobserved_as_removed=config.treat_unobserved_as_removed)
         perception = ActivePerceptionPlanner(repo, engine.claims, anchors, tasks)
+        search = SearchService(repo, engine, SearchPolicy(enabled=config.search_policy_enabled))
         actions = ActionSafetyService(repo, tasks.conditions, tasks)
         actions.ensure_agent_principal(clock.now())
         return cls(
@@ -101,7 +104,7 @@ class OrbitServices:
             memory=memory,
             tasks=tasks,
             hypotheses=hypotheses,
-            search=SearchService(repo, engine, SearchPolicy(enabled=config.search_policy_enabled)),
+            search=search,
             diff=diff,
             agent=QueryAgent(repo, engine, memory, diff, tasks, hypotheses, planner=perception, gate_evidence=config.gate_evidence),
             perception=perception,
@@ -109,6 +112,7 @@ class OrbitServices:
             replay=ReplayService(repo, diff),
             sandboxes=SandboxRegistry(),
             identity=IdentityService(repo, engine),
+            camera=CameraService(repo, engine, search),
             config=config,
         )
 

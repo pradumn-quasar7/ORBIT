@@ -72,6 +72,7 @@ backend/app/
     active_perception.py  observation planning (information gain / decision value)
     actions.py            action safety boundary + outcome memory
     perception_gateway.py frame ingestion, retention, redaction
+    camera.py             live camera: calibration (regions as anchor frames), snapshots, scans
     dashboard.py          inspection read model
     grading.py            status of a version from its supports (shared)
     projection.py         world as known at T (id-preserving copy)
@@ -79,11 +80,12 @@ backend/app/
     counterfactual.py     what-if premises, decision comparison, sensitivity analysis
     replay.py             frame-by-frame history
   evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner), counterfactual_eval.py (Experiment H), decision_perception_eval.py (Experiment F2), generator.py + generated.py + stats.py (generated worlds, bootstrap CIs)
-  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual)
+  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual, identity, camera)
   main.py          create_app(repository, clock) factory; lazy module-level `app`
-database/          Alembic migrations 0001–0007, migrate.py
+database/          Alembic migrations 0001–0009, migrate.py
 experiments/       scenarios/catalog.py, runners/run_bench.py, results/
-frontend/          static inspection dashboard served at /ui/
+frontend/          static inspection dashboard served at /ui/; camera.html + camera_core.js
+                   live webcam client (in-browser detection, regions, QR markers)
 scripts/           seed_demo.py (flagship scenario)
 ```
 

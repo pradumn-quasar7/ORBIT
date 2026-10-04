@@ -1,0 +1,31 @@
+[hidden] { display: none !important; }
+.cam-layout { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); }
+.cam-side { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.stage { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16 / 9; }
+.stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.stage canvas { cursor: default; }
+.stage.drawing canvas { cursor: crosshair; }
+.stage-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; color: #cfd6df; padding: 16px; }
+.stage-empty p { margin: 4px 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+.toggle { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; }
+.region-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 12px; }
+.region-form label, .field-row label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.region-form input, .field-row input, .scan-row select {
+  font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.field-row input { width: 100%; }
+.scan-row { display: flex; gap: 8px; margin-top: 8px; }
+.scan-row select { flex: 1; min-width: 0; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 8px; font-size: 13px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; }
+.log { max-height: 180px; overflow-y: auto; font-size: 12.5px; }
+.log li.err { color: var(--contradicted); }
+.list li button.link { border: 0; padding: 0 4px; color: var(--muted); background: none; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+@media (max-width: 860px) {
+  .cam-layout { grid-template-columns: 1fr; }
+}

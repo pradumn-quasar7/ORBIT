@@ -47,6 +47,8 @@ table { width: 100%; min-width: 680px; border-collapse: collapse; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { color: var(--muted); font-weight: 600; font-size: 12px; }
 td.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.navlink { color: var(--accent); text-decoration: none; font-size: 13px; margin-right: 8px; }
+.navlink:hover { text-decoration: underline; }
 .list { margin: 0; padding-left: 20px; }
 .list li { margin: 6px 0; }
 .empty { color: var(--muted); font-style: italic; list-style: none; margin-left: -20px; }
