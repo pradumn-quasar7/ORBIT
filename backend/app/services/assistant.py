@@ -228,6 +228,7 @@ class AssistantService:
             CommandKind.CHECKS: self._checks,
             CommandKind.RECAP: self._recap,
             CommandKind.HELP: self._help,
+            CommandKind.HEARD: self._heard,
             CommandKind.GREET: self._greet,
         }[command.kind]
         turn = AssistantTurn(conversation_id=conv.id, at=at, user_text=text, command=command, reply="", speech="", gesture=Gesture.EXPLAIN)
@@ -286,6 +287,29 @@ class AssistantService:
             return f"is powered {value}"
         return f"has {attribute} {value}"
 
+    def _spoken_changes(self, response: GroundedResponse) -> str:
+        """Speak the world changes first (objects moved, appeared, contested), task
+        bookkeeping last; the full list stays on screen."""
+        rank = {"EVIDENCE_CONFLICT": 0, "OBJECT_MOVED": 1, "OBJECT_STATE_CHANGED": 1, "PROCEDURE_REVISION_DETECTED": 1,
+                "OBJECT_ADDED": 2, "RELATION_CHANGED": 3, "IDENTITY_MERGED": 3}
+
+        def importance(c) -> int:
+            kind = c.change_type.value
+            if kind == "OBJECT_REMOVED_OR_UNOBSERVED":  # a confirmed absence matters; "not seen again" least
+                return 2 if c.absence and c.absence.value == "CONFIRMED_ABSENT" else 9
+            return rank.get(kind, 5)
+
+        world = sorted((c for c in response.changes if c.change_type.value != "TASK_PROGRESS_CHANGED"), key=importance)
+        tasks = [c for c in response.changes if c.change_type.value == "TASK_PROGRESS_CHANGED"]
+        n = len(response.changes)
+        head = f"{n} change{'s' if n != 1 else ''}."
+        said = " ".join(self.agent.phrase_change(c) for c in world[:2])
+        more = len(world) - 2
+        tail = f" And {more} more on screen." if more > 0 else ""
+        blocked = sum(1 for c in tasks if str(c.after).upper() == "BLOCKED")
+        task = f" {blocked} task step{'s are' if blocked != 1 else ' is'} now blocked." if blocked else ""
+        return f"{head} {said}{tail}{task}".replace("  ", " ").strip()
+
     def _clarify(self, turn: AssistantTurn, command: Command) -> None:
         mention, ids = next(iter(command.ambiguous.items()))
         turn.reply = f"Which {mention} do you mean: {', '.join(ids)}?"
@@ -329,7 +353,8 @@ class AssistantService:
             turn.gesture = Gesture.ASK
             turn.response = None
             return
-        if response.intent.kind == QueryKind.UNKNOWN and not response.retrieval:
+        if response.intent.kind == QueryKind.UNKNOWN:
+            turn.response = None  # "related memories" are recall aids, not an answer worth reading out
             turn.reply = ("I didn't catch that as a question or a request. You can ask where something is, tell me where "
                           "you put something, tell me you finished a step, or ask me to get an action approved.")
             turn.gesture = Gesture.SHRUG
@@ -337,6 +362,8 @@ class AssistantService:
         turn.reply = response.summary
         if response.answer and response.answer not in response.summary:
             turn.reply = f"{response.answer} {response.summary}"
+        if response.intent.kind == QueryKind.WHAT_CHANGED and response.changes:
+            turn.speech = self._spoken_changes(response)
         turn.gesture = Gesture.EXPLAIN if not response.abstained else (Gesture.THINK if response.requested_observation else Gesture.SHRUG)
         if response.conflicts:
             turn.gesture = Gesture.ALERT
@@ -598,6 +625,14 @@ class AssistantService:
                       "for your yes. You do the action, I verify the result.")
         turn.speech = "Ask me where things are or what changed, tell me what you did, or ask me to prepare an action for your approval."
         turn.gesture = Gesture.EXPLAIN
+
+    def _heard(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        from backend.app.providers.commands import FILLER, normalise
+        if FILLER.match(normalise(command.raw)):
+            turn.reply, turn.gesture = "I'm listening. Take your time.", Gesture.NOD
+        else:
+            turn.reply = "Yes, I can hear you clearly. Ask me about your workspace, or tell me what you did."
+            turn.gesture = Gesture.NOD
 
     def _greet(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
         turn.reply = f"Hi {conv.user_id}! I'm keeping track of your workspace. What do you need?"

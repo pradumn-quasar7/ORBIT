@@ -40,6 +40,7 @@ class CommandKind(str, Enum):
     CHECKS = "CHECKS"  # "what should I check?" → active-perception plan
     RECAP = "RECAP"  # "what did you do for me?"
     HELP = "HELP"
+    HEARD = "HEARD"  # "can you hear me?", "testing", fillers like "ok so like"
     GREET = "GREET"
 
 
@@ -80,11 +81,20 @@ class CommandProvider(ABC):
 
 
 # --------------------------------------------------------------------- lexicons
-YES = re.compile(r"^(yes|yeah|yep|yup|sure|ok|okay|confirm(ed)?|approved?|i approve|authori[sz]e( it)?|do it|go ahead|please do)\b")
+# Consent must be the *whole* utterance ("yes", "yes please", "ok go ahead"): a filler
+# such as "ok so like" must never approve an action.
+_CONSENT = r"(yes|yeah|yep|yup|sure|ok|okay|confirm(ed)?|approved?|i approve|authori[sz]e( it)?|do it|go ahead|please do|please|thanks|thank you)"
+YES = re.compile(rf"^(yes|yeah|yep|yup|sure|ok|okay|confirm(ed)?|approved?|i approve|authori[sz]e( it)?|do it|go ahead|please do)( {_CONSENT})*$")
 NO = re.compile(r"^(no|nope|nah|cancel|don t|do not|deny|denied|stop|never ?mind|abort)\b")
 QUESTION_START = re.compile(r"^(where|what|whats|which|who|whos|when|why|how|is|are|was|were|does|do|did|has|have|can i|could i|should i|tell me|show me|any)\b")
 POLITE = re.compile(r"^(?:(?:hey |ok |okay )?orbit,? )?(?:please |kindly |can you |could you |would you |will you |go ahead and |i want you to |i d like you to |i need you to )*")
-GREETING = re.compile(r"^(hi|hello|hey|good (morning|afternoon|evening)|namaste)\b(?! orbit,? (open|close|turn|switch))")
+# Speech-to-text renders "Orbi" in many ways ("orby", "orbit", "aur bhi" with an Indian accent).
+NAME = r"(orbi|orby|orbie|orbee|orbit|aur ?bhi|aur ?be|or be|orb)"
+GREETING = re.compile(rf"^((hi|hello|hey|hay|hai|good (morning|afternoon|evening)|namaste)( {NAME})?|{NAME})$")
+ADDRESS = re.compile(rf"^(?:(?:hi|hey|hay|hai|ok|okay|hello)\s+)?{NAME}\s+(?=\S)")
+HEARD = re.compile(r"\b(can|do|did) you (hear|listen to|understand) me\b|\b(am i|i am|i m|im) (audible|clear|loud enough)\b"
+                   r"|\bare you (listening|there|working|alive|awake)\b|\b(is|was) (this|it|that) working\b|^(testing|test|mic test|check)( (1|one|2|two|3|three|testing))*$")
+FILLER = re.compile(r"^((ok|okay|so|like|um+|uh+|hmm+|mm+|yeah|right|well|and|but|actually|wait|hold on|let me see|let me think)\s*)+$")
 HELP = re.compile(r"\b(help|what can you do|how do i use you|what do you do)\b")
 RECAP = re.compile(r"\bwhat (did|have) you (do|done)\b|\bwhat have you done\b|\byour actions\b")
 CHECKS = re.compile(r"\bwhat (should|do) i (check|look at|verify|inspect)\b|\bwhat needs (checking|verifying|a look)\b|\bwhat should i look at\b")
@@ -221,6 +231,7 @@ class RuleBasedCommandProvider(CommandProvider):
         t = normalise(text)
         question = raw.strip().endswith("?") or bool(QUESTION_START.match(t))
 
+        t = ADDRESS.sub("", t, count=1)  # "hey orbi, where is…" → "where is…"
         if context.pending_confirmation:
             if YES.match(t) and not question:
                 return Command(kind=CommandKind.CONFIRM, raw=raw)
@@ -228,13 +239,15 @@ class RuleBasedCommandProvider(CommandProvider):
                 return Command(kind=CommandKind.CANCEL, raw=raw)
         if context.awaiting_performance and PERFORMED.match(t) and not STEP_NUMBER.search(t):
             return Command(kind=CommandKind.PERFORMED, raw=raw)
+        if HEARD.search(t) or FILLER.match(t):
+            return Command(kind=CommandKind.HEARD, raw=raw)
         if HELP.search(t):
             return Command(kind=CommandKind.HELP, raw=raw)
         if RECAP.search(t):
             return Command(kind=CommandKind.RECAP, raw=raw)
         if CHECKS.search(t):
             return Command(kind=CommandKind.CHECKS, raw=raw)
-        if GREETING.match(t) and len(t.split()) <= 4:
+        if GREETING.match(t):
             return Command(kind=CommandKind.GREET, raw=raw)
 
         entities, anchors, ambiguous = _mentions(t, vocabulary)
