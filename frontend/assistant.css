@@ -41,3 +41,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .msg.notice.alert { border-left-color: var(--contradicted); }
 .notice-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); margin-bottom: 2px; }
 .as-status { display: inline-flex; gap: 8px; align-items: center; }
+.level { width: 64px; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.level span { display: block; height: 100%; background: var(--verified); transform: scaleX(0); transform-origin: left; transition: transform 0.08s linear; }
+.voice-row select { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+.voice-status { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.voice-status.ok { color: var(--verified); }
+.voice-status.info { color: var(--ink); }
+.voice-status.error { color: var(--contradicted); background: color-mix(in srgb, var(--contradicted) 10%, transparent); padding: 6px 10px; border-radius: 8px; }
+.voice-status code { user-select: all; }

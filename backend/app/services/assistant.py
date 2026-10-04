@@ -41,6 +41,7 @@ from backend.app.providers.base import Vocabulary
 from backend.app.providers.commands import (
     PRONOUNS,
     Command,
+    spoken_numbers,
     CommandContext,
     CommandKind,
     CommandProvider,
@@ -205,6 +206,7 @@ class AssistantService:
 
     def _say(self, conversation_id: str, text: str, at: datetime) -> AssistantTurn:
         conv = self.get(conversation_id)
+        text = spoken_numbers(text)
         if conv.pending and at > conv.pending.expires_at:
             conv.pending = None  # an old question cannot be answered with a new "yes"
         vocabulary = self.agent.vocabulary()

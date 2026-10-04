@@ -34,10 +34,19 @@
       <div class="avatar" id="avatar" aria-hidden="true"><p class="avatar-fallback" id="avatar-fallback" hidden>3D view unavailable — the chat still works.</p></div>
       <div class="voice-row">
         <button id="mic" type="button" class="primary" aria-pressed="false">🎙 Talk</button>
+        <span class="level" aria-hidden="true"><span id="level"></span></span>
+        <label class="toggle">Speech
+          <select id="engine" aria-label="Speech recognition engine">
+            <option value="auto">Auto</option>
+            <option value="browser">Browser service (online)</option>
+            <option value="local">On this device (private)</option>
+          </select>
+        </label>
         <label class="toggle"><input type="checkbox" id="speak" checked> Speak replies</label>
         <label class="who">You are <input id="user" type="text" value="operator" autocomplete="off" aria-label="Your ORBIT principal id"></label>
       </div>
-      <p class="hint" id="voice-hint"></p>
+      <p class="voice-status" id="voice-hint" role="status"></p>
+      <p class="voice-status info" id="open-browser" hidden>Copy <code>http://localhost:8765/ui/assistant.html</code> into Chrome or Edge to talk to Orbi. <button type="button" id="copy-link">Copy link</button></p>
     </section>
 
     <section class="card as-chat" aria-labelledby="chat-h">

@@ -102,7 +102,7 @@ DID_VERBS: List[Tuple[re.Pattern, str, Any]] = [  # "I opened the valve" → (at
     (re.compile(r"^(i|we) (just |have |ve )?(turned|switched|powered) (\S+ ){0,2}on\b"), "power", "on"),
     (re.compile(r"^(i|we) (just |have |ve )?(turned|switched|powered) (\S+ ){0,2}off\b"), "power", "off"),
 ]
-PLACE_VERBS = re.compile(r"\b(put|placed|moved|left|set|dropped|kept|keep|stored|returned|brought|carried|took)\b")
+PLACE_VERBS = re.compile(r"\b(put|placed|place|moved|move|left|set|dropped|drop|kept|keep|stored|store|returned|return|brought|bring|carried|took)\b")
 LOCATION_STATEMENT = re.compile(r"\b(is|are) (now |still )?(on|in|at|inside|on top of)\b")
 PREPOSITION = re.compile(r"\b(?:on|in|at|to|onto|into|inside|on top of)\s+(?:the |my )?([a-z0-9 ]{1,40})$")
 
@@ -128,6 +128,23 @@ VALUE_ATTRIBUTE = {
 }
 VALUE_CANONICAL = {"opened": "open", "shut": "closed", "uninstalled": False, "installed": True}
 PRONOUNS = re.compile(r"\b(it|that|this one|that one|them)\b")
+
+
+_NUMBER_WORDS = {w: str(i) for i, w in enumerate(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty".split())}
+_NUMBERED = re.compile(r"\b(bench|shelf|step|desk|table|cart|rack|bay|station|room|lab|zone|area|drawer|bin|slot|camera)(\s+(?:number\s+)?)("
+                       + "|".join(_NUMBER_WORDS) + r"|for|to|too)\b", re.I)
+
+
+def spoken_numbers(text: str) -> str:
+    """Speech-to-text writes numbers as words ("bench four", even "bench for"): turn
+    numbered places and steps back into digits so they match ORBIT's ids."""
+    homophones = {"for": "4", "to": "2", "too": "2"}
+
+    def fix(m: re.Match) -> str:
+        word = m.group(3).lower()
+        return f"{m.group(1)} {homophones.get(word) or _NUMBER_WORDS[word]}"
+    return _NUMBERED.sub(fix, text)
 
 
 def _mentions(text: str, vocabulary: Vocabulary) -> Tuple[List[Tuple[str, Tuple[int, int]]], List[Tuple[str, Tuple[int, int]]], Dict[str, List[str]]]:

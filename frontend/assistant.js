@@ -59,37 +59,73 @@ function speak(text) {
   });
 }
 
-const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognizer = null;
-function setupMic() {
-  if (!Recognition) {
-    $("mic").disabled = true;
-    $("voice-hint").textContent = "Voice input needs Chrome or Edge; typing works everywhere.";
+// Voice input: browser speech service, or Whisper on this device (voice.js).
+let voice = null;
+let errorShown = false;
+function voiceStatus(text, kind) {
+  const h = $("voice-hint");
+  h.textContent = text;
+  h.className = `voice-status ${kind || ""}`;
+}
+
+async function setupMic() {
+  const { Voice, inClaudeApp, explain } = await import("./voice.js");
+  const select = $("engine");
+  if (!Voice.browserAvailable) select.querySelector('option[value="browser"]').disabled = true;
+  const saved = store.get("orbit.voice");
+  voice = new Voice({
+    onPartial(text) { $("text").value = text; },
+    onFinal(text) { $("text").value = text; send(text); },
+    onState(state, engine) {
+      $("mic").setAttribute("aria-pressed", String(state === "listening"));
+      $("mic").textContent = state === "listening" ? "■ Stop" : state === "transcribing" ? "… transcribing" : state === "loading" ? "… loading" : "🎙 Talk";
+      $("mic").disabled = state === "transcribing";
+      if (state === "listening") {
+        errorShown = false;
+        setState("listening");
+        voiceStatus(engine === "local" ? "Listening (on this device)… speak, then pause." : "Listening… speak, then pause.", "ok");
+      } else if (state === "transcribing") {
+        setState("thinking");
+        voiceStatus("Transcribing on this device…", "ok");
+      } else {
+        if (!busy) setState("idle");
+        if (!errorShown) voiceStatus("Ready. Press Talk to speak again.", "");
+      }
+    },
+    onError(code, message) {
+      errorShown = true;
+      voiceStatus(message, "error");
+      if (inClaudeApp) $("open-browser").hidden = false;
+    },
+    onInfo(text) { voiceStatus(text, "info"); },
+    onLevel(level) { $("level").style.transform = `scaleX(${level.toFixed(3)})`; },
+  });
+  if (saved && (saved !== "browser" || Voice.browserAvailable)) voice.engine = saved;
+  select.value = voice.engine;
+  select.addEventListener("change", () => { voice.engine = select.value; store.set("orbit.voice", select.value); });
+  $("mic").addEventListener("click", () => { if (synth) synth.cancel(); voice.toggle(); });
+  $("copy-link").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(location.href); $("copy-link").textContent = "Copied"; }
+    catch { $("copy-link").textContent = "Select the link and copy it"; }
+  });
+
+  if (inClaudeApp) {
+    voiceStatus(explain("not-allowed"), "error");
+    $("open-browser").hidden = false;
     return;
   }
-  $("voice-hint").textContent = "Press Talk and speak. Speech is transcribed by your browser's speech service (in Chrome, an online Google service); only the text reaches ORBIT.";
-  $("mic").addEventListener("click", () => {
-    if (recognizer) { recognizer.stop(); return; }
-    if (synth) synth.cancel();
-    recognizer = new Recognition();
-    recognizer.lang = navigator.language || "en-US";
-    recognizer.interimResults = true;
-    recognizer.maxAlternatives = 1;
-    $("mic").setAttribute("aria-pressed", "true");
-    setState("listening");
-    recognizer.onresult = (e) => {
-      const r = e.results[e.results.length - 1];
-      $("text").value = r[0].transcript;
-      if (r.isFinal) send(r[0].transcript);
+  // Tell the user up front if the microphone is already blocked for this site.
+  try {
+    const perm = await navigator.permissions.query({ name: "microphone" });
+    const show = () => {
+      if (perm.state === "denied") voiceStatus(explain("not-allowed"), "error");
+      else voiceStatus(perm.state === "granted" ? "Microphone ready. Press Talk and speak." : "Press Talk — your browser will ask to use the microphone.", "");
     };
-    recognizer.onerror = (e) => { $("voice-hint").textContent = e.error === "not-allowed" ? "Microphone permission was denied." : `Voice error: ${e.error}`; };
-    recognizer.onend = () => {
-      recognizer = null;
-      $("mic").setAttribute("aria-pressed", "false");
-      if (!busy) setState("idle");
-    };
-    recognizer.start();
-  });
+    show();
+    perm.onchange = show;
+  } catch {
+    voiceStatus("Press Talk and speak.", "");
+  }
 }
 
 // --------------------------------------------------------------------- api
