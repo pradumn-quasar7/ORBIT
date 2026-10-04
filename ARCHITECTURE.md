@@ -49,7 +49,7 @@ backend/app/
   core/            time (UTCDateTime), clock, OrbitConfig + composition root (OrbitServices)
   domain/          Pydantic models, enums, weakest-link status aggregation
   repositories/    Repository ABC; InMemoryRepository; sql/ (tables + SqlRepository)
-  providers/       replaceable boundaries: embedding, retrieval, reasoning, perception
+  providers/       replaceable boundaries: embedding, retrieval, reasoning, perception, commands (rule-based / Claude)
   services/
     spatial.py            anchor hierarchy
     entity_registry.py    re-identification (follows merge aliases)
@@ -73,6 +73,7 @@ backend/app/
     actions.py            action safety boundary + outcome memory
     perception_gateway.py frame ingestion, retention, redaction
     camera.py             live camera: calibration (regions as anchor frames), snapshots, scans
+    assistant.py          conversational assistant: delegation inside ORBIT, consent-bound action prep
     dashboard.py          inspection read model
     grading.py            status of a version from its supports (shared)
     projection.py         world as known at T (id-preserving copy)
@@ -80,12 +81,13 @@ backend/app/
     counterfactual.py     what-if premises, decision comparison, sensitivity analysis
     replay.py             frame-by-frame history
   evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner), counterfactual_eval.py (Experiment H), decision_perception_eval.py (Experiment F2), generator.py + generated.py + stats.py (generated worlds, bootstrap CIs)
-  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual, identity, camera)
+  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual, identity, camera, assistant)
   main.py          create_app(repository, clock) factory; lazy module-level `app`
 database/          Alembic migrations 0001–0009, migrate.py
 experiments/       scenarios/catalog.py, runners/run_bench.py, results/
 frontend/          static inspection dashboard served at /ui/; camera.html + camera_core.js
-                   live webcam client (in-browser detection, regions, QR markers)
+                   live webcam client (in-browser detection, regions, QR markers);
+                   assistant.html + avatar.js: chat/voice assistant with a three.js avatar
 scripts/           seed_demo.py (flagship scenario)
 ```
 

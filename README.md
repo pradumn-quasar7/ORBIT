@@ -43,6 +43,17 @@ ORBIT_DATABASE_URL=sqlite:///./orbit_demo.db .venv/bin/uvicorn backend.app.main:
 ```
 Then open http://localhost:8765/ui/ and ask "What changed?" or "Continue.".
 
+### Assistant (Orbi)
+Open http://localhost:8765/ui/assistant.html (Chrome or Edge for voice). Type or press
+**Talk**: "Where is the microscope?", "I moved the notebook to bench 4", "I finished step 6",
+"What should I check?", "Open the valve" (Orbi checks prerequisites and asks for your yes;
+you do the action and say "done"; ORBIT verifies the result), "What did you do for me?".
+The demo's `operator` may authorise actions. Optional: let Claude parse free-form
+language — this sends the workspace vocabulary to the Anthropic API:
+```bash
+ORBIT_ASSISTANT_LLM=anthropic ANTHROPIC_API_KEY=... ORBIT_DATABASE_URL=sqlite:///./orbit_demo.db .venv/bin/uvicorn backend.app.main:app --port 8765
+```
+
 ### Live camera
 With the server running, open http://localhost:8765/ui/camera.html in Chrome or Edge,
 click **Start camera** and allow camera access (on macOS the browser also needs

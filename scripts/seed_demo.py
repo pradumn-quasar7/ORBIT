@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend.app.core.clock import FixedClock  # noqa: E402
 from backend.app.core.container import OrbitServices  # noqa: E402
 from backend.app.domain.models import ObservedRelation, StateCondition  # noqa: E402
-from backend.app.domain.types import EpistemicStatus  # noqa: E402
+from backend.app.domain.types import EpistemicStatus, PrincipalKind, Scope  # noqa: E402
 from backend.app.providers.perception import SimulatedPerceptionProvider, SimulatedScene, make_frame  # noqa: E402
 from backend.app.repositories.sql import SqlRepository  # noqa: E402
 from backend.app.services.perception_gateway import PerceptionGateway  # noqa: E402
@@ -101,6 +101,8 @@ def seed(url: str, now: datetime) -> OrbitServices:
     look(4, "bench_4", "session_B")
     svc.search.record_search("bench_3", t(3), ["c4"], coverage_fraction=0.95, visibility_conditions={"lighting": "good"},
                              session_id="session_B")
+    # The person at the keyboard: may authorise and perform actions the assistant prepares (Phase 16).
+    svc.actions.register_principal("operator", PrincipalKind.HUMAN, [Scope.OBSERVE, Scope.AUTHORIZE, Scope.ACTUATE], t(200))
     return svc
 
 

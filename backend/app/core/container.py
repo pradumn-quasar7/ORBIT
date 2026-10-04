@@ -8,8 +8,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 from backend.app.core.clock import Clock, SystemClock
+from backend.app.providers.commands import AnthropicCommandProvider, CommandProvider, RuleBasedCommandProvider, http_transport
 from backend.app.repositories.base import Repository
 from backend.app.services.actions import ActionSafetyService
+from backend.app.services.assistant import AssistantService
 from backend.app.services.active_perception import ActivePerceptionPlanner
 from backend.app.services.hypotheses import HypothesisService
 from backend.app.services.identity import IdentityService
@@ -63,6 +65,7 @@ class OrbitServices:
     sandboxes: SandboxRegistry
     identity: IdentityService
     camera: CameraService
+    assistant: AssistantService
 
     config: OrbitConfig = OrbitConfig()
 
@@ -95,6 +98,9 @@ class OrbitServices:
         search = SearchService(repo, engine, SearchPolicy(enabled=config.search_policy_enabled))
         actions = ActionSafetyService(repo, tasks.conditions, tasks)
         actions.ensure_agent_principal(clock.now())
+        agent = QueryAgent(repo, engine, memory, diff, tasks, hypotheses, planner=perception, gate_evidence=config.gate_evidence)
+        assistant = AssistantService(repo, engine, agent, tasks, actions, perception, command_provider())
+        assistant.ensure_principal(clock.now())
         return cls(
             repo=repo,
             clock=clock,
@@ -106,15 +112,26 @@ class OrbitServices:
             hypotheses=hypotheses,
             search=search,
             diff=diff,
-            agent=QueryAgent(repo, engine, memory, diff, tasks, hypotheses, planner=perception, gate_evidence=config.gate_evidence),
+            agent=agent,
             perception=perception,
             actions=actions,
             replay=ReplayService(repo, diff),
             sandboxes=SandboxRegistry(),
             identity=IdentityService(repo, engine),
             camera=CameraService(repo, engine, search),
+            assistant=assistant,
             config=config,
         )
+
+
+def command_provider() -> CommandProvider:
+    """Rule-based by default. ORBIT_ASSISTANT_LLM=anthropic (with ANTHROPIC_API_KEY) lets
+    Claude parse messages; the workspace vocabulary is then sent to the API, so it is
+    opt-in only. ORBIT_ASSISTANT_MODEL overrides the model."""
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if os.environ.get("ORBIT_ASSISTANT_LLM", "").lower() == "anthropic" and key:
+        return AnthropicCommandProvider(http_transport(key), os.environ.get("ORBIT_ASSISTANT_MODEL", "claude-sonnet-5-5"))
+    return RuleBasedCommandProvider()
 
 
 def default_repository() -> Repository:
