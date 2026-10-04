@@ -1,11 +1,11 @@
 # ORBIT Project Status
 
 ## Current Phase
-**Phase 15 — Live webcam perception (COMPLETE).** ORBIT v0.1 (Phases 0–9) is complete;
-Phases 10–13 added counterfactual sandboxes, decision-aware perception, risk-graded
-verification and identity curation; Phase 14 evaluates ORBIT on randomly generated worlds
-with bootstrap intervals; Phase 15 connects a real camera: detection runs in the browser
-and only stable detections reach ORBIT.
+**Phase 16 — Conversational assistant with a 3D avatar (COMPLETE).** ORBIT v0.1 (Phases
+0–9) is complete; Phases 10–13 added counterfactual sandboxes, decision-aware perception,
+risk-graded verification and identity curation; Phase 14 evaluates ORBIT on generated
+worlds; Phase 15 connects a real webcam; Phase 16 adds "Orbi", a talking assistant that
+acts on the user's behalf inside ORBIT and prepares physical actions for their explicit yes.
 
 ## Phase Log
 
@@ -213,6 +213,18 @@ and only stable detections reach ORBIT.
 - ADR-039. Tests: `test_camera.py` (calibration, 409/422, region placement, privacy and confidence filters, QR identity across a move, heartbeat corroboration, region-scoped absence via scan) and `frontend/tests/camera_core.test.js` (run by pytest when Node is present).
 - Verified in the browser: libraries and model load (~25 s first download; now preloaded on page open), a simulated tracker → API round trip produces correct entities (QR id kept, person dropped). The browser pane blocks real cameras, so the live feed must be checked by the user.
 
+### Phase 16 — Conversational assistant + 3D avatar
+**Planned**
+- A conversational agent that does things on the user's behalf — by voice or text — through ORBIT's own services, with a 3D avatar as its face. It may record what the user says and does, report task progress, pause tasks, answer questions and suggest checks; it may never actuate, and may only *prepare* physical actions for the user's explicit, recorded "yes" (spec §14, §16, Golden Rule 7).
+
+**Implemented**
+- `providers/commands.py`: `Command` (ASK, TELL, STEP_DONE, STEP_START, INTERRUPT, ACT, PERFORMED, CONFIRM, CANCEL, CHECKS, RECAP, HELP, GREET); `RuleBasedCommandProvider` (default, offline); `AnthropicCommandProvider` (opt-in Claude tool-use parsing, validated against the vocabulary, falls back to rules; consent words never reach the model).
+- `services/assistant.py`: `AssistantService` orchestrates the query agent, claims, interventions, task service, active perception and the action-safety boundary. "I moved/opened X" is a *known intervention* (invalidates, then records testimony); "X is Y" is a plain statement (a disagreement with fresh camera evidence becomes a conflict). Actions: propose as `orbit-assistant` (agent: observe/reason/recommend only) → prerequisites → if the speaker may authorise, a 2-minute confirmation bound to that action → "yes" recorded as the human's authorisation → the human performs and says "done" → outcome verified against post-action evidence. A recap lists every delegated act with references.
+- `api/assistant.py`: `GET /assistant`, `POST /assistant/conversations`, `GET /assistant/conversations/{id}`, `POST /assistant/conversations/{id}/messages`.
+- Frontend: `assistant.html|css|js` (chat with evidence badges, delegated-act list, observation requests, approve/decline card with countdown, voice in via Web Speech API, voice out via speech synthesis) and `avatar.js` (procedural three.js robot "Orbi": idle breathing, blinking, gaze following the pointer, lip movement while speaking, gestures WAVE/NOD/EXPLAIN/THINK/SHRUG/ASK/ALERT, an orbit ring coloured by state). Demo seed registers a human `operator` who may authorise.
+- ADR-040. Tests: `test_assistant.py` (38, both backends): grounded answers + pronoun follow-up, spoken names instead of ids, testimony provenance, intervention vs conflicting statement, unknown place / ambiguous object record nothing, step start/done through readiness checks, pause, the full prepare → yes → done → verify flow, decline, confirmation expiry, unauthorised speaker, the assistant itself can never authorise, blocked action explains prerequisites, LLM parser validation/fallback/consent isolation, API.
+- Verified in the browser: avatar renders; prepare → reminder on "done" → approve → done → outcome unverified with a look request → recap. Found and fixed during that check: input was blocked while the avatar spoke; stale approval cards stayed clickable; "done" before approval fell through to the question answerer.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -242,7 +254,8 @@ and only stable detections reach ORBIT.
 | Important claims are auditable | `test_evidence_engine.py::test_tampered_evidence_fails_integrity`, action audit events |
 
 ## Known Issues / Limitations
-- No multi-workspace / multi-tenant separation or authentication on the API (spec §17 access control is principal-scoped for actions only).
+- No multi-workspace / multi-tenant separation or authentication on the API (spec §17 access control is principal-scoped for actions only). In particular the assistant trusts the "You are" id: anyone who can reach the server can speak as `operator`. Do not expose it beyond your own machine before authentication exists.
+- Assistant conversations are process-local (a restart drops context and pending approvals — fail-safe); delegated acts themselves are in the durable audit trail. Voice input uses the browser's speech service (online in Chrome).
 - Reasoning provider is rule-based; free-form language coverage is limited to the supported question types. An LLM provider can be added behind `ReasoningProvider`.
 - Live camera: COCO-SSD knows ~80 everyday classes (no cables, tools, pumps) — such objects need QR tags `orbit:<type>:<id>`. One fixed camera per view; no pose tracking. The model is fetched from a CDN on first use (internet needed). Detection quality on real scenes is not yet measured.
 - In-memory vector index is rebuilt per process; a pgvector `RetrievalProvider` is needed for large memories.
@@ -251,14 +264,15 @@ and only stable detections reach ORBIT.
 - Sandboxes are process-local and disposable (not persisted); each probe copies the world, which is fine for small workspaces but not optimised.
 
 ## Next (candidates)
-1. Meta Quest 3S client: WebXR AR session served over HTTPS on the LAN, then (optionally) a native app with the Passthrough Camera API.
-2. Measured live accuracy: label a short recorded desk session and report identity/diff metrics on real frames.
-3. Generated futures for Experiment H and generated perception worlds for Experiment F2.
+1. Meta Quest 3S client: Orbi and the world model in a WebXR AR session served over HTTPS on the LAN, then (optionally) a native app with the Passthrough Camera API.
+2. Webcam fixes from the first live test: achromatic colours (black/gray) must not split one object into two; hysteresis + rate limit on snapshots; a scan must count recently seen objects; drop implausible desk labels; camera view name separate from the demo world.
+3. Measured live accuracy: label a short recorded desk session and report identity/diff metrics on real frames.
+4. Generated futures for Experiment H and generated perception worlds for Experiment F2.
 3. API authentication and workspace separation.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 483 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 521 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
@@ -280,6 +294,7 @@ and only stable detections reach ORBIT.
 - ADR-035 Merge by evidence replay (bitemporal) · ADR-036 Ambiguity casts doubt · ADR-037 Region-scoped absence
 - ADR-038 Generated worlds with bootstrap CIs; relocation needs evidence of leaving
 - ADR-039 Live camera: on-device detection, calibration as anchor frames, markers as identity
+- ADR-040 Conversational assistant: delegation inside ORBIT, deterministic consent, interventions vs statements
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.
@@ -288,4 +303,4 @@ and only stable detections reach ORBIT.
 - G (AR utility) — deferred (needs an AR client).
 
 ## Last Updated
-- 2026-10-04 (Phase 15)
+- 2026-10-04 (Phase 16)

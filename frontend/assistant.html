@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ORBIT Assistant</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="assistant.css">
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◎</span>
+      <div>
+        <h1>ORBIT</h1>
+        <p class="tagline">Assistant — acts for you inside ORBIT; physical actions need your yes</p>
+      </div>
+    </div>
+    <div class="meta">
+      <a href="./" class="navlink">← Inspector</a>
+      <a href="camera.html" class="navlink">Live camera</a>
+    </div>
+  </header>
+
+  <main class="as-layout">
+    <section class="card as-stage" aria-labelledby="avatar-h">
+      <div class="card-head">
+        <h2 id="avatar-h">Orbi</h2>
+        <span class="hint" id="state-label">starting…</span>
+      </div>
+      <div class="avatar" id="avatar" aria-hidden="true"><p class="avatar-fallback" id="avatar-fallback" hidden>3D view unavailable — the chat still works.</p></div>
+      <div class="voice-row">
+        <button id="mic" type="button" class="primary" aria-pressed="false">🎙 Talk</button>
+        <label class="toggle"><input type="checkbox" id="speak" checked> Speak replies</label>
+        <label class="who">You are <input id="user" type="text" value="operator" autocomplete="off" aria-label="Your ORBIT principal id"></label>
+      </div>
+      <p class="hint" id="voice-hint"></p>
+    </section>
+
+    <section class="card as-chat" aria-labelledby="chat-h">
+      <div class="card-head">
+        <h2 id="chat-h">Conversation</h2>
+        <span class="hint" id="parser"></span>
+      </div>
+      <ol id="log" class="chat" aria-live="polite"></ol>
+      <div class="chips" id="chips"></div>
+      <form id="form" class="composer">
+        <input id="text" type="text" placeholder="Ask, tell, or request… e.g. “Where is the microscope?”" autocomplete="off" aria-label="Message">
+        <button type="submit" class="primary">Send</button>
+      </form>
+    </section>
+  </main>
+
+  <script type="module" src="assistant.js"></script>
+</body>
+</html>

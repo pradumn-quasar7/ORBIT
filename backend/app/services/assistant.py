@@ -1,0 +1,562 @@
+"""ORBIT assistant (Phase 16): a conversational agent that acts on the user's behalf
+inside ORBIT's boundaries.
+
+What it may do by itself, because the user's words are the evidence:
+- answer questions (through the grounded query agent and its evidence gate);
+- record what the user states (USER_STATEMENT evidence — testimony, graded as such,
+  never allowed to silently overwrite stronger evidence);
+- report a finished or started task step, pause a task;
+- say what is worth checking (active perception).
+
+What it may only *prepare*: a physical action. It proposes the action, has its
+prerequisites checked, and asks the user for an explicit "yes" (matched
+deterministically, within a short window, for that exact action). A "yes" is recorded
+as the user's authorisation. Nothing is actuated: the user does the action and says so;
+ORBIT then checks the expected outcome against evidence observed afterwards (spec §16).
+
+Every delegated act is recorded with provenance (conversation, utterance, actor), so
+"what did you do for me?" is answerable from the audit trail. Conversation context
+(focus, pending confirmation) is process-local and fails safe: after a restart a
+pending "yes" simply expires (ADR-040).
+"""
+import re
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
+from pydantic import BaseModel, Field
+
+from backend.app.core.time import UTCDateTime
+from backend.app.domain.models import ActionRequest, GroundedResponse, ObservationRequest, StateCondition, generate_id
+from backend.app.domain.types import ActionStatus, ClaimDecision, ConditionState, PrincipalKind, QueryKind, Scope, SourceType, TaskStatus
+
+from backend.app.providers.base import Vocabulary
+from backend.app.providers.commands import (
+    PRONOUNS,
+    Command,
+    CommandContext,
+    CommandKind,
+    CommandProvider,
+    RuleBasedCommandProvider,
+)
+from backend.app.repositories.base import Repository
+from backend.app.services.actions import ActionError, ActionSafetyService
+from backend.app.services.active_perception import ActivePerceptionPlanner, DecisionAwarePolicy
+from backend.app.services.query_agent import QueryAgent, hhmm
+from backend.app.services.tasks import PostconditionViolatedError, TaskError, TaskService
+from backend.app.services.world_state_engine import WorldStateEngine
+
+ASSISTANT = "orbit-assistant"
+CONFIRM_WINDOW = timedelta(minutes=2)
+
+
+class Gesture(str, Enum):
+    """How the avatar should move while it speaks the reply."""
+
+    WAVE = "WAVE"
+    NOD = "NOD"
+    EXPLAIN = "EXPLAIN"
+    THINK = "THINK"  # abstained: ORBIT needs a look before it can say
+    SHRUG = "SHRUG"  # did not understand / nothing to report
+    ASK = "ASK"  # waiting for the user's decision
+    ALERT = "ALERT"  # blocked, conflicting, or refused
+
+
+class DelegatedAction(BaseModel):
+    at: UTCDateTime
+    kind: str  # recorded_statement | completed_step | started_step | interrupted_task | proposed_action | authorized_action | declined_action | reported_performed | outcome_checked
+    summary: str
+    refs: List[str] = Field(default_factory=list)  # event / action / version ids
+
+
+class PendingConfirmation(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("confirm"))
+    action_id: str
+    summary: str
+    created_at: UTCDateTime
+    expires_at: UTCDateTime
+
+
+class AssistantTurn(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("turn"))
+    conversation_id: str
+    at: UTCDateTime
+    user_text: str
+    command: Command
+    reply: str
+    speech: str  # the reply as the avatar says it (names instead of ids, short)
+    gesture: Gesture
+    done: List[DelegatedAction] = Field(default_factory=list)
+    pending: Optional[PendingConfirmation] = None
+    response: Optional[GroundedResponse] = None
+    action: Optional[ActionRequest] = None
+    observation_requests: List[ObservationRequest] = Field(default_factory=list)
+    focus: List[str] = Field(default_factory=list)
+
+
+class Conversation(BaseModel):
+    id: str = Field(default_factory=lambda: generate_id("conv"))
+    user_id: str
+    started_at: UTCDateTime
+    turns: List[AssistantTurn] = Field(default_factory=list)
+    focus: List[str] = Field(default_factory=list)
+    pending: Optional[PendingConfirmation] = None
+    awaiting_performance: Optional[str] = None  # action the user was authorised to do
+    delegated: List[DelegatedAction] = Field(default_factory=list)
+
+
+class ConversationNotFound(KeyError):
+    pass
+
+
+def _sentences(text: str, limit: int = 260) -> str:
+    out = ""
+    for s in re.split(r"(?<=[.!?])\s+", text.strip()):
+        if out and len(out) + len(s) > limit:
+            break
+        out = f"{out} {s}".strip()
+    return out or text[:limit]
+
+
+class AssistantService:
+    def __init__(
+        self,
+        repository: Repository,
+        engine: WorldStateEngine,
+        agent: QueryAgent,
+        tasks: TaskService,
+        actions: ActionSafetyService,
+        perception: ActivePerceptionPlanner,
+        parser: Optional[CommandProvider] = None,
+        confirm_window: timedelta = CONFIRM_WINDOW,
+    ):
+        self.repo = repository
+        self.engine = engine
+        self.agent = agent
+        self.tasks = tasks
+        self.actions = actions
+        self.perception = perception
+        self.parser = parser or RuleBasedCommandProvider()
+        self.confirm_window = confirm_window
+        self.conversations: Dict[str, Conversation] = {}
+
+    # --------------------------------------------------------------- lifecycle
+    def ensure_principal(self, at: datetime) -> None:
+        """The assistant is an agent: it may observe, reason and recommend — never
+        authorise or actuate (those stay with the human it talks to)."""
+        if self.repo.get_principal(ASSISTANT) is None:
+            self.actions.register_principal(ASSISTANT, PrincipalKind.AGENT, [Scope.OBSERVE, Scope.REASON, Scope.RECOMMEND], at)
+
+    def start(self, user_id: str, at: datetime, conversation_id: Optional[str] = None) -> Conversation:
+        self.ensure_principal(at)
+        conv = Conversation(user_id=user_id, started_at=at)
+        if conversation_id:
+            if conversation_id in self.conversations:
+                raise ValueError(f"conversation {conversation_id} already exists")
+            conv.id = conversation_id
+        self.conversations[conv.id] = conv
+        return conv
+
+    def get(self, conversation_id: str) -> Conversation:
+        conv = self.conversations.get(conversation_id)
+        if conv is None:
+            raise ConversationNotFound(conversation_id)
+        return conv
+
+    # -------------------------------------------------------------------- turn
+    def say(self, conversation_id: str, text: str, at: datetime) -> AssistantTurn:
+        conv = self.get(conversation_id)
+        if conv.pending and at > conv.pending.expires_at:
+            conv.pending = None  # an old question cannot be answered with a new "yes"
+        vocabulary = self.agent.vocabulary()
+        context = CommandContext(
+            focus=conv.focus, pending_confirmation=conv.pending is not None,
+            awaiting_performance=conv.awaiting_performance is not None, steps=self._steps(),
+        )
+        command = self.parser.parse(text, vocabulary, context)
+        handler = {
+            CommandKind.ASK: self._ask,
+            CommandKind.TELL: self._tell,
+            CommandKind.STEP_DONE: self._step_done,
+            CommandKind.STEP_START: self._step_start,
+            CommandKind.INTERRUPT: self._interrupt,
+            CommandKind.ACT: self._act,
+            CommandKind.CONFIRM: self._confirm,
+            CommandKind.CANCEL: self._cancel,
+            CommandKind.PERFORMED: self._performed,
+            CommandKind.CHECKS: self._checks,
+            CommandKind.RECAP: self._recap,
+            CommandKind.HELP: self._help,
+            CommandKind.GREET: self._greet,
+        }[command.kind]
+        turn = AssistantTurn(conversation_id=conv.id, at=at, user_text=text, command=command, reply="", speech="", gesture=Gesture.EXPLAIN)
+        if command.ambiguous and not command.entity_id and command.kind in (CommandKind.TELL, CommandKind.ACT):
+            self._clarify(turn, command)
+        else:
+            handler(conv, command, turn, at)
+        if command.entity_id and command.entity_id not in turn.focus:
+            turn.focus.insert(0, command.entity_id)
+        conv.focus = (turn.focus + [e for e in conv.focus if e not in turn.focus])[:5]
+        turn.focus = list(conv.focus)
+        turn.pending = conv.pending
+        turn.speech = self._speakable(turn.speech or _sentences(turn.reply), vocabulary)
+        conv.delegated += turn.done
+        conv.turns.append(turn)
+        del conv.turns[:-200]
+        return turn
+
+    # ---------------------------------------------------------------- helpers
+    def _steps(self) -> Dict[str, List[Tuple[str, int, str]]]:
+        return {
+            t.id: [(s.id, s.step_order, s.description) for s in t.steps]
+            for t in self.repo.list_tasks() if t.status not in (TaskStatus.COMPLETED, TaskStatus.ABANDONED)
+        }
+
+    def _name(self, entity_id: Optional[str]) -> str:
+        e = self.repo.get_entity(entity_id) if entity_id else None
+        if e is None:
+            return entity_id or "it"
+        return e.name if e.name and e.name != e.type else f"the {e.type}" if self._unique_type(e.type) else e.id
+
+    def _unique_type(self, etype: str) -> bool:
+        return sum(1 for e in self.repo.list_entities() if e.type == etype and not e.merged_into) == 1
+
+    def _speakable(self, text: str, vocabulary: Vocabulary) -> str:
+        """Ids are for screens; the avatar says names."""
+        def name(m: re.Match) -> str:
+            eid = m.group(0)
+            if eid not in vocabulary.entities:
+                return eid
+            e = self.repo.get_entity(eid)
+            return (e.name if e.name and e.name != e.type else f"a {e.type}") if e else eid
+        text = re.sub(r"\b[a-z]+_[a-z]+_[0-9a-f]{8,}\b", name, text)
+        return text.replace("_", " ")
+
+    @staticmethod
+    def _value(attribute: Optional[str], value: Any) -> str:
+        """Speakable predicate: "is at bench_3", "is open", "is powered on", "has model_number CP-200"."""
+        if attribute == "location":
+            return f"is at {value}"
+        if isinstance(value, bool):
+            return f"is {'' if value else 'not '}{attribute}"
+        if attribute == "state":
+            return f"is {value}"
+        if attribute == "power":
+            return f"is powered {value}"
+        return f"has {attribute} {value}"
+
+    def _clarify(self, turn: AssistantTurn, command: Command) -> None:
+        mention, ids = next(iter(command.ambiguous.items()))
+        turn.reply = f"Which {mention} do you mean: {', '.join(ids)}?"
+        turn.gesture = Gesture.ASK
+
+    def _record(self, turn: AssistantTurn, at: datetime, kind: str, summary: str, refs: List[str]) -> None:
+        turn.done.append(DelegatedAction(at=at, kind=kind, summary=summary, refs=refs))
+
+    def _provenance(self, conv: Conversation, text: str) -> Dict[str, Any]:
+        return {"actor": conv.user_id, "via": ASSISTANT, "conversation": conv.id, "utterance": text}
+
+    def _step(self, command: Command) -> Optional[Tuple[str, str]]:
+        """Resolve the command's step reference to (task id, step id)."""
+        if command.step_ref is None:
+            return None
+        for task in self.repo.list_tasks():
+            if command.task_id and task.id != command.task_id:
+                continue
+            for s in task.steps:
+                if s.id == command.step_ref or (command.step_ref.isdigit() and s.step_order == int(command.step_ref)):
+                    return task.id, s.id
+        return None
+
+    def _current_task(self, command: Command):
+        if command.task_id:
+            return self.repo.get_task(command.task_id)
+        open_tasks = [t for t in self.repo.list_tasks() if t.status not in (TaskStatus.COMPLETED, TaskStatus.ABANDONED)]
+        return max(open_tasks, key=lambda t: t.updated_at) if open_tasks else None
+
+    # ---------------------------------------------------------------- handlers
+    def _ask(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        query = command.raw
+        if command.used_context and command.entity_id:
+            query = PRONOUNS.sub(command.entity_id, query, count=1)
+        response = self.agent.answer(query, at)
+        turn.response = response
+        turn.focus = list(response.intent.entity_ids)
+        turn.observation_requests = list(response.requested_observations)
+        if response.intent.kind == QueryKind.UNKNOWN and conv.pending is not None:
+            turn.reply = f"I'm still waiting for your decision: {conv.pending.summary}. Say yes or no."
+            turn.gesture = Gesture.ASK
+            turn.response = None
+            return
+        if response.intent.kind == QueryKind.UNKNOWN and not response.retrieval:
+            turn.reply = ("I didn't catch that as a question or a request. You can ask where something is, tell me where "
+                          "you put something, tell me you finished a step, or ask me to get an action approved.")
+            turn.gesture = Gesture.SHRUG
+            return
+        turn.reply = response.summary
+        if response.answer and response.answer not in response.summary:
+            turn.reply = f"{response.answer} {response.summary}"
+        turn.gesture = Gesture.EXPLAIN if not response.abstained else (Gesture.THINK if response.requested_observation else Gesture.SHRUG)
+        if response.conflicts:
+            turn.gesture = Gesture.ALERT
+
+    def _tell(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        if command.unknown_place:
+            turn.reply = (f"I don't know a place called '{command.unknown_place}' yet, so I haven't recorded that. "
+                          "Add it as a place in ORBIT (or draw it as a camera region) and tell me again.")
+            turn.gesture = Gesture.SHRUG
+            return
+        if not command.entity_id or not command.attribute:
+            turn.reply = "I couldn't tell which object you mean, so I haven't recorded anything."
+            turn.gesture = Gesture.SHRUG
+            return
+        name = self._name(command.entity_id)
+        before = self.engine.claims.assess_attribute(command.entity_id, command.attribute, at)
+        refs: List[str] = []
+        if command.intervention:  # spec §10: a known intervention invalidates the old belief first
+            refs += [e.id for e in self.engine.record_intervention(
+                command.entity_id, at, f"{conv.user_id} reported: {command.raw}", [command.attribute],
+                source=f"user:{conv.user_id}", provenance=self._provenance(conv, command.raw))]
+        result = self.engine.assert_claim(
+            command.entity_id, command.attribute, command.value, source=f"user:{conv.user_id}", timestamp=at,
+            source_type=SourceType.USER_STATEMENT, source_reference=f"assistant:{conv.id}",
+            provenance=self._provenance(conv, command.raw),
+        )
+        after = self.engine.claims.assess_attribute(command.entity_id, command.attribute, at)
+        fact = f"{name} {self._value(command.attribute, command.value)}"
+        decision = result.decision
+        if decision == ClaimDecision.NEW and command.intervention:
+            was = f" (before: {before.last_known_value})" if before.last_known_value not in (None, command.value) else ""
+            turn.reply, turn.gesture = f"Got it: {fact}{was}. Recorded as your change ({after.status.value} until the camera sees it).", Gesture.NOD
+        elif decision == ClaimDecision.NEW:
+            turn.reply, turn.gesture = f"Noted: {fact}, on your word ({after.status.value}).", Gesture.NOD
+        elif decision == ClaimDecision.CORROBORATE:
+            turn.reply, turn.gesture = f"That matches what I had: {fact}. I've added your word as supporting evidence ({after.status.value}).", Gesture.NOD
+        elif decision == ClaimDecision.SUPERSEDE:
+            was = f" (before: {before.last_known_value})" if before.last_known_value not in (None, command.value) else ""
+            how = "your change" if command.intervention else "your statement"
+            turn.reply, turn.gesture = f"Updated: {fact}{was}. Recorded as {how} ({after.status.value} until the camera sees it).", Gesture.NOD
+        elif decision == ClaimDecision.RESOLVE:
+            turn.reply, turn.gesture = f"Thanks, that settles the open conflict: {fact}.", Gesture.NOD
+        elif decision in (ClaimDecision.CONTRADICT, ClaimDecision.CONFLICT_UPDATE):
+            turn.reply = (f"That disagrees with the evidence I have ({result.reason}). I've recorded your statement and "
+                          f"flagged a conflict instead of overwriting either side. A fresh look would settle it.")
+            turn.gesture = Gesture.ALERT
+            turn.observation_requests = [self.tasks.conditions.request_for(self.tasks.conditions.check(
+                StateCondition(entity_id=command.entity_id, attribute=command.attribute, expected=command.value, operator="exists"), at))]
+        else:  # UNCONFIRMED
+            turn.reply = f"I've recorded what you said, but it isn't enough to change what I believe: {result.reason}."
+            turn.gesture = Gesture.THINK
+        refs += [e.id for e in result.events] + ([result.version_id] if result.version_id else [])
+        what = "your change" if command.intervention else "your statement"
+        self._record(turn, at, "recorded_statement", f"Recorded {what}: {fact} ({decision.value})", refs)
+
+    def _step_done(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        resolved = self._step(command)
+        if resolved is None:
+            turn.reply, turn.gesture = "I couldn't find that step in an open task.", Gesture.SHRUG
+            return
+        task_id, step_id = resolved
+        try:
+            task = self.tasks.complete_step(
+                task_id, step_id, at, source=f"user:{conv.user_id}", source_type=SourceType.USER_STATEMENT,
+                actor=conv.user_id, note=f"reported to the ORBIT assistant: {command.raw}",
+            )
+        except PostconditionViolatedError as exc:
+            turn.reply, turn.gesture = f"I didn't record it as done, because the evidence says otherwise: {exc}.", Gesture.ALERT
+            return
+        except TaskError as exc:
+            turn.reply, turn.gesture = f"I can't mark that done yet: {exc}.", Gesture.ALERT
+            return
+        step = next(s for s in task.steps if s.id == step_id)
+        reply = f"Recorded step {step.step_order} ({step.description}) as done on your word ({step.completion_status.value})."
+        if step.completion_status.value != "VERIFIED" and step.postconditions:
+            reply += " It becomes verified once its result is observed."
+        if task.status == TaskStatus.COMPLETED:
+            reply += f" That completes the task '{task.goal}'."
+        else:
+            plan = self.tasks.preview(task_id, at)
+            if plan.next_step is not None:
+                reply += f" Next: step {plan.next_step.step_order}, {plan.next_step.description}."
+            elif plan.requested_observations:
+                turn.observation_requests = list(plan.requested_observations)
+                reply += f" Before the next step: {plan.requested_observations[0].instruction}"
+        turn.reply, turn.gesture = reply, Gesture.NOD
+        self._record(turn, at, "completed_step", f"Marked {task_id} step {step.step_order} done", step.evidence_refs[-1:])
+
+    def _step_start(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        resolved = self._step(command)
+        if resolved is None:
+            turn.reply, turn.gesture = "I couldn't find that step in an open task.", Gesture.SHRUG
+            return
+        task_id, step_id = resolved
+        try:
+            task = self.tasks.start_step(task_id, step_id, at, actor=conv.user_id)
+        except TaskError as exc:
+            plan = self.tasks.preview(task_id, at)
+            turn.observation_requests = [r for r in plan.requested_observations if not r.for_steps or step_id in r.for_steps]
+            ask = f" {turn.observation_requests[0].instruction}" if turn.observation_requests else ""
+            turn.reply, turn.gesture = f"Not yet: {exc}.{ask}", Gesture.ALERT
+            return
+        step = next(s for s in task.steps if s.id == step_id)
+        turn.reply, turn.gesture = f"Okay, step {step.step_order} ({step.description}) is in progress. Its prerequisites are met.", Gesture.NOD
+        self._record(turn, at, "started_step", f"Started {task_id} step {step.step_order}", [])
+
+    def _interrupt(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        task = self._current_task(command)
+        if task is None:
+            turn.reply, turn.gesture = "There is no open task to pause.", Gesture.SHRUG
+            return
+        self.tasks.interrupt_task(task.id, at, reason=f"said to the assistant: {command.raw}", actor=conv.user_id)
+        turn.reply = (f"Paused '{task.goal}' at {hhmm(at)}. When you're back, say 'continue' and I'll check what "
+                      "changed before suggesting the next step.")
+        turn.gesture = Gesture.NOD
+        self._record(turn, at, "interrupted_task", f"Paused task {task.id}", [])
+
+    def _act(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        resolved = self._step(command)
+        task_id, step_id = resolved if resolved else (None, None)
+        targets = [command.entity_id] if command.entity_id else []
+        description = f"{command.verb or 'act on'} {self._name(command.entity_id)}" if command.entity_id else None
+        if description is None and step_id:
+            step = next(s for s in self.repo.get_task(task_id).steps if s.id == step_id)
+            description = step.description.lower()
+        expected = []
+        if command.entity_id and command.attribute and command.value is not None:
+            goal = StateCondition(entity_id=command.entity_id, attribute=command.attribute, expected=command.value,
+                                  description=f"{command.entity_id}.{command.attribute} == {command.value!r}")
+            already = self.tasks.conditions.check(goal, at)
+            if already.state == ConditionState.SATISFIED:
+                turn.reply = (f"No need: {self._name(command.entity_id)} already {self._value(command.attribute, command.value)} "
+                              f"({already.status.value}, {already.reason}).")
+                turn.gesture = Gesture.EXPLAIN
+                return
+            expected = [goal]
+        try:
+            request = self.actions.propose(
+                description, ASSISTANT, at, target_entity_ids=targets, expected_outcome=expected,
+                prerequisites=None if step_id else [], task_id=task_id, step_id=step_id,
+            )
+        except ActionError as exc:
+            turn.reply, turn.gesture = f"I can't prepare that: {exc}.", Gesture.ALERT
+            return
+        turn.action = request
+        self._record(turn, at, "proposed_action", f"Prepared '{description}' for authorization", [request.id])
+        if request.status == ActionStatus.PREREQUISITES_FAILED:
+            failing = [c for c in request.prerequisite_checks if c.state != ConditionState.SATISFIED]
+            why = "; ".join(f"{c.condition.entity_id}.{c.condition.attribute}: {c.reason}" for c in failing)
+            turn.observation_requests = list(request.requested_observations)
+            ask = f" {turn.observation_requests[0].instruction}" if turn.observation_requests else ""
+            waiver = " (A risk shortfall can only be waived, with a reason, in the Inspector.)" if any(c.risk_shortfall for c in failing) else ""
+            turn.reply = f"I've prepared '{description}', but it can't be authorized yet: {why}.{ask}{waiver}"
+            turn.gesture = Gesture.ALERT
+            return
+        principal = self.repo.get_principal(conv.user_id)
+        if principal is None or Scope.AUTHORIZE not in principal.scopes or principal.kind != PrincipalKind.HUMAN:
+            turn.reply = (f"I've prepared '{description}' ({request.risk.value} risk), but {conv.user_id} isn't registered to "
+                          "authorize actions, so someone who is will need to approve it.")
+            turn.gesture = Gesture.ALERT
+            return
+        met = [f"{c.condition.entity_id}.{c.condition.attribute} = {c.observed_value!r} ({c.status.value})" for c in request.prerequisite_checks]
+        facts = f"Prerequisites I track are met: {'; '.join(met)}." if met else "I track no prerequisites for it."
+        summary = f"Authorize '{description}' ({request.risk.value} risk, action {request.id})"
+        conv.pending = PendingConfirmation(action_id=request.id, summary=summary, created_at=at, expires_at=at + self.confirm_window)
+        turn.reply = (f"I've prepared '{description}' ({request.risk.value} risk). {facts} I can't do it physically; you would. "
+                      f"Shall I record your authorization? Say yes or no.")
+        turn.gesture = Gesture.ASK
+
+    def _confirm(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        pending = conv.pending
+        conv.pending = None
+        if pending is None:
+            turn.reply, turn.gesture = "There's nothing waiting for your approval.", Gesture.SHRUG
+            return
+        try:
+            request = self.actions.authorize(pending.action_id, conv.user_id, True, at,
+                                             reason=f"confirmed in conversation {conv.id}: '{command.raw}'")
+        except ActionError as exc:
+            turn.reply, turn.gesture = f"I couldn't record the authorization: {exc}.", Gesture.ALERT
+            return
+        turn.action = request
+        if request.status != ActionStatus.AUTHORIZED:
+            turn.reply = "The evidence changed while we were talking: its prerequisites are no longer met, so it is not authorized."
+            turn.observation_requests = list(request.requested_observations)
+            turn.gesture = Gesture.ALERT
+            return
+        conv.awaiting_performance = request.id
+        turn.reply = (f"Authorized under your name. Please {request.action} yourself, then tell me 'done' and I'll check "
+                      "the result against what the camera sees.")
+        turn.gesture = Gesture.NOD
+        self._record(turn, at, "authorized_action", f"Recorded your authorization of '{request.action}'", [request.id])
+
+    def _cancel(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        pending = conv.pending
+        conv.pending = None
+        if pending is None:
+            turn.reply, turn.gesture = "Okay.", Gesture.NOD
+            return
+        request = self.actions.authorize(pending.action_id, conv.user_id, False, at, reason=f"declined in conversation {conv.id}")
+        turn.action = request
+        turn.reply, turn.gesture = f"Okay, I won't. Recorded '{request.action}' as declined.", Gesture.NOD
+        self._record(turn, at, "declined_action", f"Recorded that you declined '{request.action}'", [request.id])
+
+    def _performed(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        action_id = conv.awaiting_performance
+        request = self.repo.get_action(action_id) if action_id else None
+        if request is None:
+            turn.reply, turn.gesture = "There's no authorized action I'm waiting on.", Gesture.SHRUG
+            return
+        try:
+            if request.status == ActionStatus.AUTHORIZED:
+                self.actions.report_performed(action_id, conv.user_id, at, notes=f"reported to the ORBIT assistant: {command.raw}")
+                self._record(turn, at, "reported_performed", f"Recorded that you performed '{request.action}'", [action_id])
+            request = self.actions.verify_outcome(action_id, at)
+        except ActionError as exc:
+            turn.reply, turn.gesture = f"I couldn't record that: {exc}.", Gesture.ALERT
+            return
+        turn.action = request
+        self._record(turn, at, "outcome_checked", f"Checked the outcome of '{request.action}': {request.status.value}", [action_id])
+        if request.status == ActionStatus.OUTCOME_VERIFIED:
+            conv.awaiting_performance = None
+            turn.reply, turn.gesture = f"Confirmed: the result of '{request.action}' is observed. Recorded as verified.", Gesture.NOD
+        elif request.status == ActionStatus.OUTCOME_FAILED:
+            conv.awaiting_performance = None
+            why = "; ".join(c.reason for c in request.outcome_checks if c.state == ConditionState.VIOLATED)
+            turn.reply, turn.gesture = f"The evidence says '{request.action}' did not have the expected result: {why}.", Gesture.ALERT
+        elif not request.expected_outcome:
+            conv.awaiting_performance = None
+            turn.reply, turn.gesture = f"Thanks, recorded that you did '{request.action}'. There was no outcome for me to check.", Gesture.NOD
+        else:
+            turn.observation_requests = list(request.requested_observations)
+            ask = turn.observation_requests[0].instruction if turn.observation_requests else "Show it to the camera."
+            turn.reply = f"Thanks, recorded. I can't confirm the result yet: {ask} Then say 'check again'."
+            turn.gesture = Gesture.THINK
+
+    def _checks(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        plan = self.perception.plan(at, DecisionAwarePolicy(), k=3)
+        if not plan.actions:
+            turn.reply, turn.gesture = "Nothing needs checking right now: everything I rely on is supported.", Gesture.NOD
+            return
+        tips = " ".join(f"{i + 1}. {a.instruction}" for i, a in enumerate(plan.actions))
+        turn.reply, turn.gesture = f"Worth checking, most useful first: {tips}", Gesture.EXPLAIN
+        turn.speech = f"The most useful thing to check: {plan.actions[0].instruction}"
+
+    def _recap(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        if not conv.delegated:
+            turn.reply, turn.gesture = "I haven't done anything on your behalf in this conversation yet.", Gesture.SHRUG
+            return
+        items = "; ".join(f"{d.at:%H:%M} {d.summary}" for d in conv.delegated[-6:])
+        turn.reply, turn.gesture = f"On your behalf I have: {items}.", Gesture.EXPLAIN
+        turn.speech = f"I've done {len(conv.delegated)} thing{'s' if len(conv.delegated) != 1 else ''} for you. They're listed on screen."
+
+    def _help(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        turn.reply = ("I keep track of your workspace and act for you inside ORBIT. Ask 'where is the microscope?' or 'what changed?'; "
+                      "tell me 'I put the notebook on bench 4' or 'I finished step 7'; say 'pause the task' or 'continue'; "
+                      "ask 'what should I check?'. For physical actions like 'open the valve' I check the prerequisites and ask "
+                      "for your yes. You do the action, I verify the result.")
+        turn.speech = "Ask me where things are or what changed, tell me what you did, or ask me to prepare an action for your approval."
+        turn.gesture = Gesture.EXPLAIN
+
+    def _greet(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
+        turn.reply = f"Hi {conv.user_id}! I'm keeping track of your workspace. What do you need?"
+        turn.gesture = Gesture.WAVE
