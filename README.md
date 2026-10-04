@@ -48,7 +48,10 @@ Open http://localhost:8765/ui/assistant.html (Chrome or Edge for voice). Type or
 **Talk**: "Where is the microscope?", "I moved the notebook to bench 4", "I finished step 6",
 "What should I check?", "Open the valve" (Orbi checks prerequisites and asks for your yes;
 you do the action and say "done"; ORBIT verifies the result), "What did you do for me?".
-The demo's `operator` may authorise actions. Optional: let Claude parse free-form
+The demo's `operator` may authorise actions. Voice needs a regular browser (the Claude
+app's built-in browser blocks the microphone). "Speech: On this device" transcribes with
+Whisper inside the page, so nothing leaves your computer; "Auto" uses the browser's speech
+service and switches to on-device recognition if that service fails. Optional: let Claude parse free-form
 language — this sends the workspace vocabulary to the Anthropic API:
 ```bash
 ORBIT_ASSISTANT_LLM=anthropic ANTHROPIC_API_KEY=... ORBIT_DATABASE_URL=sqlite:///./orbit_demo.db .venv/bin/uvicorn backend.app.main:app --port 8765

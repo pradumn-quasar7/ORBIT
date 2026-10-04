@@ -240,6 +240,16 @@ up unasked when the world changes.
 - ADR-041. Tests: `test_realtime.py` (commit/rollback semantics on both backends, failing listeners, bus filters/replay/overflow, SSE framing and resume, camera snapshot → stream, outcome verified/failed by the camera, focus notices with cooldown, own changes not announced, no bus → no notices, UI cache header).
 - Verified in the browser with two tabs: a simulated camera observation moved the microscope on the Inspector and in its ticker without a refresh; Orbi announced "Verified: the result of 'open the valve' is now observed" the moment the valve was seen open.
 
+### Phase 17.1 — Voice input that works (fix)
+**Planned**
+- The user reported Orbi could not hear them. Find out why and make voice input work, or say clearly why not and how to fix it.
+
+**Implemented**
+- Cause: the Claude app's built-in browser blocks the microphone (`not-allowed`), and the page only showed a small grey hint. Chrome's Web Speech API also depends on an online Google service that other browsers (Electron apps, Brave, the Quest browser) lack.
+- `frontend/voice.js`: two engines behind one interface. The browser speech service is the default; **on-device Whisper** (`onnx-community/whisper-base.en` via transformers.js, ~2 s per command, downloaded once and cached) is used when chosen or when the browser service fails (`network`, `service-not-allowed`, `language-not-supported`). It stops recording on its own after a pause. A live input-level meter shows the microphone is working. Every failure has a plain explanation and a fix (site permission, macOS privacy setting, missing device, mic in use, the Claude app's built-in browser with a copy-link button). The permission state is checked up front.
+- Parser fixes found with Whisper output: present-tense reports ("I move the notebook to …") and spoken numbers ("bench four", "bench for" → bench 4, "step six" → step 6).
+- Verified in the browser: an emulated microphone playing a synthesised clip went through recording → end-of-speech → Whisper → "Where is the microscope?" → Orbi's grounded answer. Tiny vs base on the same clips: tiny heard "bench for", so base was chosen. A real microphone could not be tested here (blocked in the built-in browser); the user needs Chrome or Edge.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -270,7 +280,7 @@ up unasked when the world changes.
 
 ## Known Issues / Limitations
 - No multi-workspace / multi-tenant separation or authentication on the API (spec §17 access control is principal-scoped for actions only). In particular the assistant trusts the "You are" id: anyone who can reach the server can speak as `operator`. Do not expose it beyond your own machine before authentication exists.
-- Assistant conversations are process-local (a restart drops context and pending approvals — fail-safe); delegated acts themselves are in the durable audit trail. The realtime bus is in-process too: with several server workers each would only see its own commits (run one worker, or add a shared broker such as Postgres LISTEN/NOTIFY). Voice input uses the browser's speech service (online in Chrome).
+- Assistant conversations are process-local (a restart drops context and pending approvals — fail-safe); delegated acts themselves are in the durable audit trail. The realtime bus is in-process too: with several server workers each would only see its own commits (run one worker, or add a shared broker such as Postgres LISTEN/NOTIFY). Voice input uses the browser's speech service (online in Chrome) or on-device Whisper (private; ~80 MB first download). Voice never works inside the Claude app's built-in browser (microphone blocked).
 - Reasoning provider is rule-based; free-form language coverage is limited to the supported question types. An LLM provider can be added behind `ReasoningProvider`.
 - Live camera: COCO-SSD knows ~80 everyday classes (no cables, tools, pumps) — such objects need QR tags `orbit:<type>:<id>`. One fixed camera per view; no pose tracking. The model is fetched from a CDN on first use (internet needed). Detection quality on real scenes is not yet measured.
 - In-memory vector index is rebuilt per process; a pgvector `RetrievalProvider` is needed for large memories.
@@ -287,7 +297,7 @@ up unasked when the world changes.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 541 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 548 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
@@ -311,6 +321,7 @@ up unasked when the world changes.
 - ADR-039 Live camera: on-device detection, calibration as anchor frames, markers as identity
 - ADR-040 Conversational assistant: delegation inside ORBIT, deterministic consent, interventions vs statements
 - ADR-041 Realtime: commit-time notifications, SSE with replay, proactive assistant notices
+- ADR-042 Voice input: browser speech service with on-device Whisper fallback
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.

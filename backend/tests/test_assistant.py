@@ -263,3 +263,22 @@ def test_assistant_api(client):
     assert client.post("/assistant/conversations/nope/messages", json={"text": "hi"}).status_code == 404
     assert client.post(f"/assistant/conversations/{cid}/messages", json={"text": ""}).status_code == 422
     assert client.post("/assistant/conversations", json={"user_id": "ana", "id": cid}).status_code == 409
+
+
+# ------------------------------------------------------------- spoken input
+@pytest.mark.parametrize("heard, entity, value", [
+    ("I move the notebook to bench four.", "n1", "bench_4"),  # Whisper: present tense, number as a word
+    ("I put the notebook on bench for", "n1", "bench_4"),  # homophone
+    ("i placed the notebook on bench 3", "n1", "bench_3"),
+])
+def test_speech_transcripts_are_understood(lab, heard, entity, value):
+    turn = lab.say(heard, 5)
+    assert turn.command.kind == CommandKind.TELL and turn.command.intervention
+    assert lab.svc.engine.claims.assess_attribute(entity, "location", at(5)).last_known_value == value
+
+
+def test_spoken_numbers_only_touch_numbered_places():
+    from backend.app.providers.commands import spoken_numbers
+    assert spoken_numbers("I finished step six") == "I finished step 6"
+    assert spoken_numbers("that one is for me") == "that one is for me"
+    assert spoken_numbers("bring it to bench two") == "bring it to bench 2"
