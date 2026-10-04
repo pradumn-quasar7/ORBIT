@@ -134,5 +134,35 @@
       el("button", { type: "button", onclick: () => { $("q").value = q; ask(q); } }, q))
   );
   load();
-  setInterval(load, 15000);
+
+  // Live updates (Phase 17): redraw as soon as ORBIT commits a change; coalesce bursts
+  // (one camera snapshot can commit several events) into one reload.
+  let pending = null;
+  function soon() {
+    clearTimeout(pending);
+    pending = setTimeout(load, 250);
+  }
+  function tick(msg) {
+    const t = $("ticker");
+    const d = msg.data || {};
+    const when = new Date(msg.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const text = msg.topic === "world"
+      ? (d.description || `${d.event_type} ${d.entity_id || ""}`)
+      : `${d.source} observed ${d.entities && d.entities.length ? d.entities.join(", ") : "nothing new"}${d.field_of_view ? ` (${d.field_of_view})` : ""}`;
+    const line = el("div", { class: `tick ${msg.topic}` }, el("span", { class: "mono" }, when), " ", text);
+    t.hidden = false;
+    t.prepend(line);
+    while (t.children.length > 4) t.lastChild.remove();
+  }
+  OrbitLive.connect("/stream?topics=world,observation", {
+    onMessage(msg) {
+      if (msg.topic !== "overflow") tick(msg);
+      soon();
+    },
+    onStatus(state) {
+      OrbitLive.pill($("live"), state);
+      if (state === "live") soon(); // after a reconnect, make sure nothing was missed
+    },
+  });
+  setInterval(load, 60000); // safety net: freshness ages even when nothing happens
 })();

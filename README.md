@@ -54,6 +54,14 @@ language — this sends the workspace vocabulary to the Anthropic API:
 ORBIT_ASSISTANT_LLM=anthropic ANTHROPIC_API_KEY=... ORBIT_DATABASE_URL=sqlite:///./orbit_demo.db .venv/bin/uvicorn backend.app.main:app --port 8765
 ```
 
+### Realtime
+Every page is live: the Inspector redraws and shows a ticker the moment ORBIT commits a
+change, and Orbi speaks up unasked (e.g. "Verified: the result of 'open the valve' is now
+observed" when the camera sees it). Scripts can follow the same stream:
+```bash
+curl -N "localhost:8765/stream?topics=world,observation"
+```
+
 ### Live camera
 With the server running, open http://localhost:8765/ui/camera.html in Chrome or Edge,
 click **Start camera** and allow camera access (on macOS the browser also needs

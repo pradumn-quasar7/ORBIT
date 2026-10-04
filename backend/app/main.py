@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.app.api import actions, assistant, camera, counterfactual, evidence, identity, inspect, memory, queries, spatial, world
+from backend.app.api import actions, assistant, camera, counterfactual, evidence, identity, inspect, memory, queries, realtime, spatial, world
 from backend.app.core.clock import Clock
 from backend.app.core.container import OrbitServices, default_repository
 from backend.app.repositories.base import Repository
@@ -14,9 +14,30 @@ VERSION = "0.1.0"
 FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
 
 
+class RevalidateUI:
+    """Static UI files carry ``Cache-Control: no-cache``: browsers keep using their cache
+    but check the ETag first, so an update is never masked by a stale script. Plain ASGI
+    (not BaseHTTPMiddleware) so the /stream responses are untouched."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not scope["path"].startswith("/ui"):
+            return await self.app(scope, receive, send)
+
+        async def send_with_header(message):
+            if message["type"] == "http.response.start":
+                headers = [(k, v) for k, v in message.get("headers", []) if k.lower() != b"cache-control"]
+                message = {**message, "headers": headers + [(b"cache-control", b"no-cache")]}
+            await send(message)
+
+        await self.app(scope, receive, send_with_header)
+
+
 def create_app(repository: Optional[Repository] = None, clock: Optional[Clock] = None) -> FastAPI:
     app = FastAPI(title="ORBIT World Model API", version=VERSION)
-    app.state.orbit = OrbitServices.build(repository or default_repository(), clock)
+    app.state.orbit = OrbitServices.build(repository or default_repository(), clock, realtime=True)
 
     @app.get("/")
     def health_check():
@@ -38,9 +59,11 @@ def create_app(repository: Optional[Repository] = None, clock: Optional[Clock] =
     app.include_router(identity.router)
     app.include_router(camera.router)
     app.include_router(assistant.router)
+    app.include_router(realtime.router)
 
     if FRONTEND.is_dir():
         app.mount("/ui", StaticFiles(directory=FRONTEND, html=True), name="ui")
+        app.add_middleware(RevalidateUI)
 
         @app.get("/dashboard", include_in_schema=False)
         def dashboard():

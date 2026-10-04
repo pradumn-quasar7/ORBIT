@@ -1,11 +1,12 @@
 # ORBIT Project Status
 
 ## Current Phase
-**Phase 16 — Conversational assistant with a 3D avatar (COMPLETE).** ORBIT v0.1 (Phases
-0–9) is complete; Phases 10–13 added counterfactual sandboxes, decision-aware perception,
-risk-graded verification and identity curation; Phase 14 evaluates ORBIT on generated
-worlds; Phase 15 connects a real webcam; Phase 16 adds "Orbi", a talking assistant that
-acts on the user's behalf inside ORBIT and prepares physical actions for their explicit yes.
+**Phase 17 — Realtime (COMPLETE).** ORBIT v0.1 (Phases 0–9) is complete; Phases 10–13
+added counterfactual sandboxes, decision-aware perception, risk-graded verification and
+identity curation; Phase 14 evaluates ORBIT on generated worlds; Phase 15 connects a real
+webcam; Phase 16 adds "Orbi", a talking assistant acting on the user's behalf; Phase 17
+makes everything live: every committed change is pushed to open views, and Orbi speaks
+up unasked when the world changes.
 
 ## Phase Log
 
@@ -225,6 +226,20 @@ acts on the user's behalf inside ORBIT and prepares physical actions for their e
 - ADR-040. Tests: `test_assistant.py` (38, both backends): grounded answers + pronoun follow-up, spoken names instead of ids, testimony provenance, intervention vs conflicting statement, unknown place / ambiguous object record nothing, step start/done through readiness checks, pause, the full prepare → yes → done → verify flow, decline, confirmation expiry, unauthorised speaker, the assistant itself can never authorise, blocked action explains prerequisites, LLM parser validation/fallback/consent isolation, API.
 - Verified in the browser: avatar renders; prepare → reminder on "done" → approve → done → outcome unverified with a look request → recap. Found and fixed during that check: input was blocked while the avatar spoke; stale approval cards stayed clickable; "done" before approval fell through to the question answerer.
 
+### Phase 17 — Realtime
+**Planned**
+- No view should wait for a refresh or a question: push every committed world change to the dashboard, camera and assistant pages as it happens; let the assistant react to world changes on its own (verify an authorised action the moment the camera sees the result; announce changes to what the user is discussing, conflicts, and task steps losing support) — without ever announcing anything that was rolled back.
+
+**Implemented**
+- Repository commit notifications (`Repository.on_commit`): events and observations are reported once per transaction, after commit, in write order; rollbacks discard them; listener errors never fail a write (both backends).
+- `core/realtime.py` `EventBus`: numbered messages (topics `world`, `observation`, `assistant`), a 500-message replay buffer, bounded per-subscriber queues (oldest dropped + `overflow` signal), thread-safe hand-off from worker threads to the event loop, conversation-scoped notices.
+- `api/realtime.py`: `GET /stream` (Server-Sent Events, `Last-Event-ID` resume, heartbeats, topic / conversation filters), `GET /stream/recent`, `GET /stream/status`. Realtime is on for the served app only (`OrbitServices.build(realtime=True)`); benchmarks and sandboxes stay silent.
+- Assistant notices (`AssistantNotice`): outcome verified / failed as soon as post-action evidence commits; focus changes and conflicts for what was just discussed; task steps blocked or needing re-verification. The user's own turn is answered in the reply, not re-announced; the same news is not repeated within 20 s.
+- Frontend: `realtime.js` (shared auto-reconnecting EventSource + "● live" pill); the Inspector redraws within ~250 ms of a commit and shows a live ticker (60 s safety poll for ageing freshness); Orbi shows and speaks notices, queued behind current speech.
+- UI files are served with `Cache-Control: no-cache` (ETag revalidation) — found in testing: a browser kept running a stale pre-realtime `app.js`.
+- ADR-041. Tests: `test_realtime.py` (commit/rollback semantics on both backends, failing listeners, bus filters/replay/overflow, SSE framing and resume, camera snapshot → stream, outcome verified/failed by the camera, focus notices with cooldown, own changes not announced, no bus → no notices, UI cache header).
+- Verified in the browser with two tabs: a simulated camera observation moved the microscope on the Inspector and in its ticker without a refresh; Orbi announced "Verified: the result of 'open the valve' is now observed" the moment the valve was seen open.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -255,7 +270,7 @@ acts on the user's behalf inside ORBIT and prepares physical actions for their e
 
 ## Known Issues / Limitations
 - No multi-workspace / multi-tenant separation or authentication on the API (spec §17 access control is principal-scoped for actions only). In particular the assistant trusts the "You are" id: anyone who can reach the server can speak as `operator`. Do not expose it beyond your own machine before authentication exists.
-- Assistant conversations are process-local (a restart drops context and pending approvals — fail-safe); delegated acts themselves are in the durable audit trail. Voice input uses the browser's speech service (online in Chrome).
+- Assistant conversations are process-local (a restart drops context and pending approvals — fail-safe); delegated acts themselves are in the durable audit trail. The realtime bus is in-process too: with several server workers each would only see its own commits (run one worker, or add a shared broker such as Postgres LISTEN/NOTIFY). Voice input uses the browser's speech service (online in Chrome).
 - Reasoning provider is rule-based; free-form language coverage is limited to the supported question types. An LLM provider can be added behind `ReasoningProvider`.
 - Live camera: COCO-SSD knows ~80 everyday classes (no cables, tools, pumps) — such objects need QR tags `orbit:<type>:<id>`. One fixed camera per view; no pose tracking. The model is fetched from a CDN on first use (internet needed). Detection quality on real scenes is not yet measured.
 - In-memory vector index is rebuilt per process; a pgvector `RetrievalProvider` is needed for large memories.
@@ -272,7 +287,7 @@ acts on the user's behalf inside ORBIT and prepares physical actions for their e
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 521 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 541 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
@@ -295,6 +310,7 @@ acts on the user's behalf inside ORBIT and prepares physical actions for their e
 - ADR-038 Generated worlds with bootstrap CIs; relocation needs evidence of leaving
 - ADR-039 Live camera: on-device detection, calibration as anchor frames, markers as identity
 - ADR-040 Conversational assistant: delegation inside ORBIT, deterministic consent, interventions vs statements
+- ADR-041 Realtime: commit-time notifications, SSE with replay, proactive assistant notices
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.
@@ -303,4 +319,4 @@ acts on the user's behalf inside ORBIT and prepares physical actions for their e
 - G (AR utility) — deferred (needs an AR client).
 
 ## Last Updated
-- 2026-10-04 (Phase 16)
+- 2026-10-04 (Phase 17)

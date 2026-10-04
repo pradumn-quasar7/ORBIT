@@ -89,9 +89,12 @@ class InMemoryRepository(Repository):
             if snapshot is not None:
                 for name, store in snapshot.items():
                     setattr(self, name, store)
+                self._discard()
             raise
         finally:
             self._depth -= 1
+        if snapshot is not None:
+            self._flush()
 
     @property
     def in_transaction(self) -> bool:
@@ -118,7 +121,9 @@ class InMemoryRepository(Repository):
 
     # Observations
     def save_observation(self, observation: Observation) -> Observation:
-        return self._put(self.observations, observation)
+        stored = self._put(self.observations, observation)
+        self._track(observation)
+        return stored
 
     def get_observation(self, observation_id: str) -> Optional[Observation]:
         return self._get(self.observations, observation_id)
@@ -185,7 +190,9 @@ class InMemoryRepository(Repository):
 
     # Events
     def save_event(self, event: Event) -> Event:
-        return self._put(self.events, event)
+        stored = self._put(self.events, event)
+        self._track(event)
+        return stored
 
     def list_events(self) -> List[Event]:
         return sorted((_copy(e) for e in self.events.values()), key=lambda x: x.timestamp)

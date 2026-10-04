@@ -105,6 +105,36 @@ async function startConversation() {
   store.set("orbit.user", user);
   conversation = await api("POST", "/assistant/conversations", { user_id: user });
   $("log").replaceChildren();
+  listen();
+}
+
+// ---------------------------------------------------------------- realtime
+// Orbi speaks up unasked when the world changes (Phase 17): the server pushes notices
+// for this conversation only.
+let live = null;
+let speech = Promise.resolve();
+function listen() {
+  if (live) live.close();
+  live = OrbitLive.connect(`/stream?topics=assistant&conversation=${encodeURIComponent(conversation.id)}`, {
+    onMessage(msg) { if (msg.type === "NOTICE") addNotice(msg.data); },
+    onStatus(state) { OrbitLive.pill($("live"), state); },
+  });
+}
+
+function addNotice(notice) {
+  const li = el("li", "msg bot notice" + (notice.gesture === "ALERT" ? " alert" : ""));
+  li.append(el("div", "notice-label", "Orbi noticed"), el("div", "", notice.reply));
+  if (notice.action) {
+    const line = el("div", "meta-line");
+    line.append(el("span", `badge ${notice.action.status}`, `action: ${notice.action.status.toLowerCase().replace(/_/g, " ")}`));
+    li.append(line);
+  }
+  $("log").append(li);
+  li.scrollIntoView({ block: "end", behavior: "smooth" });
+  avatar.setAlert(notice.gesture === "ALERT");
+  avatar.gesture(notice.gesture);
+  // Queue behind whatever Orbi is saying; a new user message still cancels speech.
+  speech = speech.then(() => speak(notice.speech));
 }
 
 // -------------------------------------------------------------------- chat
@@ -204,7 +234,7 @@ async function send(text) {
     addBot(turn);
     avatar.setAlert(turn.gesture === "ALERT");
     avatar.gesture(turn.gesture);
-    speak(turn.speech); // the user may answer (or interrupt) while Orbi is still talking
+    speech = speak(turn.speech); // the user may answer (or interrupt) while Orbi is still talking
   } catch (err) {
     typing.remove();
     const li = el("li", "msg bot alert", `Something went wrong: ${err.message}`);

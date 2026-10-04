@@ -63,12 +63,17 @@ class SqlRepository(Repository):
         if getattr(self._local, "conn", None) is not None:
             yield
             return
-        with self.engine.begin() as conn:
-            self._local.conn = conn
-            try:
-                yield
-            finally:
-                self._local.conn = None
+        try:
+            with self.engine.begin() as conn:
+                self._local.conn = conn
+                try:
+                    yield
+                finally:
+                    self._local.conn = None
+        except BaseException:
+            self._discard()
+            raise
+        self._flush()  # committed: now visible to every reader
 
     @property
     def in_transaction(self) -> bool:
@@ -141,6 +146,7 @@ class SqlRepository(Repository):
     # -------------------------------------------------------------- observations
     def save_observation(self, observation: Observation) -> Observation:
         self._upsert(t.observations, observation)
+        self._track(observation)
         return observation
 
     def get_observation(self, observation_id: str) -> Optional[Observation]:
@@ -215,6 +221,7 @@ class SqlRepository(Repository):
     # -------------------------------------------------------------------- events
     def save_event(self, event: Event) -> Event:
         self._upsert(t.events, event)
+        self._track(event)
         return event
 
     def list_events(self) -> List[Event]:
