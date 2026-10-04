@@ -1,10 +1,11 @@
 # ORBIT Project Status
 
 ## Current Phase
-**Phase 14 — Generated benchmark with confidence intervals (COMPLETE).** ORBIT v0.1
-(Phases 0–9) is complete; Phases 10–13 added counterfactual sandboxes, decision-aware
-perception, risk-graded verification and identity curation; Phase 14 evaluates ORBIT on
-randomly generated worlds with bootstrap intervals and paired ablation comparisons.
+**Phase 15 — Live webcam perception (COMPLETE).** ORBIT v0.1 (Phases 0–9) is complete;
+Phases 10–13 added counterfactual sandboxes, decision-aware perception, risk-graded
+verification and identity curation; Phase 14 evaluates ORBIT on randomly generated worlds
+with bootstrap intervals; Phase 15 connects a real camera: detection runs in the browser
+and only stable detections reach ORBIT.
 
 ## Phase Log
 
@@ -202,6 +203,16 @@ randomly generated worlds with bootstrap intervals and paired ablation compariso
 - ADR-038. Tests: `test_generated_bench.py`.
 - **Result (40 worlds per family, 95 % CI):** every ablation significantly worse on its target metric; ORBIT: diff P/R 0.88 [0.78, 0.96] / 0.96 [0.93, 0.99]; stale claims 0.13 [0.07, 0.20] (objects moved while unobserved); unsafe continuation 0.10 [0.02, 0.20] vs 0.28 without risk grading and 0.68 with naive resume; progress 0.65 [0.50, 0.80].
 
+### Phase 15 — Live webcam perception
+**Planned**
+- First real sensor: a laptop/USB webcam in Chrome/Edge. Detect objects on the device, never send pixels or people; calibrate places by drawing regions on the picture; optional QR tags for permanent identity; filter detector flicker; send only when the scene changes (plus a heartbeat); a deliberate "scan" that can confirm absence. Groundwork for the Quest 3S client.
+
+**Implemented**
+- Backend: `services/camera.py` (`CameraService`: `configure`, `config`, `snapshot`, `scan`), `api/camera.py` (`GET/PUT /cameras/{id}/config`, `POST /cameras/{id}/snapshot`, `POST /cameras/{id}/scan`). Calibration is stored in anchor frames (`{"camera", "bbox"}` per region, `{"camera_view"}` on the view anchor). `Detection.marker_id` → explicit entity id; `person` is excluded server-side as well.
+- Browser client: `frontend/camera.html|css|js` (camera loop, region editor, scan, status/log, "ORBIT identified") and `frontend/camera_core.js` (pure logic: IoU tracker with 3-hit confirmation, majority colour vote, sticky QR markers, scene signature, send-on-change + 60 s heartbeat). COCO-SSD lite (TensorFlow.js) runs locally; QR via native `BarcodeDetector` or jsQR. Link from the Inspector.
+- ADR-039. Tests: `test_camera.py` (calibration, 409/422, region placement, privacy and confidence filters, QR identity across a move, heartbeat corroboration, region-scoped absence via scan) and `frontend/tests/camera_core.test.js` (run by pytest when Node is present).
+- Verified in the browser: libraries and model load (~25 s first download; now preloaded on page open), a simulated tracker → API round trip produces correct entities (QR id kept, person dropped). The browser pane blocks real cameras, so the live feed must be checked by the user.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -233,20 +244,21 @@ randomly generated worlds with bootstrap intervals and paired ablation compariso
 ## Known Issues / Limitations
 - No multi-workspace / multi-tenant separation or authentication on the API (spec §17 access control is principal-scoped for actions only).
 - Reasoning provider is rule-based; free-form language coverage is limited to the supported question types. An LLM provider can be added behind `ReasoningProvider`.
-- Real camera perception requires plugging a detector into `DetectionPerceptionProvider`; none is bundled.
+- Live camera: COCO-SSD knows ~80 everyday classes (no cables, tools, pumps) — such objects need QR tags `orbit:<type>:<id>`. One fixed camera per view; no pose tracking. The model is fetched from a CDN on first use (internet needed). Detection quality on real scenes is not yet measured.
 - In-memory vector index is rebuilt per process; a pgvector `RetrievalProvider` is needed for large memories.
 - PostgreSQL is supported by the schema but CI runs on SQLite only (no Postgres available in this environment).
 - AR client and VR rendering (§48 steps 18–19 front-ends) are deferred; the replay/counterfactual backend exists.
 - Sandboxes are process-local and disposable (not persisted); each probe copies the world, which is fine for small workspaces but not optimised.
 
 ## Next (candidates)
-1. Generated futures for Experiment H and generated perception worlds for Experiment F2.
-2. Real detector integration (e.g. OWL-ViT/YOLO) behind the adapter + latency measurement on real frames.
+1. Meta Quest 3S client: WebXR AR session served over HTTPS on the LAN, then (optionally) a native app with the Passthrough Camera API.
+2. Measured live accuracy: label a short recorded desk session and report identity/diff metrics on real frames.
+3. Generated futures for Experiment H and generated perception worlds for Experiment F2.
 3. API authentication and workspace separation.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 468 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 483 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
@@ -267,6 +279,7 @@ randomly generated worlds with bootstrap intervals and paired ablation compariso
 - ADR-033 Risk-graded verification · ADR-034 Explicit waivers, inherited prerequisites
 - ADR-035 Merge by evidence replay (bitemporal) · ADR-036 Ambiguity casts doubt · ADR-037 Region-scoped absence
 - ADR-038 Generated worlds with bootstrap CIs; relocation needs evidence of leaving
+- ADR-039 Live camera: on-device detection, calibration as anchor frames, markers as identity
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.
@@ -275,4 +288,4 @@ randomly generated worlds with bootstrap intervals and paired ablation compariso
 - G (AR utility) — deferred (needs an AR client).
 
 ## Last Updated
-- 2026-10-03 (Phase 14)
+- 2026-10-04 (Phase 15)

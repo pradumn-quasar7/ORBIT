@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.app.api import actions, counterfactual, evidence, identity, inspect, memory, queries, spatial, world
+from backend.app.api import actions, camera, counterfactual, evidence, identity, inspect, memory, queries, spatial, world
 from backend.app.core.clock import Clock
 from backend.app.core.container import OrbitServices, default_repository
 from backend.app.repositories.base import Repository
@@ -36,6 +36,7 @@ def create_app(repository: Optional[Repository] = None, clock: Optional[Clock] =
     app.include_router(inspect.router)
     app.include_router(counterfactual.router)
     app.include_router(identity.router)
+    app.include_router(camera.router)
 
     if FRONTEND.is_dir():
         app.mount("/ui", StaticFiles(directory=FRONTEND, html=True), name="ui")

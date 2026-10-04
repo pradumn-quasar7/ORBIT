@@ -43,6 +43,16 @@ ORBIT_DATABASE_URL=sqlite:///./orbit_demo.db .venv/bin/uvicorn backend.app.main:
 ```
 Then open http://localhost:8765/ui/ and ask "What changed?" or "Continue.".
 
+### Live camera
+With the server running, open http://localhost:8765/ui/camera.html in Chrome or Edge,
+click **Start camera** and allow camera access (on macOS the browser also needs
+System Settings → Privacy & Security → Camera). Draw boxes on the picture for the places
+you care about and name them; ORBIT then remembers what stable objects are where.
+Detection runs in the browser — video and people are never sent. Print a QR code with
+the text `orbit:<id>` (or `orbit:<type>:<id>`) and stick it on an object to give it a
+permanent identity. **Scan region** is a deliberate look: anything ORBIT expects there
+but cannot see is recorded as confirmed absent.
+
 ### Benchmark (ORBIT-BENCH)
 ```bash
 .venv/bin/python experiments/runners/run_bench.py

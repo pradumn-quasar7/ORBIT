@@ -59,4 +59,9 @@ tests, updated `PROJECT_STATUS.md` / `DECISIONS.md`, and a merge to `main`.
 - [x] **Phase 14 — Generated benchmark**
   - Seeded random worlds with simulator ground truth, bootstrap intervals, paired ablation deltas, progress metric.
 
+- [x] **Phase 15 — Live webcam perception**
+  - In-browser detection (COCO-SSD), regions drawn on the picture as ORBIT places, QR identity tags, stability filter, scan-to-confirm-absence; people never sent.
+
+- [ ] **Phase 16 (next) — Meta Quest 3S client** — WebXR AR session over HTTPS on the LAN using the same camera endpoints; native Passthrough Camera API app optional.
+
 - [ ] **Later** — AR client (step 18), VR rendering of replay/counterfactuals (step 19 front-end), wearable clients, pilot study.
