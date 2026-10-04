@@ -38,9 +38,11 @@ start; to run them by hand: `.venv/bin/alembic upgrade head`.
 
 ### Demo: the flagship scenario
 ```bash
-.venv/bin/python scripts/seed_demo.py --reset
-ORBIT_DATABASE_URL=sqlite:///./orbit_demo.db .venv/bin/uvicorn backend.app.main:app --port 8765
+scripts/run_demo.sh --reset
 ```
+This seeds the demo world and (re)starts the server on port 8765; without `--reset` it
+keeps the current demo data. Always restart with this script: live pages hold streaming
+connections open, and the script makes sure the old server really stops.
 Then open http://localhost:8765/ui/ and ask "What changed?" or "Continue.".
 
 ### Assistant (Orbi)

@@ -250,6 +250,21 @@ up unasked when the world changes.
 - Parser fixes found with Whisper output: present-tense reports ("I move the notebook to …") and spoken numbers ("bench four", "bench for" → bench 4, "step six" → step 6).
 - Verified in the browser: an emulated microphone playing a synthesised clip went through recording → end-of-speech → Whisper → "Where is the microscope?" → Orbi's grounded answer. Tiny vs base on the same clips: tiny heard "bench for", so base was chosen. A real microphone could not be tested here (blocked in the built-in browser); the user needs Chrome or Edge.
 
+### Phase 17.2 — Live conversation fixes (from the user's first real voice session)
+**Planned**
+- The user reported Orbi "still not listening, not replying". Find the cause and fix what their real transcript showed.
+
+**Implemented**
+- **Server would not restart**: since Phase 17 every open page holds a streaming connection, so a stopped server waited forever for them. Three half-stopped servers were alive and the port was held by one that no longer answered. Fix: `--timeout-graceful-shutdown 2`, and `scripts/run_demo.sh` (stops any old server, force-stops if needed, starts, waits until healthy, prints the URLs; log in `.run/server.log`). Verified: restart with an open stream completes in ~2 s.
+- Voice worked once the page ran in Chrome. Fixes from the real transcript:
+  - "hay Aur Bhi" ("Hey Orbi" transcribed for an Indian accent) and other renderings of the name are greetings, and are stripped as a form of address ("hey orbi, where is…").
+  - New `HEARD` command: "I am audible to you", "can you hear me", "testing" get "Yes, I can hear you"; fillers ("ok so like") get "I'm listening".
+  - "what change from the last scenario", "what's new", "any updates" now mean *what changed*.
+  - Unknown input gets a friendly fallback instead of "couldn't map that to a question about the world state".
+  - "What changed" is spoken as a short, ranked summary (moves, conflicts, confirmed absences first; "not seen again" last). The full list stays on screen.
+- **Safety fix**: while an approval was pending, any utterance *starting* with "ok"/"yes" counted as consent, so the user's own filler "ok so like" would have approved an action. Consent must now be the whole utterance ("yes", "yes please", "ok go ahead").
+- Tests: 38 new cases from the user's real phrases, consent phrasings and spoken summaries.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -297,7 +312,7 @@ up unasked when the world changes.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 548 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 586 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 

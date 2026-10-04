@@ -282,3 +282,54 @@ def test_spoken_numbers_only_touch_numbered_places():
     assert spoken_numbers("I finished step six") == "I finished step 6"
     assert spoken_numbers("that one is for me") == "that one is for me"
     assert spoken_numbers("bring it to bench two") == "bring it to bench 2"
+
+
+# ------------------------------------------------------- live conversation
+@pytest.mark.parametrize("heard, kind", [
+    ("hay Aur Bhi", CommandKind.GREET),  # "Hey Orbi" as transcribed for an Indian accent
+    ("hey orbi", CommandKind.GREET),
+    ("Orbit", CommandKind.GREET),
+    ("I am audible to you", CommandKind.HEARD),
+    ("can you hear me?", CommandKind.HEARD),
+    ("testing one two three", CommandKind.HEARD),
+    ("ok so like", CommandKind.HEARD),
+    ("hey orbi where is the microscope", CommandKind.ASK),
+])
+def test_what_people_actually_say(lab, heard, kind):
+    turn = lab.say(heard, 2)
+    assert turn.command.kind == kind
+    assert "couldn't map" not in turn.reply
+
+
+def test_address_is_stripped_and_question_answered(lab):
+    turn = lab.say("hey orbi, where is the microscope?", 2)
+    assert "bench_4" in turn.reply
+
+
+def test_unknown_gets_a_friendly_fallback(lab):
+    turn = lab.say("so what about the weather", 2)
+    assert turn.gesture == Gesture.SHRUG and "didn't catch" in turn.reply and turn.response is None
+
+
+def test_what_changed_phrasings(lab):
+    for text in ("so what change from the last scenario", "what's new?", "any updates"):
+        assert lab.say(text, 2).response.intent.kind.value == "WHAT_CHANGED", text
+
+
+@pytest.mark.parametrize("utterance, confirms", [
+    ("yes", True), ("yes please", True), ("ok go ahead", True), ("yes, authorize it", True),
+    ("ok so like", False), ("yes but where is the microscope", False), ("okay what changed", False),
+])
+def test_consent_must_be_the_whole_utterance(lab, repo, utterance, confirms):
+    ask = lab.say("open the valve", 2)
+    turn = lab.say(utterance, 2.2)
+    assert (turn.command.kind == CommandKind.CONFIRM) is confirms
+    expected = ActionStatus.AUTHORIZED if confirms else ActionStatus.AWAITING_AUTHORIZATION
+    assert repo.get_action(ask.pending.action_id).status == expected
+
+
+def test_what_changed_is_spoken_naturally(lab):
+    lab.see(5, ent("m17", "bench_3", "microscope", name="Microscope M17"))
+    turn = lab.say("what changed since 9:02?", 6)
+    assert turn.response.changes and "→" not in turn.speech
+    assert "change" in turn.speech and "Microscope M17" in turn.speech
