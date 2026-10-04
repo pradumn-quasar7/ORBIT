@@ -4,9 +4,11 @@ Every implementation must behave as a value store: objects returned by ``get_*``
 ``list_*`` are copies, and nothing is persisted until ``save_*`` is called. This keeps
 the in-memory and SQL implementations interchangeable (ADR-005).
 """
+import logging
+import threading
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from typing import Iterator, List, Optional
+from typing import Callable, Dict, Iterator, List, Optional, Union
 
 from backend.app.domain.models import (
     ActionRequest,
@@ -30,6 +32,10 @@ from backend.app.domain.models import (
 )
 
 
+Committed = Union[Event, Observation]
+log = logging.getLogger("orbit.repository")
+
+
 class Repository(ABC):
     @contextmanager
     def transaction(self) -> Iterator[None]:
@@ -39,6 +45,46 @@ class Repository(ABC):
     @property
     def in_transaction(self) -> bool:
         return False
+
+    # ------------------------------------------------- commit notifications (Phase 17)
+    # Events and observations written inside a transaction are reported once it
+    # commits, in write order; a rollback discards them. Outside a transaction a write
+    # is reported immediately. Implementations call _track / _flush / _discard.
+    def on_commit(self, fn: Callable[[List[Committed]], None]) -> None:
+        self.__dict__.setdefault("_commit_listeners", []).append(fn)
+
+    def _pending(self) -> Dict[str, Committed]:
+        local = self.__dict__.setdefault("_commit_local", threading.local())
+        if not hasattr(local, "items"):
+            local.items = {}
+        return local.items
+
+    def _track(self, item: Committed) -> None:
+        if not self.__dict__.get("_commit_listeners"):
+            return
+        if self.in_transaction:
+            pending = self._pending()
+            pending.pop(item.id, None)  # re-saved (e.g. resolutions filled in): report the final copy once
+            pending[item.id] = item.model_copy(deep=True)
+        else:
+            self._emit([item.model_copy(deep=True)])
+
+    def _flush(self) -> None:
+        pending = self._pending()
+        items = list(pending.values())
+        pending.clear()
+        if items:
+            self._emit(items)
+
+    def _discard(self) -> None:
+        self._pending().clear()
+
+    def _emit(self, items: List[Committed]) -> None:
+        for fn in self.__dict__.get("_commit_listeners", []):
+            try:
+                fn(items)
+            except Exception:  # notification must never fail a write that already committed
+                log.exception("commit listener failed")
 
     # Entities
     @abstractmethod

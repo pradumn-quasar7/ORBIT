@@ -46,7 +46,7 @@ $$B_t = \text{Update}(B_{t-1}, O_t, \text{context}, \text{evidence}, \text{time}
 
 ```
 backend/app/
-  core/            time (UTCDateTime), clock, OrbitConfig + composition root (OrbitServices)
+  core/            time (UTCDateTime), clock, OrbitConfig + composition root (OrbitServices), realtime (EventBus)
   domain/          Pydantic models, enums, weakest-link status aggregation
   repositories/    Repository ABC; InMemoryRepository; sql/ (tables + SqlRepository)
   providers/       replaceable boundaries: embedding, retrieval, reasoning, perception, commands (rule-based / Claude)
@@ -81,13 +81,14 @@ backend/app/
     counterfactual.py     what-if premises, decision comparison, sensitivity analysis
     replay.py             frame-by-frame history
   evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner), counterfactual_eval.py (Experiment H), decision_perception_eval.py (Experiment F2), generator.py + generated.py + stats.py (generated worlds, bootstrap CIs)
-  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual, identity, camera, assistant)
+  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual, identity, camera, assistant, realtime /stream)
   main.py          create_app(repository, clock) factory; lazy module-level `app`
 database/          Alembic migrations 0001–0009, migrate.py
 experiments/       scenarios/catalog.py, runners/run_bench.py, results/
 frontend/          static inspection dashboard served at /ui/; camera.html + camera_core.js
                    live webcam client (in-browser detection, regions, QR markers);
-                   assistant.html + avatar.js: chat/voice assistant with a three.js avatar
+                   assistant.html + avatar.js: chat/voice assistant with a three.js avatar;
+                   realtime.js: shared live connection (Server-Sent Events)
 scripts/           seed_demo.py (flagship scenario)
 ```
 

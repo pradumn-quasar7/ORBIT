@@ -18,10 +18,12 @@
     <div class="meta">
       <a href="assistant.html" class="navlink">Assistant →</a>
       <a href="camera.html" class="navlink">Live camera →</a>
+      <span id="live" class="live-pill" data-state="connecting" role="status">○ connecting</span>
       <span id="as-of">loading…</span>
       <button id="refresh" type="button">Refresh</button>
     </div>
   </header>
+  <div class="ticker" id="ticker" aria-live="polite" hidden></div>
 
   <section class="counts" id="counts" aria-label="Summary counts"></section>
 
@@ -85,6 +87,7 @@
   <footer>Statuses: <span class="badge VERIFIED">VERIFIED</span> <span class="badge OBSERVED">OBSERVED</span>
     <span class="badge INFERRED">INFERRED</span> <span class="badge STALE">STALE</span>
     <span class="badge CONTRADICTED">CONTRADICTED</span> <span class="badge UNKNOWN">UNKNOWN</span></footer>
+  <script src="realtime.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

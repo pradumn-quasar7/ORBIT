@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from backend.app.core.clock import Clock, SystemClock
+from backend.app.core.realtime import EventBus, publish_committed
 from backend.app.providers.commands import AnthropicCommandProvider, CommandProvider, RuleBasedCommandProvider, http_transport
 from backend.app.repositories.base import Repository
 from backend.app.services.actions import ActionSafetyService
@@ -66,6 +67,7 @@ class OrbitServices:
     identity: IdentityService
     camera: CameraService
     assistant: AssistantService
+    bus: EventBus
 
     config: OrbitConfig = OrbitConfig()
 
@@ -76,7 +78,10 @@ class OrbitServices:
         clock: Optional[Clock] = None,
         config: Optional[OrbitConfig] = None,
         sandbox: bool = False,
+        realtime: bool = False,
     ) -> "OrbitServices":
+        """``realtime=True`` (the served app) publishes every committed event and
+        observation on ``bus`` and lets the assistant react to them (Phase 17)."""
         clock = clock or SystemClock()
         config = config or OrbitConfig()
         anchors = AnchorRegistry(repo)
@@ -99,8 +104,11 @@ class OrbitServices:
         actions = ActionSafetyService(repo, tasks.conditions, tasks)
         actions.ensure_agent_principal(clock.now())
         agent = QueryAgent(repo, engine, memory, diff, tasks, hypotheses, planner=perception, gate_evidence=config.gate_evidence)
-        assistant = AssistantService(repo, engine, agent, tasks, actions, perception, command_provider())
+        bus = EventBus()
+        assistant = AssistantService(repo, engine, agent, tasks, actions, perception, command_provider(), bus=bus)
         assistant.ensure_principal(clock.now())
+        if realtime and not sandbox:
+            repo.on_commit(publish_committed(bus))
         return cls(
             repo=repo,
             clock=clock,
@@ -120,6 +128,7 @@ class OrbitServices:
             identity=IdentityService(repo, engine),
             camera=CameraService(repo, engine, search),
             assistant=assistant,
+            bus=bus,
             config=config,
         )
 

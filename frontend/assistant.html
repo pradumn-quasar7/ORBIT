@@ -29,7 +29,7 @@
     <section class="card as-stage" aria-labelledby="avatar-h">
       <div class="card-head">
         <h2 id="avatar-h">Orbi</h2>
-        <span class="hint" id="state-label">starting…</span>
+        <span class="as-status"><span id="live" class="live-pill" data-state="connecting" role="status">○ connecting</span> <span class="hint" id="state-label">starting…</span></span>
       </div>
       <div class="avatar" id="avatar" aria-hidden="true"><p class="avatar-fallback" id="avatar-fallback" hidden>3D view unavailable — the chat still works.</p></div>
       <div class="voice-row">
@@ -54,6 +54,7 @@
     </section>
   </main>
 
+  <script src="realtime.js"></script>
   <script type="module" src="assistant.js"></script>
 </body>
 </html>

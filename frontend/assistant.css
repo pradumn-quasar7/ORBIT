@@ -37,3 +37,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   .avatar { min-height: 280px; }
   .as-chat { min-height: 0; }
 }
+.msg.notice { border-left: 3px solid var(--accent); }
+.msg.notice.alert { border-left-color: var(--contradicted); }
+.notice-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); margin-bottom: 2px; }
+.as-status { display: inline-flex; gap: 8px; align-items: center; }

@@ -23,8 +23,8 @@ def ent(cid, loc, type, **kw):
 
 
 class Lab:
-    def __init__(self, repo):
-        self.svc = OrbitServices.build(repo)
+    def __init__(self, repo, realtime=False):
+        self.svc = OrbitServices.build(repo, realtime=realtime)
         for a, p in (("lab204", None), ("bench_3", "lab204"), ("bench_4", "lab204"), ("shelf_a", "lab204")):
             self.svc.anchors.register(a, T0, parent_id=p)
         self._n = 0

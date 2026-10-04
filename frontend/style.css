@@ -83,3 +83,13 @@ footer { padding: 0 24px 24px; color: var(--muted); font-size: 12px; display: fl
   main { grid-template-columns: 1fr; padding: 16px; }
   header, .counts { padding-left: 16px; padding-right: 16px; }
 }
+
+/* Live updates (Phase 17) */
+.live-pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.live-pill[data-state="live"] { color: var(--verified); border-color: currentColor; }
+.live-pill[data-state="reconnecting"], .live-pill[data-state="closed"] { color: var(--stale); border-color: currentColor; }
+.ticker { margin: 12px 24px 0; padding: 6px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font-size: 12.5px; display: grid; gap: 2px; }
+.ticker .tick { animation: tick-in 0.6s ease-out; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ticker .tick.observation { color: var(--muted); }
+@keyframes tick-in { from { background: color-mix(in srgb, var(--accent) 22%, transparent); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .ticker .tick { animation: none; } }

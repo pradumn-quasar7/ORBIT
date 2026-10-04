@@ -18,8 +18,14 @@ Every delegated act is recorded with provenance (conversation, utterance, actor)
 "what did you do for me?" is answerable from the audit trail. Conversation context
 (focus, pending confirmation) is process-local and fails safe: after a restart a
 pending "yes" simply expires (ADR-040).
+
+Realtime (Phase 17): the assistant also listens to committed world changes and speaks
+up unasked — an authorised action's outcome is verified the moment the camera sees
+it; a change to something the user was just talking about, a new conflict, a task
+step losing its support are announced as notices (ADR-041).
 """
 import re
+import threading
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
@@ -28,6 +34,7 @@ from pydantic import BaseModel, Field
 
 from backend.app.core.time import UTCDateTime
 from backend.app.domain.models import ActionRequest, GroundedResponse, ObservationRequest, StateCondition, generate_id
+from backend.app.core.realtime import EventBus, Message
 from backend.app.domain.types import ActionStatus, ClaimDecision, ConditionState, PrincipalKind, QueryKind, Scope, SourceType, TaskStatus
 
 from backend.app.providers.base import Vocabulary
@@ -94,6 +101,20 @@ class AssistantTurn(BaseModel):
     focus: List[str] = Field(default_factory=list)
 
 
+class AssistantNotice(BaseModel):
+    """Something the assistant says unasked, because the world changed."""
+
+    id: str = Field(default_factory=lambda: generate_id("notice"))
+    conversation_id: str
+    at: UTCDateTime
+    kind: str  # outcome_verified | outcome_failed | focus_changed | conflict | task_changed
+    reply: str
+    speech: str
+    gesture: Gesture
+    refs: List[str] = Field(default_factory=list)
+    action: Optional[ActionRequest] = None
+
+
 class Conversation(BaseModel):
     id: str = Field(default_factory=lambda: generate_id("conv"))
     user_id: str
@@ -103,6 +124,7 @@ class Conversation(BaseModel):
     pending: Optional[PendingConfirmation] = None
     awaiting_performance: Optional[str] = None  # action the user was authorised to do
     delegated: List[DelegatedAction] = Field(default_factory=list)
+    notices: List[AssistantNotice] = Field(default_factory=list)
 
 
 class ConversationNotFound(KeyError):
@@ -129,6 +151,8 @@ class AssistantService:
         perception: ActivePerceptionPlanner,
         parser: Optional[CommandProvider] = None,
         confirm_window: timedelta = CONFIRM_WINDOW,
+        bus: Optional[EventBus] = None,
+        notice_cooldown: timedelta = timedelta(seconds=20),
     ):
         self.repo = repository
         self.engine = engine
@@ -139,6 +163,13 @@ class AssistantService:
         self.parser = parser or RuleBasedCommandProvider()
         self.confirm_window = confirm_window
         self.conversations: Dict[str, Conversation] = {}
+        self.bus = bus
+        self.notice_cooldown = notice_cooldown
+        self._lock = threading.RLock()  # turns (request threads) and notices (committing threads)
+        self._local = threading.local()  # .speaking: conversation of the turn in this thread; .reacting
+        self._last_notice: Dict[Tuple[str, str, str], datetime] = {}
+        if bus is not None:
+            bus.listen(self.on_message)
 
     # --------------------------------------------------------------- lifecycle
     def ensure_principal(self, at: datetime) -> None:
@@ -165,6 +196,14 @@ class AssistantService:
 
     # -------------------------------------------------------------------- turn
     def say(self, conversation_id: str, text: str, at: datetime) -> AssistantTurn:
+        with self._lock:
+            self._local.speaking = conversation_id  # its own writes are answered in the reply, not as notices
+            try:
+                return self._say(conversation_id, text, at)
+            finally:
+                self._local.speaking = None
+
+    def _say(self, conversation_id: str, text: str, at: datetime) -> AssistantTurn:
         conv = self.get(conversation_id)
         if conv.pending and at > conv.pending.expires_at:
             conv.pending = None  # an old question cannot be answered with a new "yes"
@@ -529,7 +568,8 @@ class AssistantService:
         else:
             turn.observation_requests = list(request.requested_observations)
             ask = turn.observation_requests[0].instruction if turn.observation_requests else "Show it to the camera."
-            turn.reply = f"Thanks, recorded. I can't confirm the result yet: {ask} Then say 'check again'."
+            live = " I'll confirm it the moment the camera sees the result." if self.bus is not None else " Then say 'check again'."
+            turn.reply = f"Thanks, recorded. I can't confirm the result yet: {ask}{live}"
             turn.gesture = Gesture.THINK
 
     def _checks(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
@@ -560,3 +600,83 @@ class AssistantService:
     def _greet(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:
         turn.reply = f"Hi {conv.user_id}! I'm keeping track of your workspace. What do you need?"
         turn.gesture = Gesture.WAVE
+
+    # ---------------------------------------------------------------- realtime
+    _FOCUS_EVENTS = {"OBJECT_MOVED", "OBJECT_STATE_CHANGED", "OBJECT_REMOVED_OR_UNOBSERVED", "IDENTITY_AMBIGUOUS"}
+    _ALERT_EVENTS = {"EVIDENCE_CONFLICT", "IDENTITY_CONFLICT"}
+
+    def on_message(self, msg: Message) -> None:
+        """Bus listener, called in the committing thread after commit."""
+        if getattr(self._local, "reacting", False) or msg["topic"] not in ("world", "observation"):
+            return
+        data = msg["data"]
+        entities = ([data["entity_id"]] if data.get("entity_id") else []) if msg["topic"] == "world" else list(data.get("entities") or [])
+        at = datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))  # Python 3.9 rejects "Z"
+        with self._lock:
+            self._local.reacting = True
+            try:
+                for conv in list(self.conversations.values()):
+                    if conv.id == getattr(self._local, "speaking", None):
+                        continue
+                    self._react(conv, msg, data, entities, at)
+            finally:
+                self._local.reacting = False
+
+    def _react(self, conv: Conversation, msg: Message, data: Dict[str, Any], entities: List[str], at: datetime) -> None:
+        # 1. An authorised action the user performed: verify as soon as evidence arrives.
+        if conv.awaiting_performance and entities:
+            request = self.repo.get_action(conv.awaiting_performance)
+            if request and request.status in (ActionStatus.PERFORMED, ActionStatus.OUTCOME_UNVERIFIED) \
+                    and set(entities) & set(request.target_entity_ids):
+                try:
+                    request = self.actions.verify_outcome(request.id, at)
+                except ActionError:
+                    request = None
+                if request and request.status == ActionStatus.OUTCOME_VERIFIED:
+                    conv.awaiting_performance = None
+                    seen = "; ".join(f"{c.condition.entity_id}.{c.condition.attribute} = {c.observed_value!r}" for c in request.outcome_checks)
+                    self._notice(conv, at, "outcome_verified", f"Verified: the result of '{request.action}' is now observed ({seen}).",
+                                 Gesture.NOD, [request.id], request, key=request.id)
+                    return
+                if request and request.status == ActionStatus.OUTCOME_FAILED:
+                    conv.awaiting_performance = None
+                    why = "; ".join(c.reason for c in request.outcome_checks if c.state == ConditionState.VIOLATED)
+                    self._notice(conv, at, "outcome_failed", f"Careful: '{request.action}' did not have the expected result. {why}.",
+                                 Gesture.ALERT, [request.id], request, key=request.id)
+                    return
+        if msg["topic"] != "world":
+            return
+        kind = data["event_type"]
+        entity = data.get("entity_id")
+        # 2. Something the user was just talking about changed, or became contested.
+        if entity and entity in conv.focus[:3] and (kind in self._FOCUS_EVENTS or kind in self._ALERT_EVENTS):
+            alert = kind in self._ALERT_EVENTS or kind == "OBJECT_REMOVED_OR_UNOBSERVED"
+            what = data.get("description") or kind.lower().replace("_", " ")
+            self._notice(conv, at, "conflict" if kind in self._ALERT_EVENTS else "focus_changed",
+                         f"Update on {self._name(entity)}: {what}.", Gesture.ALERT if alert else Gesture.EXPLAIN,
+                         [data["id"]], key=f"{entity}:{kind}")
+            return
+        # 3. A task step lost its support while the user is working.
+        if kind == "TASK_PROGRESS_CHANGED" and data.get("task_id"):
+            after = (data.get("after_state") or {}).get("status")
+            if after in ("BLOCKED", "NEEDS_REVERIFICATION", "INVALIDATED"):
+                self._notice(conv, at, "task_changed", f"Heads up: {data.get('description') or 'a task step changed'}.",
+                             Gesture.ALERT, [data["id"]], key=f"{data['task_id']}:{after}")
+
+    def _notice(self, conv: Conversation, at: datetime, kind: str, reply: str, gesture: Gesture, refs: List[str],
+                action: Optional[ActionRequest] = None, key: str = "") -> None:
+        k = (conv.id, kind, key)
+        last = self._last_notice.get(k)
+        if last is not None and at - last < self.notice_cooldown:
+            return  # the same news again within seconds is noise
+        self._last_notice[k] = at
+        notice = AssistantNotice(conversation_id=conv.id, at=at, kind=kind, reply=reply,
+                                 speech=self._speakable(_sentences(reply), self.agent.vocabulary()),
+                                 gesture=gesture, refs=refs, action=action)
+        if kind.startswith("outcome"):
+            notice_act = DelegatedAction(at=at, kind="outcome_checked", summary=f"Checked the outcome of '{action.action}': {action.status.value}", refs=refs)
+            conv.delegated.append(notice_act)
+        conv.notices.append(notice)
+        del conv.notices[:-100]
+        if self.bus is not None:
+            self.bus.publish("assistant", "NOTICE", notice.model_dump(mode="json"), conversation=conv.id, at=at)
