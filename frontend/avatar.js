@@ -1,12 +1,26 @@
 // ORBIT avatar (Phase 16): a procedural three.js character. No external model files;
 // everything is built from primitives so it loads fast (also in the Quest browser).
-// API: const a = await createAvatar(el); a.setState("idle"|"listening"|"thinking"|"speaking");
-//      a.gesture("WAVE"|"NOD"|"EXPLAIN"|"THINK"|"SHRUG"|"ASK"|"ALERT"); a.mouth(0..1).
+// createAvatar(el)  — a self-contained view for a web page (the assistant page);
+// buildAvatar()     — just the character, to place in any scene (the AR room, Phase 18);
+//                     the caller runs its update(now) once per frame.
+// API of both: setState("idle"|"listening"|"thinking"|"speaking"), setAlert(bool),
+//              gesture("WAVE"|"NOD"|"EXPLAIN"|"THINK"|"SHRUG"|"ASK"|"ALERT"), mouth(0..1),
+//              lookAt(x, y) with x, y in [-1, 1] (where the person is, relative to Orbi).
 import * as THREE from "three";
 
 const STATE_COLORS = { idle: 0x7aa2ff, listening: 0x4ade80, thinking: 0xfbbf24, speaking: 0x7aa2ff, alert: 0xf87171 };
 const ease = (x) => 0.5 - Math.cos(Math.PI * Math.min(1, Math.max(0, x))) / 2;
 const lerp = (a, b, t) => a + (b - a) * t;
+
+export function addLights(scene) {
+  scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x30343c, 1.6));
+  const key = new THREE.DirectionalLight(0xffffff, 1.6);
+  key.position.set(2, 3, 3);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x7aa2ff, 1.1);
+  rim.position.set(-2.5, 2, -2);
+  scene.add(rim);
+}
 
 export function createAvatar(container) {
   const scene = new THREE.Scene();
@@ -17,21 +31,42 @@ export function createAvatar(container) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.appendChild(renderer.domElement);
+  addLights(scene);
+  const avatar = buildAvatar();
+  scene.add(avatar.object);
 
-  scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x30343c, 1.6));
-  const key = new THREE.DirectionalLight(0xffffff, 1.6);
-  key.position.set(2, 3, 3);
-  scene.add(key);
-  const rim = new THREE.DirectionalLight(0x7aa2ff, 1.1);
-  rim.position.set(-2.5, 2, -2);
-  scene.add(rim);
+  container.addEventListener("pointermove", (e) => {
+    const r = container.getBoundingClientRect();
+    avatar.lookAt(((e.clientX - r.left) / r.width - 0.5) * 2, ((e.clientY - r.top) / r.height - 0.5) * 2);
+  });
+  container.addEventListener("pointerleave", () => avatar.lookAt(0, 0));
 
+  function resize() {
+    const w = container.clientWidth || 300, h = container.clientHeight || 300;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(container);
+  resize();
+
+  function frame(now) {
+    avatar.update(now);
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  return avatar;
+}
+
+export function buildAvatar() {
+  const holder = new THREE.Group(); // the caller positions this; the body sways inside it
   const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.1, ...opts });
   const shell = mat(0xeef1f6), dark = mat(0x1d2330, { roughness: 0.3 }), accent = mat(0x7aa2ff, { emissive: 0x7aa2ff, emissiveIntensity: 0.35 });
 
   // ---------------------------------------------------------------- body
   const root = new THREE.Group();
-  scene.add(root);
+  holder.add(root);
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.75, 48), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 }));
   shadow.rotation.x = -Math.PI / 2;
   root.add(shadow);
@@ -117,22 +152,6 @@ export function createAvatar(container) {
   let nextBlink = performance.now() + 2500, blinkStart = 0;
   const color = new THREE.Color(STATE_COLORS.idle);
 
-  container.addEventListener("pointermove", (e) => {
-    const r = container.getBoundingClientRect();
-    look.tx = ((e.clientX - r.left) / r.width - 0.5) * 2;
-    look.ty = ((e.clientY - r.top) / r.height - 0.5) * 2;
-  });
-  container.addEventListener("pointerleave", () => { look.tx = 0; look.ty = 0; });
-
-  function resize() {
-    const w = container.clientWidth || 300, h = container.clientHeight || 300;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-  }
-  new ResizeObserver(resize).observe(container);
-  resize();
-
   // Each gesture returns pose offsets for progress p in [0, 1].
   const GESTURES = {
     WAVE: { dur: 1800, pose: (p) => ({ armR: [-2.6 + Math.sin(p * Math.PI * 6) * 0.35 * (1 - p), 0.25], tilt: 0.12 * Math.sin(p * Math.PI) }) },
@@ -144,7 +163,7 @@ export function createAvatar(container) {
     ALERT: { dur: 1400, pose: (p) => { const k = Math.sin(p * Math.PI); return { browDown: 0.025 * k, pitch: -0.08 * k, armL: [-0.4 * k, -0.2 * k], armR: [-0.4 * k, 0.2 * k] }; } },
   };
 
-  function frame(now) {
+  function update(now) {
     const t = now / 1000;
     let pose = {};
     if (current) {
@@ -209,13 +228,12 @@ export function createAvatar(container) {
     moon.position.set(Math.cos(a) * 0.95, 1.15 + Math.sin(a) * 0.95 * Math.cos(Math.PI / 2.3), Math.sin(a) * 0.95 * Math.sin(Math.PI / 2.3));
     ringMat.opacity = state === "listening" ? 0.6 + 0.35 * Math.abs(Math.sin(t * 4)) : 0.85;
     ears.forEach((e) => { e.scale.y = state === "listening" ? 1.25 : 1; });
-
-    renderer.render(scene, camera);
-    requestAnimationFrame(frame);
   }
-  requestAnimationFrame(frame);
 
   return {
+    object: holder,
+    update,
+    lookAt(x, y) { look.tx = Math.max(-1, Math.min(1, x)); look.ty = Math.max(-1, Math.min(1, y)); },
     setState(next) {
       if (next === "speaking" && state !== "speaking") speakingSince = performance.now();
       state = STATE_COLORS[next] ? next : "idle";

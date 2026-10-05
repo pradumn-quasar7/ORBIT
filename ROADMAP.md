@@ -68,6 +68,10 @@ tests, updated `PROJECT_STATUS.md` / `DECISIONS.md`, and a merge to `main`.
 - [x] **Phase 17 — Realtime**
   - Commit-time change notifications, Server-Sent Events with replay, live Inspector, proactive assistant notices.
 
-- [ ] **Phase 18 (next) — Meta Quest 3S client** — WebXR AR session over HTTPS on the LAN using the same camera endpoints; native Passthrough Camera API app optional.
+- [x] **Phase 18 — Meta Quest 3S mixed reality**
+  - Live-webcam fixes; paired HTTPS access on the LAN; ORBIT places pinned to the real room with persistent anchors, live evidence labels, Orbi in the room, voice and consent.
+
+- [ ] **Phase 19 (next) — First headset session & native perception**
+  - Fix what a real Quest session reveals; a native app with the Passthrough Camera API so the headset can perceive. — WebXR AR session over HTTPS on the LAN using the same camera endpoints; native Passthrough Camera API app optional.
 
 - [ ] **Later** — AR client (step 18), VR rendering of replay/counterfactuals (step 19 front-end), wearable clients, pilot study.

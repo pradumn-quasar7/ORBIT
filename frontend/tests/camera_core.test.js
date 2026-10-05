@@ -35,7 +35,7 @@ test("regions pick the smallest containing box", () => {
 });
 
 test("tracker needs several hits, drops people, survives one-frame flicker", () => {
-  const tr = new core.Tracker({ minHits: 3, maxMisses: 2 });
+  const tr = new core.Tracker({ minHits: 3, maxMisses: 2 });  // short memory for this test
   const bottle = { label: "bottle", score: 0.8, bbox: [0.1, 0.1, 0.2, 0.3], color: "blue" };
   const person = { label: "person", score: 0.99, bbox: [0.5, 0, 0.9, 1] };
   assert.equal(tr.update([bottle, person]).length, 0);
@@ -75,7 +75,25 @@ test("snapshot detections and change signature", () => {
   assert.equal(core.shouldSend(null, sig, 0, 1000), true);
   assert.equal(core.shouldSend(sig, sig, 0, 1000), false);
   assert.equal(core.shouldSend(sig, sig, 0, 61000), true); // heartbeat
-  assert.equal(core.shouldSend(sig, "other", 0, 1000), true);
+  assert.equal(core.shouldSend(sig, "other", 0, 3000), true);
+  assert.equal(core.shouldSend(sig, "other", 0, 1000), false); // rate-limited: within 2 s of the last send
+});
+
+test("an object survives a ~2 s gap and its colour does not flip with lighting", () => {
+  const tr = new core.Tracker(); // defaults: 3 hits, 5 misses
+  const mouse = (color) => ({ label: "mouse", score: 0.8, bbox: [0.3, 0.3, 0.4, 0.4], color });
+  ["gray", "gray", "gray", "gray"].forEach((c) => tr.update([mouse(c)]));
+  assert.equal(tr.color(tr.tracks[0]), "gray");
+  for (let i = 0; i < 4; i++) assert.equal(tr.update([]).length, 1); // flicker: still in view
+  ["black", "black", "black"].forEach((c) => tr.update([mouse(c)])); // lighting drift
+  assert.equal(tr.color(tr.tracks[0]), "gray"); // sticky
+  for (let i = 0; i < 6; i++) tr.update([]);
+  assert.equal(tr.tracks.length, 0); // really gone after > 2 s
+});
+
+test("labels COCO hallucinates on desks are not sent", () => {
+  for (const l of ["tie", "umbrella", "teddy bear", "sports ball"]) assert.equal(core.ALLOWED_LABELS.has(l), false);
+  assert.ok(core.ALLOWED_LABELS.has("mouse") && core.ALLOWED_LABELS.has("cup"));
 });
 
 test("QR markers tag their host object or stand alone", () => {

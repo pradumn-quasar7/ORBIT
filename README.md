@@ -59,6 +59,19 @@ language — this sends the workspace vocabulary to the Anthropic API:
 ORBIT_ASSISTANT_LLM=anthropic ANTHROPIC_API_KEY=... ORBIT_DATABASE_URL=sqlite:///./orbit_demo.db .venv/bin/uvicorn backend.app.main:app --port 8765
 ```
 
+### Meta Quest (mixed reality)
+```bash
+scripts/run_demo.sh --lan
+```
+Open http://localhost:8765/ui/xr.html on the computer: it shows the headset address and
+a pairing code. On the Quest (same Wi-Fi) open that `https://…:8766` address in the
+browser, accept the certificate warning once (the certificate is made by your computer),
+type the code, allow the microphone, and press **Enter AR**. Pin ORBIT places to the real
+room from the floating menu; labels over them show what ORBIT believes is there and how
+sure it is, live. Hold the grip button to talk to Orbi. If macOS asks whether Python may
+accept incoming connections, allow it. The Quest browser gives web pages no camera
+pixels, so the webcam page keeps doing perception.
+
 ### Realtime
 Every page is live: the Inspector redraws and shows a ticker the moment ORBIT commits a
 change, and Orbi speaks up unasked (e.g. "Verified: the result of 'open the valve' is now

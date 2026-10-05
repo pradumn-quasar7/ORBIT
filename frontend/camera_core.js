@@ -16,9 +16,11 @@
   // (privacy, spec §17) — the server enforces the same rule.
   const ALLOWED_LABELS = new Set([
     "bottle", "cup", "wine glass", "bowl", "laptop", "cell phone", "keyboard", "mouse", "remote", "book",
-    "scissors", "clock", "vase", "potted plant", "backpack", "handbag", "teddy bear", "toothbrush",
-    "banana", "apple", "orange", "tv", "tie", "umbrella", "sports ball", "knife", "spoon", "fork",
+    "scissors", "clock", "vase", "potted plant", "backpack", "handbag",
+    "banana", "apple", "orange", "tv", "knife", "spoon", "fork",
   ]);
+  // Dropped after the first live test: classes COCO hallucinates on desks (a cable or
+  // strap became a "tie") — "tie", "umbrella", "teddy bear", "sports ball", "toothbrush".
   const EXCLUDED_LABELS = new Set(["person"]);
   const LABEL_ALIASES = { "cell phone": "phone", "tv": "monitor", "book": "notebook" };
 
@@ -104,7 +106,10 @@
   class Tracker {
     constructor(opts = {}) {
       this.minHits = opts.minHits ?? 3; // consecutive-ish sightings before an object counts
-      this.maxMisses = opts.maxMisses ?? 4; // frames an object may vanish before it is dropped
+      // Frames an object may vanish (detector flicker, a hand passing over) and still be
+      // "in view": ~2 s at 400 ms per frame. The first live test sent ~30 empty snapshots
+      // in 5 minutes because one missed frame removed an object from the scene.
+      this.maxMisses = opts.maxMisses ?? 5;
       this.matchIou = opts.matchIou ?? 0.3;
       this.minColorShare = opts.minColorShare ?? 0.6;
       this.tracks = [];
@@ -154,14 +159,22 @@
 
     color(t) {
       const total = Object.values(t.colors).reduce((a, b) => a + b, 0);
-      if (total < 3) return null;
+      if (total < 3) return t.decided || null;
       let best = null;
       for (const [c, n] of Object.entries(t.colors)) if (!best || n > t.colors[best]) best = c;
-      return t.colors[best] / total >= this.minColorShare ? best : null; // undecided colour is omitted
+      const share = t.colors[best] / total;
+      // Sticky: once decided, a colour changes only on an overwhelming new majority, so
+      // lighting drift (black ↔ gray) does not make the same object look different.
+      if (!t.decided) {
+        if (share >= this.minColorShare) t.decided = best;
+      } else if (best !== t.decided && share >= 0.8 && total >= 8) {
+        t.decided = best;
+      }
+      return t.decided || null; // undecided colour is omitted
     }
 
     stable() {
-      return this.tracks.filter((t) => t.hits >= this.minHits && t.misses <= 1);
+      return this.tracks.filter((t) => t.hits >= this.minHits && t.misses <= this.maxMisses);
     }
   }
 
@@ -188,9 +201,11 @@
       .join(";");
   }
 
-  function shouldSend(previous, current, lastSentAt, now, heartbeatMs = 60000) {
+  // Send when the scene changed — but at most every minIntervalMs, so a burst of
+  // changes becomes one snapshot — or as a heartbeat that keeps facts fresh.
+  function shouldSend(previous, current, lastSentAt, now, heartbeatMs = 60000, minIntervalMs = 2000) {
     if (previous === null) return true;
-    if (current !== previous) return true;
+    if (current !== previous) return now - lastSentAt >= minIntervalMs;
     return now - lastSentAt >= heartbeatMs;
   }
 

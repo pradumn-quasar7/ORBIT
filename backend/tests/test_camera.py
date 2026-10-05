@@ -133,3 +133,17 @@ def test_browser_camera_core():
     """The browser's tracker / marker / signature logic (frontend/camera_core.js)."""
     proc = subprocess.run(["node", "--test", "frontend/tests/camera_core.test.js"], cwd=ROOT, capture_output=True, text=True, timeout=60)
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_neighbouring_neutral_colours_do_not_split_one_object(client, clock):
+    """Phase 15 live test: one black mouse read as gray, then black, became two mice."""
+    calibrate(client)
+    first = client.post("/cameras/webcam/snapshot", json={"detections": [det("mouse", 0.2, attributes={"color": "gray"})]}).json()
+    clock.advance(30)
+    again = client.post("/cameras/webcam/snapshot", json={"detections": [det("mouse", 0.2, attributes={"color": "black"})]}).json()
+    assert again["seen"][0]["entity_id"] == first["seen"][0]["entity_id"]
+    assert again["seen"][0]["method"] != "NEW"
+    clock.advance(30)  # black vs white is a real difference: a second mouse
+    other = client.post("/cameras/webcam/snapshot", json={"detections": [
+        det("mouse", 0.2, attributes={"color": "black"}), det("mouse", 0.8, attributes={"color": "white"})]}).json()
+    assert len({s["entity_id"] for s in other["seen"]}) == 2

@@ -46,7 +46,7 @@ $$B_t = \text{Update}(B_{t-1}, O_t, \text{context}, \text{evidence}, \text{time}
 
 ```
 backend/app/
-  core/            time (UTCDateTime), clock, OrbitConfig + composition root (OrbitServices), realtime (EventBus)
+  core/            time (UTCDateTime), clock, OrbitConfig + composition root (OrbitServices), realtime (EventBus), pairing (LAN device pairing)
   domain/          Pydantic models, enums, weakest-link status aggregation
   repositories/    Repository ABC; InMemoryRepository; sql/ (tables + SqlRepository)
   providers/       replaceable boundaries: embedding, retrieval, reasoning, perception, commands (rule-based / Claude)
@@ -81,14 +81,16 @@ backend/app/
     counterfactual.py     what-if premises, decision comparison, sensitivity analysis
     replay.py             frame-by-frame history
   evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner), counterfactual_eval.py (Experiment H), decision_perception_eval.py (Experiment F2), generator.py + generated.py + stats.py (generated worlds, bootstrap CIs)
-  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual, identity, camera, assistant, realtime /stream)
-  main.py          create_app(repository, clock) factory; lazy module-level `app`
+  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual, identity, camera, assistant, realtime /stream, xr)
+  main.py          create_app(repository, clock, pair_code, lan_url) factory; lazy module-level `app`
+  serve.py         launcher: localhost HTTP + optional LAN HTTPS listener in one process
 database/          Alembic migrations 0001–0009, migrate.py
 experiments/       scenarios/catalog.py, runners/run_bench.py, results/
 frontend/          static inspection dashboard served at /ui/; camera.html + camera_core.js
                    live webcam client (in-browser detection, regions, QR markers);
                    assistant.html + avatar.js: chat/voice assistant with a three.js avatar;
-                   realtime.js: shared live connection (Server-Sent Events)
+                   realtime.js: shared live connection (Server-Sent Events);
+                   xr.html + xr.js + xr_core.js: Quest mixed-reality client (WebXR)
 scripts/           seed_demo.py (flagship scenario)
 ```
 

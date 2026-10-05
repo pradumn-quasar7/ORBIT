@@ -69,10 +69,25 @@ def identity_conflict(entity: Entity, observed: ObservedEntity) -> Optional[str]
     return None
 
 
+# Camera colour estimates for neutral objects drift between neighbouring shades with
+# lighting (a black mouse read as gray, then black: Phase 15 live test). Neighbouring
+# neutral shades therefore do not prove two objects are different; black vs white does.
+COLOR_NEIGHBOURS = frozenset({frozenset({"black", "gray"}), frozenset({"gray", "white"}),
+                              frozenset({"black", "grey"}), frozenset({"grey", "white"}), frozenset({"gray", "grey"})})
+
+
+def values_compatible(key: str, a, b) -> bool:
+    if a == b:
+        return True
+    if key == "color" and isinstance(a, str) and isinstance(b, str):
+        return frozenset({a.lower(), b.lower()}) in COLOR_NEIGHBOURS
+    return False
+
+
 def signature_conflict(entity: Entity, observed: ObservedEntity) -> Optional[str]:
     for key in SIGNATURE_ATTRIBUTES & observed.attributes.keys():
         known = entity.current_state.get(key)
-        if known is not None and known != observed.attributes[key]:
+        if known is not None and not values_compatible(key, known, observed.attributes[key]):
             return f"{key} {observed.attributes[key]!r} != {known!r}"
     return None
 
@@ -87,7 +102,7 @@ def identity_conflict_between(a: Entity, b: Entity) -> Optional[str]:
 
 def signature_conflict_between(a: Entity, b: Entity) -> Optional[str]:
     for key in SIGNATURE_ATTRIBUTES & a.current_state.keys() & b.current_state.keys():
-        if a.current_state[key] is not None and b.current_state[key] is not None and a.current_state[key] != b.current_state[key]:
+        if a.current_state[key] is not None and b.current_state[key] is not None and not values_compatible(key, a.current_state[key], b.current_state[key]):
             return f"{key} {a.current_state[key]!r} != {b.current_state[key]!r}"
     return None
 

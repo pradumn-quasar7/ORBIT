@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ORBIT Quest</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="xr.css">
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◎</span>
+      <div>
+        <h1>ORBIT</h1>
+        <p class="tagline">Mixed reality — ORBIT's memory pinned to your real room</p>
+      </div>
+    </div>
+    <div class="meta">
+      <a href="./" class="navlink">Inspector</a>
+      <a href="assistant.html" class="navlink">Assistant</a>
+      <span id="live" class="live-pill" data-state="connecting" role="status">○ connecting</span>
+    </div>
+  </header>
+
+  <main class="xr-layout">
+    <section class="card xr-stage" aria-labelledby="view-h">
+      <div class="card-head">
+        <h2 id="view-h">Your room</h2>
+        <span class="hint" id="mode">preview</span>
+      </div>
+      <div class="view" id="view" aria-label="3D preview of ORBIT places and Orbi"></div>
+      <div class="controls">
+        <button id="enter" type="button" class="primary" disabled>Enter AR</button>
+        <button id="mic" type="button">Allow microphone</button>
+        <label class="who">You are <input id="user" type="text" value="operator" autocomplete="off" aria-label="Your ORBIT principal id"></label>
+      </div>
+      <p class="xr-status" id="xr-status" role="status">Checking for mixed reality…</p>
+    </section>
+
+    <aside class="xr-side">
+      <section class="card" id="connect" aria-labelledby="connect-h">
+        <div class="card-head"><h2 id="connect-h">Connect your Quest</h2></div>
+        <div id="connect-body"><p class="hint">Loading…</p></div>
+      </section>
+
+      <section class="card" aria-labelledby="how-h">
+        <div class="card-head"><h2 id="how-h">In the headset</h2></div>
+        <ol class="steps">
+          <li><strong>Pin a place:</strong> point at the menu item <em>Pin Bench 3</em>, pull the trigger (or pinch), then point at the real bench and pull again. It stays there next time.</li>
+          <li><strong>Read the room:</strong> a label floats over each pinned place with what ORBIT believes is there and how sure it is. It updates live.</li>
+          <li><strong>Ask:</strong> point at a label to hear it, or hold the grip button (or choose <em>Talk to Orbi</em>) and speak.</li>
+          <li><strong>Approve:</strong> when Orbi prepares an action, say “yes” or choose <em>Yes, authorize</em>. You still do the action yourself.</li>
+        </ol>
+      </section>
+
+      <section class="card" aria-labelledby="places-h">
+        <div class="card-head"><h2 id="places-h">Places</h2><span class="hint" id="pinned-count"></span></div>
+        <ul id="places" class="list"><li class="empty">Loading…</li></ul>
+      </section>
+    </aside>
+  </main>
+
+  <script src="realtime.js"></script>
+  <script src="xr_core.js"></script>
+  <script type="module" src="xr.js"></script>
+</body>
+</html>
