@@ -1,12 +1,12 @@
 # ORBIT Project Status
 
 ## Current Phase
-**Phase 17 — Realtime (COMPLETE).** ORBIT v0.1 (Phases 0–9) is complete; Phases 10–13
-added counterfactual sandboxes, decision-aware perception, risk-graded verification and
-identity curation; Phase 14 evaluates ORBIT on generated worlds; Phase 15 connects a real
-webcam; Phase 16 adds "Orbi", a talking assistant acting on the user's behalf; Phase 17
-makes everything live: every committed change is pushed to open views, and Orbi speaks
-up unasked when the world changes.
+**Phase 18 — Meta Quest 3S mixed reality (COMPLETE, untested on a headset).** ORBIT v0.1
+(Phases 0–9) is complete; Phases 10–17 added counterfactual sandboxes, decision-aware
+perception, risk-graded verification, identity curation, a generated benchmark, live
+webcam perception, Orbi the conversational assistant, and realtime updates; Phase 18 puts
+ORBIT's memory into the real room on a Quest headset, after fixing what the first live
+webcam test exposed.
 
 ## Phase Log
 
@@ -265,6 +265,18 @@ up unasked when the world changes.
 - **Safety fix**: while an approval was pending, any utterance *starting* with "ok"/"yes" counted as consent, so the user's own filler "ok so like" would have approved an action. Consent must now be the whole utterance ("yes", "yes please", "ok go ahead").
 - Tests: 38 new cases from the user's real phrases, consent phrasings and spoken summaries.
 
+### Phase 18 — Meta Quest 3S mixed reality (+ live-webcam fixes)
+**Planned**
+- (A) Fix what the first live webcam test exposed. (B) Let a Quest headset on the same Wi-Fi reach ORBIT safely (WebXR needs HTTPS; the API has no accounts). (C) A headset client: ORBIT places pinned to the real room, live labels saying what the evidence supports, Orbi in the room, voice, consent.
+- Checked against Meta's current documentation first: Quest Browser supports `immersive-ar` passthrough, anchors including persistent ones (`requestPersistentHandle`, `restorePersistentAnchor`) and plane detection; web pages get **no access to passthrough camera pixels**, so perception stays with the webcam and the headset is ORBIT's window into the room.
+
+**Implemented**
+- **(A) Webcam**: neighbouring neutral colours (black ≈ gray ≈ white, never black vs white) no longer prove two objects differ (`values_compatible`, used by re-identification and identity suggestions); tracker hysteresis (an object stays in view through ~2 s of flicker, so scans count it too), sticky colours (change only on an overwhelming new majority), snapshots at most every 2 s, hallucination-prone COCO labels dropped (tie, umbrella, teddy bear, sports ball, toothbrush), default camera place `my_desk` (no longer merges with the demo's `desk`).
+- **(B) LAN access**: `python -m backend.app.serve --lan` (or `scripts/run_demo.sh --lan`) serves the *same app* on `http://localhost:8765` and `https://<lan-ip>:8766` from one process (shared realtime bus and conversations), with a self-signed certificate for the LAN address. `core/pairing.py`: network devices must pair once by typing an 8-character code at `/pair` (HttpOnly/Secure/SameSite=Strict cookie derived from the code; constant-time compare; 8 failures → 1 min lockout; off-site redirects refused; the code is shown only to the laptop). The code persists in `.run/` until `--new-code`.
+- **(C) Headset client**: `api/xr.py` (`GET /xr/places` with supportable beliefs per place, `PUT/DELETE /xr/places/{id}` storing the persistent-anchor handle in the anchor frame, `GET /xr/pairing`); `frontend/xr.html|css|js` (WebXR `immersive-ar`, `local-floor`; optional anchors, plane detection, hit test, hands); `frontend/xr_core.js` (label wording, severity ordering, ray–plane placement, menu; unit-tested). In the headset: a lazy-following 3D menu (no DOM overlay on Quest), pin a place by pointing (hit test → detected table/wall → 1 m), labels that follow anchors and face you, point at a label to hear it, grip to talk (on-device Whisper when the browser has no speech service), Yes/No buttons when Orbi awaits consent, live updates and Orbi's notices. On a computer the same scene is a 3D preview with pairing instructions. `avatar.js` split into `buildAvatar()` (any scene) and `createAvatar()` (page).
+- ADR-043. Tests: `test_xr.py` (places and contested beliefs, pin/unpin, pairing flow, cookie properties, lockout, off-site redirect, code alphabet and persistence, certificate SAN), `xr_core.test.js` (labels, ordering, geometry, menu), `test_camera.py` (black/gray mouse stays one object), `camera_core.test.js` (hysteresis, sticky colour, rate limit, labels).
+- Verified: preview renders in the browser; a paired network client loaded the page, scripts, places, assistant and stream over HTTPS; unpaired requests were refused. **Not verified: an actual Quest session** (no headset here) — the WebXR calls follow the anchors / hit-test / plane-detection specifications and Meta's documentation.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -294,7 +306,7 @@ up unasked when the world changes.
 | Important claims are auditable | `test_evidence_engine.py::test_tampered_evidence_fails_integrity`, action audit events |
 
 ## Known Issues / Limitations
-- No multi-workspace / multi-tenant separation or authentication on the API (spec §17 access control is principal-scoped for actions only). In particular the assistant trusts the "You are" id: anyone who can reach the server can speak as `operator`. Do not expose it beyond your own machine before authentication exists.
+- No multi-workspace / multi-tenant separation or authentication on the API (spec §17 access control is principal-scoped for actions only). In particular the assistant trusts the "You are" id: anyone who can reach the server can speak as `operator`. Do not expose it beyond your own machine before authentication exists; `--lan` mode requires device pairing, but anyone who knows the code can act as any principal.
 - Assistant conversations are process-local (a restart drops context and pending approvals — fail-safe); delegated acts themselves are in the durable audit trail. The realtime bus is in-process too: with several server workers each would only see its own commits (run one worker, or add a shared broker such as Postgres LISTEN/NOTIFY). Voice input uses the browser's speech service (online in Chrome) or on-device Whisper (private; ~80 MB first download). Voice never works inside the Claude app's built-in browser (microphone blocked).
 - Reasoning provider is rule-based; free-form language coverage is limited to the supported question types. An LLM provider can be added behind `ReasoningProvider`.
 - Live camera: COCO-SSD knows ~80 everyday classes (no cables, tools, pumps) — such objects need QR tags `orbit:<type>:<id>`. One fixed camera per view; no pose tracking. The model is fetched from a CDN on first use (internet needed). Detection quality on real scenes is not yet measured.
@@ -304,15 +316,16 @@ up unasked when the world changes.
 - Sandboxes are process-local and disposable (not persisted); each probe copies the world, which is fine for small workspaces but not optimised.
 
 ## Next (candidates)
-1. Meta Quest 3S client: Orbi and the world model in a WebXR AR session served over HTTPS on the LAN, then (optionally) a native app with the Passthrough Camera API.
-2. Webcam fixes from the first live test: achromatic colours (black/gray) must not split one object into two; hysteresis + rate limit on snapshots; a scan must count recently seen objects; drop implausible desk labels; camera view name separate from the demo world.
-3. Measured live accuracy: label a short recorded desk session and report identity/diff metrics on real frames.
-4. Generated futures for Experiment H and generated perception worlds for Experiment F2.
+1. First real Quest session: fix what it reveals (anchor drift, label legibility, Whisper latency on the headset).
+2. Native Quest app with Meta's Passthrough Camera API so the headset itself can perceive (web pages get no camera pixels).
+3. API authentication: real user identities instead of a trusted "You are" field.
+4. Measured live accuracy: label a short recorded desk session and report identity/diff metrics on real frames.
+5. Generated futures for Experiment H and generated perception worlds for Experiment F2.
 3. API authentication and workspace separation.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 586 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 600 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
@@ -337,6 +350,7 @@ up unasked when the world changes.
 - ADR-040 Conversational assistant: delegation inside ORBIT, deterministic consent, interventions vs statements
 - ADR-041 Realtime: commit-time notifications, SSE with replay, proactive assistant notices
 - ADR-042 Voice input: browser speech service with on-device Whisper fallback
+- ADR-043 Quest client: memory pinned to the room, no camera pixels, paired LAN access over HTTPS
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.
@@ -345,4 +359,4 @@ up unasked when the world changes.
 - G (AR utility) — deferred (needs an AR client).
 
 ## Last Updated
-- 2026-10-04 (Phase 17)
+- 2026-10-05 (Phase 18)

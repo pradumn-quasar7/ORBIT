@@ -9,7 +9,7 @@
   const QR_EVERY = 3;
 
   const state = {
-    device: "webcam", view: "desk", regions: [], model: null, stream: null, running: false,
+    device: "webcam", view: "my_desk", regions: [], model: null, stream: null, running: false,
     tracker: new core.Tracker(), lastSig: null, lastSentAt: 0, sending: false, tick: 0, codes: [],
     draft: null, drawing: false, session: sessionId(), lastStable: [], frames: 0, fpsAt: performance.now(),
   };
@@ -49,7 +49,7 @@
   }
 
   async function saveConfig() {
-    state.view = $("view").value.trim() || "desk";
+    state.view = $("view").value.trim() || "my_desk";
     const cfg = await api("PUT", `/cameras/${encodeURIComponent(state.device)}/config`, {
       view: state.view, regions: state.regions.map((r) => ({ id: r.id, name: r.name || r.id, bbox: r.bbox })),
     });

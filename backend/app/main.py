@@ -5,9 +5,10 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.app.api import actions, assistant, camera, counterfactual, evidence, identity, inspect, memory, queries, realtime, spatial, world
+from backend.app.api import actions, assistant, camera, counterfactual, evidence, identity, inspect, memory, queries, realtime, spatial, world, xr
 from backend.app.core.clock import Clock
 from backend.app.core.container import OrbitServices, default_repository
+from backend.app.core.pairing import Pairing
 from backend.app.repositories.base import Repository
 
 VERSION = "0.1.0"
@@ -35,8 +36,12 @@ class RevalidateUI:
         await self.app(scope, receive, send_with_header)
 
 
-def create_app(repository: Optional[Repository] = None, clock: Optional[Clock] = None) -> FastAPI:
+def create_app(repository: Optional[Repository] = None, clock: Optional[Clock] = None,
+               pair_code: Optional[str] = None, lan_url: Optional[str] = None) -> FastAPI:
+    """``pair_code`` (Phase 18) requires devices on the network to pair before using the
+    API; ``lan_url`` is the address they use (shown to the laptop user)."""
     app = FastAPI(title="ORBIT World Model API", version=VERSION)
+    app.state.lan = {"code": pair_code, "url": lan_url}
     app.state.orbit = OrbitServices.build(repository or default_repository(), clock, realtime=True)
 
     @app.get("/")
@@ -60,6 +65,7 @@ def create_app(repository: Optional[Repository] = None, clock: Optional[Clock] =
     app.include_router(camera.router)
     app.include_router(assistant.router)
     app.include_router(realtime.router)
+    app.include_router(xr.router)
 
     if FRONTEND.is_dir():
         app.mount("/ui", StaticFiles(directory=FRONTEND, html=True), name="ui")
@@ -69,6 +75,7 @@ def create_app(repository: Optional[Repository] = None, clock: Optional[Clock] =
         def dashboard():
             return RedirectResponse("/ui/")
 
+    app.add_middleware(Pairing, code=pair_code)  # outermost: unpaired network devices stop here
     return app
 
 
