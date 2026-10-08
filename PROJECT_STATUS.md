@@ -325,6 +325,15 @@ the user's Mac and Quest.
 - From a real Groq run: Orbi replied in Hindi script to an English request (now: reply in the language the user spoke, Hinglish in Latin letters); it asked for an address that was in the contacts (now it knows contact names); markdown such as `**Send**` is stripped before speaking; one of three quick runs hit the free per-minute limit (now a busy model hands over to `qwen/qwen3.8-27b`, then `openai/gpt-oss-20b`).
 - Not done: reading the inbox needs Gmail API access (Google OAuth), which was not requested yet.
 
+### Phase 19.3 — Videos by voice, and voice that really acts
+**Planned**
+- "Open YouTube and play this video", then change quality, full screen and escape, all by voice, on the Mac and in the Quest. (The headset's history showed the user had already asked Orbi for a song, and it could only search.)
+
+**Implemented**
+- `core/cdp.py`: a standard-library Chrome DevTools Protocol client (local endpoints only). `services/media.py`: `search_youtube` (first videos from YouTube's results data, no API key; 0.75 s) and `MediaController` (`play`, `control`: pause, resume, fullscreen, exit_fullscreen, quality 144p–4K/best/auto with fallback to the best available, mute, volume, forward/back, speed, next, status) using YouTube's own player API in the tab. Quest: the Quest browser over the USB DevTools forward. Mac: ORBIT's own Chrome window (separate profile, port 9223), so the user's Chrome is untouched. Full screen uses a CDP user gesture. Tools `play_video` and `video_control` for both voice engines.
+- Verified on real YouTube (invisible, muted Chrome): play in 2.4 s; 480p → 1080p → 4K; full screen on/off; pause, +30 s, volume 60%.
+- **Found with real Groq runs and fixed:** (1) after a few actions the model only *said* "Paused." / "Skipped" without calling a tool, having learned the pattern from text-only history. Now history keeps the turns' tool calls and results, and a reply claiming an action with no tool call is sent back with `tool_choice: required`. (2) The free plan's 8,000 tokens/min per model allowed ~2 commands a minute. Now device, video and email results are spoken directly (one model call instead of two), tool descriptions are shorter, gpt-oss reasons at `low`, and memory keeps 4 compact turns. (3) Repeated sentences and run-together text are cleaned before speaking. Result: eight commands in a row, every one executed, 0.3–0.8 s each, with automatic hand-over between models.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -373,7 +382,7 @@ the user's Mac and Quest.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 672 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 690 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 

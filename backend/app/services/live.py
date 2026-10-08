@@ -26,7 +26,9 @@ from typing import Any, Callable, Dict, List, Optional
 from backend.app.domain.models import generate_id
 from backend.app.providers.commands import YES, normalise, spoken_numbers
 from backend.app.services.assistant import AssistantService
+from backend.app.core.cdp import CDPError
 from backend.app.services.devices import APPS, DeviceController, DeviceError
+from backend.app.services.media import MediaController, MediaError
 
 API = "https://generativelanguage.googleapis.com"
 DEFAULT_MODEL = "gemini-3.8-live"
@@ -75,70 +77,34 @@ class PendingMessage:
     expires_at: datetime
 
 
+DEVICE = {"type": "string", "enum": ["here", "quest", "mac"], "description": "here = the device the user is on"}
 TOOLS = [
-    {
-        "name": "orbit",
-        "description": (
-            "Ask or tell ORBIT, the evidence-based memory of the user's workspace. Use it for EVERY question or statement "
-            "about physical things, places, tasks and changes (where is X, what's on bench 3, what changed, continue, "
-            "I moved X to Y, I finished step 6, pause the task) and for physical actions (open the valve) — ORBIT checks "
-            "prerequisites and asks for consent. Write the request as short plain English using the ids listed in your "
-            "instructions. When ORBIT is waiting for a yes/no and the user answers, send exactly 'yes' or 'no'. "
-            "Relay ORBIT's answer faithfully, including uncertainty; never add facts of your own."),
-        "parameters": {"type": "object", "properties": {"request": {"type": "string"}}, "required": ["request"]},
-    },
-    {
-        "name": "open_app",
-        "description": "Open an app on the user's device, e.g. WhatsApp, Instagram, YouTube, browser, Gmail, Maps, Spotify.",
-        "parameters": {"type": "object", "properties": {
-            "app": {"type": "string"},
-            "device": {"type": "string", "enum": ["here", "quest", "mac"], "description": "'here' = the device the user is talking from"},
-        }, "required": ["app"]},
-    },
-    {
-        "name": "web_search",
-        "description": "Search the web in the browser on the user's device.",
-        "parameters": {"type": "object", "properties": {
-            "query": {"type": "string"},
-            "device": {"type": "string", "enum": ["here", "quest", "mac"]},
-        }, "required": ["query"]},
-    },
-    {
-        "name": "open_website",
-        "description": "Open a web address in the browser on the user's device.",
-        "parameters": {"type": "object", "properties": {
-            "url": {"type": "string"},
-            "device": {"type": "string", "enum": ["here", "quest", "mac"]},
-        }, "required": ["url"]},
-    },
-    {
-        "name": "compose_email",
-        "description": ("Write an email for the user and open it in Gmail as a draft (nothing is sent; the user reviews it and "
-                        "presses Send). Write a proper subject and a clear, polite body from what the user said, in their "
-                        "language, signed with their name if known. Then tell them it's ready to review."),
-        "parameters": {"type": "object", "properties": {
-            "to": {"type": "string", "description": "email address(es) or contact name(s), comma separated"},
-            "subject": {"type": "string"},
-            "body": {"type": "string"},
-            "cc": {"type": "string"},
-            "device": {"type": "string", "enum": ["here", "quest", "mac"]},
-        }, "required": ["to", "subject", "body"]},
-    },
-    {
-        "name": "prepare_message",
-        "description": ("Prepare a WhatsApp message (nothing is sent yet). Returns a read-back. Read it to the user and ask "
-                        "them to say yes to send; then call send_message."),
-        "parameters": {"type": "object", "properties": {
-            "to": {"type": "string", "description": "contact name or phone number with country code"},
-            "text": {"type": "string"},
-            "device": {"type": "string", "enum": ["here", "quest", "mac"]},
-        }, "required": ["to", "text"]},
-    },
-    {
-        "name": "send_message",
-        "description": "Send a prepared message. Only after the user explicitly said yes to the read-back.",
-        "parameters": {"type": "object", "properties": {"message_id": {"type": "string"}}, "required": ["message_id"]},
-    },
+    {"name": "orbit", "description": ("Ask or tell ORBIT (the workspace memory) anything about physical objects, places, tasks, changes, "
+                                      "or physical actions like 'open the valve'. Short plain English with the listed ids. When ORBIT "
+                                      "awaits a yes/no and the user answers, send exactly 'yes' or 'no'."),
+     "parameters": {"type": "object", "properties": {"request": {"type": "string"}}, "required": ["request"]}},
+    {"name": "open_app", "description": "Open an app (WhatsApp, Instagram, YouTube, browser, Gmail, Maps, Spotify).",
+     "parameters": {"type": "object", "properties": {"app": {"type": "string"}, "device": DEVICE}, "required": ["app"]}},
+    {"name": "web_search", "description": "Search the web.",
+     "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "device": DEVICE}, "required": ["query"]}},
+    {"name": "open_website", "description": "Open a web address.",
+     "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "device": DEVICE}, "required": ["url"]}},
+    {"name": "play_video", "description": "Find a YouTube video (song, title, artist, topic) and play it.",
+     "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "device": DEVICE}, "required": ["query"]}},
+    {"name": "video_control", "description": ("Control the playing YouTube video. exit_fullscreen also means 'escape'. value: quality "
+                                              "(1080p, 720p, 4k, best, auto), volume 0-100, forward/back seconds, speed 0.25-2."),
+     "parameters": {"type": "object", "properties": {
+         "action": {"type": "string", "enum": ["pause", "resume", "fullscreen", "exit_fullscreen", "quality", "mute", "unmute",
+                                               "volume", "forward", "back", "speed", "next", "status"]},
+         "value": {"type": "string"}, "device": DEVICE}, "required": ["action"]}},
+    {"name": "compose_email", "description": "Write an email (proper subject and body) and open it as a Gmail draft. Nothing is sent.",
+     "parameters": {"type": "object", "properties": {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"},
+                                                     "cc": {"type": "string"}, "device": DEVICE}, "required": ["to", "subject", "body"]}},
+    {"name": "prepare_message", "description": "Prepare a WhatsApp message (not sent). Read it back and ask the user to say yes.",
+     "parameters": {"type": "object", "properties": {"to": {"type": "string"}, "text": {"type": "string"}, "device": DEVICE},
+                    "required": ["to", "text"]}},
+    {"name": "send_message", "description": "Send a prepared message, only after the user said yes.",
+     "parameters": {"type": "object", "properties": {"message_id": {"type": "string"}}, "required": ["message_id"]}},
 ]
 
 INSTRUCTIONS = """You are Orbi, the voice of ORBIT, a memory of the user's physical workspace that only believes what it has evidence for. You talk with {user} in real time{where}.
@@ -147,9 +113,11 @@ How you work:
 - Anything about physical objects, places, tasks, steps, changes or physical actions: call the `orbit` tool and say what it answers, briefly and in your own words, keeping its uncertainty ("last seen 3 hours ago, may have moved"). Never guess facts about the room yourself. If ORBIT doesn't know, say so.
 - Physical actions (open the valve, turn off the microscope): ask ORBIT through `orbit`. ORBIT checks prerequisites and may ask for a yes. You never act physically; the user does.
 - Apps, websites and searches on the user's devices: use `open_app`, `web_search`, `open_website`. Device "here" is the one they're talking from{here}; they can say "on the Mac" or "in the headset".
+- Videos: "play X" or "open YouTube and play X" → `play_video`; then "full screen", "escape", "1080p", "pause", "skip 30 seconds", "louder" → `video_control`. Say briefly what's playing.
 - Email: call `compose_email` with a subject and a well-written body; Gmail opens with the draft and the user presses Send themselves. You cannot send email. You cannot read the inbox.
 - Messages: call `prepare_message`, read back the recipient and the exact text, ask "Shall I send it?", and only after the user says yes call `send_message`. The yes must come from the user; a yes is checked against their own words.
 - Consent: never answer yes on the user's behalf and never treat your own words as consent.
+- Every action needs a tool call, every time ("escape", "pause", "skip a minute" included). Never say something was done unless a tool result in this turn says so; if a tool fails, say so.
 - Keep replies short and spoken: one or two sentences. Reply in the language the user just spoke: English if they spoke English. If they mix Hindi and English, reply in simple Hinglish written in Latin letters. Use Devanagari only if they spoke pure Hindi.
 - When ORBIT needs a fresh look, ask the user to show it to the webcam (the ORBIT camera page) or to check and tell you. The headset cannot send camera images to ORBIT.
 - If you're not sure what the user wants, ask a short question.
@@ -167,6 +135,7 @@ class LiveService:
                  transport: Transport = http_post, message_window: timedelta = timedelta(minutes=2)):
         self.assistant = assistant
         self.devices = devices
+        self.media = MediaController(devices)
         self.settings = settings or LiveSettings.from_env()
         self.transport = transport
         self.message_window = message_window
@@ -256,13 +225,14 @@ class LiveService:
             handler = {
                 "orbit": self._orbit, "open_app": self._open_app, "web_search": self._web_search,
                 "open_website": self._open_website, "compose_email": self._compose_email,
+                "play_video": self._play_video, "video_control": self._video_control,
                 "prepare_message": self._prepare_message, "send_message": self._send_message,
             }[name]
         except KeyError:
             return {"ok": False, "error": f"unknown tool {name}"}
         try:
             return handler(args or {}, conversation_id, device, heard or "", at)
-        except DeviceError as exc:
+        except (DeviceError, MediaError, CDPError, OSError) as exc:
             return {"ok": False, "error": str(exc)}
 
     @staticmethod
@@ -282,7 +252,7 @@ class LiveService:
         if not request:
             return {"ok": False, "error": "empty request"}
         turn = self.assistant.say(conversation_id, request, at, heard=heard)
-        out: Dict[str, Any] = {"ok": True, "answer": turn.reply, "kind": turn.command.kind.value}
+        out: Dict[str, Any] = {"ok": True, "answer": turn.reply, "speak": turn.speech, "kind": turn.command.kind.value}
         if turn.pending:
             out["waiting_for_user_consent"] = turn.pending.summary + ". Ask the user to say yes or no."
         if turn.observation_requests:
@@ -304,6 +274,12 @@ class LiveService:
                 return {"ok": False, "error": f"{url!r} isn't a web address"}
             url = "https://" + url
         return {"ok": True, "result": self.devices.open_url(url, self._device(args, device))}
+
+    def _play_video(self, args, conversation_id, device, heard, at):
+        return self.media.play(str(args.get("query", "")), self._device(args, device))
+
+    def _video_control(self, args, conversation_id, device, heard, at):
+        return self.media.control(str(args.get("action", "")), args.get("value"), self._device(args, device))
 
     def _compose_email(self, args, conversation_id, device, heard, at):
         subject, body = str(args.get("subject", "")).strip(), str(args.get("body", "")).strip()
