@@ -277,6 +277,17 @@ webcam test exposed.
 - ADR-043. Tests: `test_xr.py` (places and contested beliefs, pin/unpin, pairing flow, cookie properties, lockout, off-site redirect, code alphabet and persistence, certificate SAN), `xr_core.test.js` (labels, ordering, geometry, menu), `test_camera.py` (black/gray mouse stays one object), `camera_core.test.js` (hysteresis, sticky colour, rate limit, labels).
 - Verified: preview renders in the browser; a paired network client loaded the page, scripts, places, assistant and stream over HTTPS; unpaired requests were refused. **Not verified: an actual Quest session** (no headset here) — the WebXR calls follow the anchors / hit-test / plane-detection specifications and Meta's documentation.
 
+### Phase 18.1 — First real Quest 3S session (fixes)
+**Planned**
+- The user connected a Quest 3S over USB (Developer Mode, `adb reverse tcp:8765 tcp:8765`, page at `http://localhost:8765/ui/xr.html`: a secure context with no certificate or pairing). AR worked first time (Bench 3, Bench 4 and the Cart were pinned), but Orbi could not hear or speak. Diagnose on the device and fix.
+
+**Implemented**
+- Diagnosed live through the Quest Browser's remote-debugging socket (`adb forward tcp:9222 localabstract:chrome_devtools_remote`, Chrome DevTools Protocol).
+- **Hearing**: the Quest Browser has no Web Speech recognition (on-device Whisper was used, correctly), but its noise-suppressed microphone is ~20× quieter than a laptop's: room RMS ≈ 0.0007 against a fixed speech threshold of ≈ 0.013, so every utterance was discarded as silence. Speech detection now learns the room's noise floor in the first 0.4 s (threshold = 3.5 × median, min 0.0012). Recordings are never discarded for being quiet; they are peak-normalised before Whisper. The level meter is relative to the floor. Diagnostics go to the console.
+- **Speaking**: the Quest Browser has no `speechSynthesis`. New `GET /speech?text=` renders replies with the server's system voice (macOS `say`, argv only, embedded commands stripped, ≤ 400 chars, bounded cache). The headset plays it with the mouth driven by the audio level.
+- **Understanding** (from the real transcripts): "Hey R.B." / "Arby" are Orbi's name; leading fillers ("okay tell me…") are dropped; "where is bench 3" (a place) answers what is there; an unknown object gets "I know about: …"; "get an action approved" explains how. Place contents are spoken naturally ("At Bench 4: … Last seen there, but may have moved: … Confirmed gone: …").
+- Tests: transcripts from the session, place-contents speech, speech endpoint (WAV, cache, length cap, unavailable).
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -325,7 +336,7 @@ webcam test exposed.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 600 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 618 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 

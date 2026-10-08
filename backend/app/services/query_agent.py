@@ -94,6 +94,9 @@ class QueryAgent:
 
     def answer(self, query: str, at: datetime) -> GroundedResponse:
         intent = self.reasoning.interpret(query, self.vocabulary(), at)
+        # "Where is bench 3?" names a place, not an object: answer what is there.
+        if intent.kind == QueryKind.WHERE_IS and not intent.entity_ids and not intent.ambiguous and intent.anchor_id:
+            intent.kind = QueryKind.CONTENTS
         # Questions about the world or a task step do not need a single object resolved.
         if intent.ambiguous and not intent.entity_ids and intent.kind not in (
             QueryKind.WHAT_CHANGED, QueryKind.CONTINUE, QueryKind.SAFETY
@@ -170,7 +173,9 @@ class QueryAgent:
     def _require_entities(self, intent: QueryIntent, at: datetime, what: str) -> Optional[GroundedResponse]:
         if intent.entity_ids:
             return None
-        return self._respond(intent, at, f"I couldn't tell which object you mean, so I can't answer {what}.")
+        known = [self._name(e.id) for e in self.repo.list_entities() if not e.merged_into][:6]
+        hint = f" I know about: {', '.join(known)}." if known else ""
+        return self._respond(intent, at, f"I couldn't tell which object you mean, so I can't answer {what}.{hint}")
 
     # ---------------------------------------------- point-in-time state claims
     def _point(self, intent: QueryIntent, at: datetime, attribute: str) -> GroundedResponse:

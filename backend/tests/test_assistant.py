@@ -333,3 +333,30 @@ def test_what_changed_is_spoken_naturally(lab):
     turn = lab.say("what changed since 9:02?", 6)
     assert turn.response.changes and "→" not in turn.speech
     assert "change" in turn.speech and "Microscope M17" in turn.speech
+
+
+# ----------------------------------------------- Quest headset transcripts
+@pytest.mark.parametrize("heard, kind", [
+    ("Hi, Hey R.B.", CommandKind.GREET),
+    ("hey arby", CommandKind.GREET),
+    ("Get an action approved.", CommandKind.HELP),
+    ("okay, where is the microscope?", CommandKind.ASK),
+])
+def test_headset_transcripts(lab, heard, kind):
+    assert lab.say(heard, 2).command.kind == kind
+
+
+def test_where_is_a_place_answers_what_is_there(lab):
+    turn = lab.say("okay tell me where is bench 4", 2)
+    assert turn.response.intent.kind.value == "CONTENTS" and "Microscope M17" in turn.reply
+
+
+def test_unknown_object_lists_what_orbi_knows(lab):
+    turn = lab.say("where are the pin decks", 2)
+    assert "I know about:" in turn.reply and "Microscope M17" in turn.reply
+
+
+def test_place_contents_are_spoken_naturally(lab):
+    turn = lab.say("what's on bench 4?", 2)
+    assert "(" not in turn.speech and "OBSERVED" not in turn.speech
+    assert turn.speech.startswith("At bench 4") and "Microscope M17" in turn.speech
