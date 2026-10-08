@@ -315,6 +315,16 @@ the user's Mac and Quest.
 - Real round trips through ORBIT with Groq (synthesised speech): "where is the microscope" → `orbit("where is m17")` → an answer that keeps ORBIT's staleness; "can you open the valve" → the action prepared, consent pending. 1–2.5 s per turn. Fixed from that test: Orbi asked the user to point the *headset* camera; it now asks for the webcam or the user's own check.
 - Tests: `test_voice_agent.py` (turn pipeline, history, device tools, the model cannot give consent, silence, model fallback and limits, API, Groq voice with fallback), `live_core.test.js` (WAV, normalisation).
 
+### Phase 19.2 — Email drafts in Gmail
+**Planned**
+- The user asked whether Orbi can control Gmail and type mail for them.
+
+**Implemented**
+- New tool `compose_email(to, subject, body, cc, device)` for both voice engines: the model writes the subject and a proper body from what the user said, and Gmail opens on the Mac or in the Quest browser with the draft filled in. **Nothing is sent**: the user reviews it and presses Send. In a browser a keypress could land in another window, so sending is never automated.
+- Contacts: `.run/contacts.json` accepts `{"Name": "+91…"}`, `{"Name": "a@b.com"}` or `{"Name": {"phone": "…", "email": "…"}}`; several recipients and cc. The model is told contact *names* only, never numbers or addresses.
+- From a real Groq run: Orbi replied in Hindi script to an English request (now: reply in the language the user spoke, Hinglish in Latin letters); it asked for an address that was in the contacts (now it knows contact names); markdown such as `**Send**` is stripped before speaking; one of three quick runs hit the free per-minute limit (now a busy model hands over to `qwen/qwen3.8-27b`, then `openai/gpt-oss-20b`).
+- Not done: reading the inbox needs Gmail API access (Google OAuth), which was not requested yet.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -363,7 +373,7 @@ the user's Mac and Quest.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 666 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 672 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 

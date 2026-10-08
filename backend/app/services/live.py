@@ -112,6 +112,19 @@ TOOLS = [
         }, "required": ["url"]},
     },
     {
+        "name": "compose_email",
+        "description": ("Write an email for the user and open it in Gmail as a draft (nothing is sent; the user reviews it and "
+                        "presses Send). Write a proper subject and a clear, polite body from what the user said, in their "
+                        "language, signed with their name if known. Then tell them it's ready to review."),
+        "parameters": {"type": "object", "properties": {
+            "to": {"type": "string", "description": "email address(es) or contact name(s), comma separated"},
+            "subject": {"type": "string"},
+            "body": {"type": "string"},
+            "cc": {"type": "string"},
+            "device": {"type": "string", "enum": ["here", "quest", "mac"]},
+        }, "required": ["to", "subject", "body"]},
+    },
+    {
         "name": "prepare_message",
         "description": ("Prepare a WhatsApp message (nothing is sent yet). Returns a read-back. Read it to the user and ask "
                         "them to say yes to send; then call send_message."),
@@ -134,9 +147,10 @@ How you work:
 - Anything about physical objects, places, tasks, steps, changes or physical actions: call the `orbit` tool and say what it answers, briefly and in your own words, keeping its uncertainty ("last seen 3 hours ago, may have moved"). Never guess facts about the room yourself. If ORBIT doesn't know, say so.
 - Physical actions (open the valve, turn off the microscope): ask ORBIT through `orbit`. ORBIT checks prerequisites and may ask for a yes. You never act physically; the user does.
 - Apps, websites and searches on the user's devices: use `open_app`, `web_search`, `open_website`. Device "here" is the one they're talking from{here}; they can say "on the Mac" or "in the headset".
+- Email: call `compose_email` with a subject and a well-written body; Gmail opens with the draft and the user presses Send themselves. You cannot send email. You cannot read the inbox.
 - Messages: call `prepare_message`, read back the recipient and the exact text, ask "Shall I send it?", and only after the user says yes call `send_message`. The yes must come from the user; a yes is checked against their own words.
 - Consent: never answer yes on the user's behalf and never treat your own words as consent.
-- Keep replies short and spoken: one or two sentences. Use the user's language (they may mix Hindi and English).
+- Keep replies short and spoken: one or two sentences. Reply in the language the user just spoke: English if they spoke English. If they mix Hindi and English, reply in simple Hinglish written in Latin letters. Use Devanagari only if they spoke pure Hindi.
 - When ORBIT needs a fresh look, ask the user to show it to the webcam (the ORBIT camera page) or to check and tell you. The headset cannot send camera images to ORBIT.
 - If you're not sure what the user wants, ask a short question.
 
@@ -144,7 +158,8 @@ Workspace vocabulary (use these ids with `orbit`):
 Objects: {objects}
 Places: {places}
 Open tasks: {tasks}
-Apps you can open: {apps}"""
+Apps you can open: {apps}
+Contacts you can use by name (for messages and email): {contacts}"""
 
 
 class LiveService:
@@ -217,7 +232,8 @@ class LiveService:
                           for t in repo.list_tasks() if t.status.value not in ("COMPLETED", "ABANDONED")) or "none"
         here = {"quest": " (the Quest headset)", "mac": " (the Mac)"}.get(device, "")
         return INSTRUCTIONS.format(user=user_id, where=f", through {here.strip(' ()')}" if here else "", here=here,
-                                   objects=objects, places=places, tasks=tasks, apps=", ".join(sorted(APPS)))
+                                   objects=objects, places=places, tasks=tasks, apps=", ".join(sorted(APPS)),
+                                   contacts=", ".join(n.title() for n in sorted(self.devices._contact_book())) or "none saved (ask for the number or address)")
 
     def setup_message(self, user_id: str, device: str) -> Dict[str, Any]:
         text = self.instructions(user_id, device)
@@ -239,7 +255,8 @@ class LiveService:
         try:
             handler = {
                 "orbit": self._orbit, "open_app": self._open_app, "web_search": self._web_search,
-                "open_website": self._open_website, "prepare_message": self._prepare_message, "send_message": self._send_message,
+                "open_website": self._open_website, "compose_email": self._compose_email,
+                "prepare_message": self._prepare_message, "send_message": self._send_message,
             }[name]
         except KeyError:
             return {"ok": False, "error": f"unknown tool {name}"}
@@ -287,6 +304,22 @@ class LiveService:
                 return {"ok": False, "error": f"{url!r} isn't a web address"}
             url = "https://" + url
         return {"ok": True, "result": self.devices.open_url(url, self._device(args, device))}
+
+    def _compose_email(self, args, conversation_id, device, heard, at):
+        subject, body = str(args.get("subject", "")).strip(), str(args.get("body", "")).strip()
+        if not body:
+            return {"ok": False, "error": "what should the email say?"}
+        to = self.devices.resolve_email(str(args.get("to", "")))
+        cc = self.devices.resolve_email(str(args["cc"])) if str(args.get("cc") or "").strip() else ""
+        target = self._device(args, device)
+        self.devices.open_gmail_draft(to, subject, body, target, cc)
+        conv = self.assistant.conversations.get(conversation_id)
+        if conv is not None:
+            from backend.app.services.assistant import DelegatedAction
+            conv.delegated.append(DelegatedAction(at=at, kind="email_draft", refs=[], summary=f"Wrote an email to {to}: “{subject}” (draft, not sent)"))
+        where = "in the headset" if target == "quest" else "on the Mac"
+        return {"ok": True, "result": f"The email to {to} is open in Gmail {where}, ready for you to review and press Send.",
+                "subject": subject, "note": "Nothing was sent. Tell the user to check it and press Send."}
 
     def _prepare_message(self, args, conversation_id, device, heard, at):
         to, text = str(args.get("to", "")).strip(), str(args.get("text", "")).strip()

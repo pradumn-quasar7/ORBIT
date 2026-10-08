@@ -76,7 +76,8 @@ Restart with `scripts/run_demo.sh --lan`. The assistant page and the Quest then 
 real time (interrupt Orbi any time). Orbi can open apps and websites and search on the
 Mac or the Quest ("open WhatsApp in the headset", "search 3D printers on the Mac"), and
 send a WhatsApp message after reading it back and hearing your own "yes". Contacts by
-name come from `.run/contacts.json`, e.g. `{"Mom": "+91 98765 43210"}`. Sending from the
+name come from `.run/contacts.json`, e.g. `{"Mom": "+91 98765 43210", "Prof Rao": {"email": "rao@uni.edu"}}`.
+"Write a mail to Prof Rao that I'll be late" opens a ready Gmail draft; you press Send. Sending from the
 Mac's WhatsApp app needs Accessibility permission for Python (System Settings → Privacy &
 Security → Accessibility); on the Quest the chat opens with the text filled in and you
 tap send. Facts about your workspace still come only from ORBIT's evidence.
