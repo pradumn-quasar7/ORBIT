@@ -136,3 +136,27 @@ def test_no_system_voice_is_reported(client, monkeypatch):
     from backend.app.api import speech
     monkeypatch.setattr(speech, "available", lambda: False)
     assert client.get("/speech", params={"text": "hi"}).status_code == 501
+
+
+def test_quest_usb_link_is_restored_when_it_drops(monkeypatch):
+    """The headset page reaches ORBIT through `adb reverse`; the link vanishes when the cable
+    is unplugged or the headset sleeps, and must come back by itself."""
+    import threading
+    from backend.app import serve
+    calls, rounds = [], {"n": 0}
+    stop = threading.Event()
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd[1:])
+        if cmd[1:] == ["devices"]:
+            rounds["n"] += 1
+            if rounds["n"] >= 3:
+                stop.set()
+            return subprocess.CompletedProcess(cmd, 0, "List of devices attached\n" + ("X\tdevice\n" if rounds["n"] != 2 else ""), "")
+        if cmd[1:] == ["reverse", "--list"]:
+            return subprocess.CompletedProcess(cmd, 0, "", "")  # the link was lost
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+    monkeypatch.setattr(serve.shutil, "which", lambda name: "/usr/bin/adb")
+    monkeypatch.setattr(serve.subprocess, "run", fake_run)
+    serve.keep_quest_linked(8765, stop, every=0)
+    assert calls.count(["reverse", "tcp:8765", "tcp:8765"]) == 2  # attached, unplugged, attached again

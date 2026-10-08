@@ -11,6 +11,8 @@ network must pair with the code printed below before they can use the API.
 """
 import argparse
 import asyncio
+import shutil
+import threading
 import ipaddress
 import os
 import signal
@@ -68,6 +70,33 @@ def pairing_code(renew: bool = False) -> str:
     return f.read_text().strip()
 
 
+def keep_quest_linked(port: int, stop: "threading.Event", every: float = 4.0) -> None:
+    """Keep the Quest's USB link to ORBIT alive. `adb reverse` is lost whenever the cable is
+    unplugged or the headset sleeps; the Quest's ORBIT page (http://localhost:8765) then
+    reaches nothing and Orbi can't hear you. Re-applied whenever a Quest is attached."""
+    adb = shutil.which("adb")
+    if adb is None:
+        return
+    linked = False
+    while not stop.is_set():
+        try:
+            devices = subprocess.run([adb, "devices"], capture_output=True, text=True, timeout=5).stdout
+            attached = any(line.endswith("\tdevice") for line in devices.splitlines())
+            if attached:
+                rev = subprocess.run([adb, "reverse", "--list"], capture_output=True, text=True, timeout=5).stdout
+                if f"tcp:{port}" not in rev:
+                    subprocess.run([adb, "reverse", f"tcp:{port}", f"tcp:{port}"], capture_output=True, timeout=5)
+                    subprocess.run([adb, "forward", "tcp:9222", "localabstract:chrome_devtools_remote"], capture_output=True, timeout=5)
+                    print("Quest connected over USB: ORBIT is reachable at http://localhost:%d in the headset" % port, flush=True)
+                linked = True
+            elif linked:
+                print("Quest disconnected from USB: plug the cable back in (or use the Wi-Fi address)", flush=True)
+                linked = False
+        except (OSError, subprocess.SubprocessError):
+            pass
+        stop.wait(every)
+
+
 async def serve(args) -> None:
     load_env()  # GEMINI_API_KEY etc. from the git-ignored .env
     code = url = None
@@ -93,6 +122,9 @@ async def serve(args) -> None:
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop)
+
+    link_stop = threading.Event()
+    threading.Thread(target=keep_quest_linked, args=(args.port, link_stop), daemon=True).start()
 
     print(f"ORBIT on this computer:  http://localhost:{args.port}/ui/", flush=True)
     if ip:
