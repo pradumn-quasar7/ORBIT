@@ -128,11 +128,19 @@
     const sorted = pinnable(places).sort((a, b) => Number(!!a.xr) - Number(!!b.xr) || a.name.localeCompare(b.name));
     return [
       { action: "talk", label: "🎙 Talk to Orbi" },
-      { action: "labels", label: labelsShown ? "Hide place labels" : "Show place labels" },
+      { action: "labels_show", label: `${labelsShown ? "✓ " : ""}Show place labels` },
+      { action: "labels_hide", label: `${labelsShown ? "" : "✓ "}Hide place labels` },
       ...sorted.map((p) => ({ action: "pin", id: p.id, label: `${p.xr ? "Move" : "Pin"} ${p.name}` })),
       { action: "exit", label: "Leave AR" },
     ];
   }
 
-  return { TONES, relativeTime, itemLine, placeCard, placeSpeech, rayPlane, inPolygon, placementTarget, faceYaw, pinnable, menuItems };
+  // "show labels" / "hide the place labels" spoken to Orbi → "show" | "hide" | null.
+  function labelCommand(text) {
+    const m = String(text || "").toLowerCase().match(/\b(show|display|turn on|bring back|hide|remove|turn off)\b.*\blabels?\b/);
+    if (!m) return null;
+    return /^(show|display|turn on|bring back)$/.test(m[1]) ? "show" : "hide";
+  }
+
+  return { labelCommand, TONES, relativeTime, itemLine, placeCard, placeSpeech, rayPlane, inPolygon, placementTarget, faceYaw, pinnable, menuItems };
 });

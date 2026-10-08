@@ -65,6 +65,14 @@ test("geometry helpers", () => {
 
 test("menu lists unpinned places first", () => {
   const items = core.menuItems([{ id: "b", name: "B", xr: { handle: "h" } }, { id: "a", name: "A" }, { id: "lab", name: "Lab", anchor_type: "room" }]);
-  assert.deepEqual(items.map((i) => i.label), ["🎙 Talk to Orbi", "Show place labels", "Pin A", "Move B", "Leave AR"]);
-  assert.equal(core.menuItems([], true)[1].label, "Hide place labels");
+  assert.deepEqual(items.map((i) => i.label), ["🎙 Talk to Orbi", "Show place labels", "✓ Hide place labels", "Pin A", "Move B", "Leave AR"]);
+  assert.deepEqual(core.menuItems([], true).slice(1, 3).map((i) => i.label), ["✓ Show place labels", "Hide place labels"]);
+});
+
+test("spoken label commands", () => {
+  assert.equal(core.labelCommand("Show labels"), "show");
+  assert.equal(core.labelCommand("orbi, bring back the place labels"), "show");
+  assert.equal(core.labelCommand("hide the labels"), "hide");
+  assert.equal(core.labelCommand("remove that label"), "hide");
+  assert.equal(core.labelCommand("show me bench 4"), null);
 });

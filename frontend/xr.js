@@ -340,17 +340,20 @@ function onSelect(controller) {
   }
 }
 
+function setLabels(on, quiet = false) {
+  labelsShown = on;
+  store.set("orbit.labels", on ? "on" : "off");
+  if (!on) for (const c of cards.values()) c.group.visible = false;
+  if (state.session) buildMenu();
+  if (!quiet) say(on ? "Showing what I remember about each place." : "Labels hidden.", "NOD");
+}
+
 async function act(data) {
   switch (data.action) {
     case "talk": return startTalking();
     case "exit": return state.session && state.session.end();
-    case "labels": {
-      labelsShown = !labelsShown;
-      store.set("orbit.labels", labelsShown ? "on" : "off");
-      if (!labelsShown) for (const c of cards.values()) c.group.visible = false;
-      buildMenu();
-      return say(labelsShown ? "Showing what I remember about each place." : "Labels hidden.", "NOD");
-    }
+    case "labels_show": return setLabels(true);
+    case "labels_hide": return setLabels(false);
     case "pin": {
       state.placing = data.id;
       const place = state.places.find((p) => p.id === data.id);
@@ -604,7 +607,12 @@ async function toggleLive() {
         if (s === "speaking") orbi.setState("speaking");
         if (s === "closed") { liveSession = null; orbi.setState("idle"); drawBubble(bubble, "Live conversation ended. Talk again any time.", "#9aa4b2"); }
       },
-      userText(text) { heardLine = text; drawBubble(bubble, `“${text}”`, "#9aa4b2"); },
+      userText(text, final) {
+        heardLine = text;
+        drawBubble(bubble, `“${text}”`, "#9aa4b2");
+        const cmd = final && core.labelCommand(text);
+        if (cmd) setLabels(cmd === "show", true); // handled right here in the headset
+      },
       orbiText(text, final) { drawBubble(bubble, text); if (final) heardLine = ""; },
       tool(name, args, result) {
         if (!result.ok) { orbi.gesture("SHRUG"); status(result.error, "error"); }
