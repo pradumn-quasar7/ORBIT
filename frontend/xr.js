@@ -13,6 +13,10 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
 };
 
+// Place labels ("Bench 4: Microscope M17 — seen 3 h ago…") are hidden in AR unless the
+// user turns them on from the menu; the choice is remembered.
+let labelsShown = (() => { try { return localStorage.getItem("orbit.labels") === "on"; } catch { return false; } })();
+
 const state = {
   places: [], conversation: null, pending: null, session: null, refSpace: null,
   anchors: new Map(), // place id → XRAnchor (this session)
@@ -282,7 +286,7 @@ const menu = new THREE.Group();
 let buttons = [];
 function buildMenu() {
   buttons.forEach((b) => menu.remove(b.mesh));
-  const items = core.menuItems(state.places);
+  const items = core.menuItems(state.places, labelsShown);
   if (state.pending) {
     items.unshift({ action: "no", label: "No", kind: "no" }, { action: "yes", label: "Yes, authorize", kind: "yes" });
   }
@@ -340,6 +344,13 @@ async function act(data) {
   switch (data.action) {
     case "talk": return startTalking();
     case "exit": return state.session && state.session.end();
+    case "labels": {
+      labelsShown = !labelsShown;
+      store.set("orbit.labels", labelsShown ? "on" : "off");
+      if (!labelsShown) for (const c of cards.values()) c.group.visible = false;
+      buildMenu();
+      return say(labelsShown ? "Showing what I remember about each place." : "Labels hidden.", "NOD");
+    }
     case "pin": {
       state.placing = data.id;
       const place = state.places.find((p) => p.id === data.id);
@@ -443,7 +454,7 @@ function loop(t, frame) {
       const c = cards.get(id);
       const pose = c && frame.getPose(anchor.anchorSpace, state.refSpace);
       if (!pose) continue;
-      c.group.visible = true;
+      c.group.visible = labelsShown; // place labels are off unless the user turns them on
       c.group.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
     }
     followMenu();

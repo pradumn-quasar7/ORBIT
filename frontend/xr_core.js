@@ -124,10 +124,11 @@
   }
 
   // Menu: places not yet pinned first, then the rest; plus talking and leaving.
-  function menuItems(places) {
+  function menuItems(places, labelsShown = false) {
     const sorted = pinnable(places).sort((a, b) => Number(!!a.xr) - Number(!!b.xr) || a.name.localeCompare(b.name));
     return [
       { action: "talk", label: "🎙 Talk to Orbi" },
+      { action: "labels", label: labelsShown ? "Hide place labels" : "Show place labels" },
       ...sorted.map((p) => ({ action: "pin", id: p.id, label: `${p.xr ? "Move" : "Pin"} ${p.name}` })),
       { action: "exit", label: "Leave AR" },
     ];

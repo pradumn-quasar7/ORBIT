@@ -65,5 +65,6 @@ test("geometry helpers", () => {
 
 test("menu lists unpinned places first", () => {
   const items = core.menuItems([{ id: "b", name: "B", xr: { handle: "h" } }, { id: "a", name: "A" }, { id: "lab", name: "Lab", anchor_type: "room" }]);
-  assert.deepEqual(items.map((i) => i.label), ["🎙 Talk to Orbi", "Pin A", "Move B", "Leave AR"]);
+  assert.deepEqual(items.map((i) => i.label), ["🎙 Talk to Orbi", "Show place labels", "Pin A", "Move B", "Leave AR"]);
+  assert.equal(core.menuItems([], true)[1].label, "Hide place labels");
 });
