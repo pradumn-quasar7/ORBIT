@@ -71,7 +71,10 @@ tests, updated `PROJECT_STATUS.md` / `DECISIONS.md`, and a merge to `main`.
 - [x] **Phase 18 — Meta Quest 3S mixed reality**
   - Live-webcam fixes; paired HTTPS access on the LAN; ORBIT places pinned to the real room with persistent anchors, live evidence labels, Orbi in the room, voice and consent.
 
-- [ ] **Phase 19 (next) — First headset session & native perception**
-  - Fix what a real Quest session reveals; a native app with the Passthrough Camera API so the headset can perceive. — WebXR AR session over HTTPS on the LAN using the same camera endpoints; native Passthrough Camera API app optional.
+- [x] **Phase 19 — Realtime voice (Gemini Live) and device actions**
+  - Interruptible voice conversation; Orbi opens apps, searches and sends messages (with the user's own yes) on the Mac and Quest; facts about the room still only from ORBIT.
+
+- [ ] **Phase 20 (next) — Native headset perception**
+  - A native Quest app with the Passthrough Camera API so the headset itself can perceive. — WebXR AR session over HTTPS on the LAN using the same camera endpoints; native Passthrough Camera API app optional.
 
 - [ ] **Later** — AR client (step 18), VR rendering of replay/counterfactuals (step 19 front-end), wearable clients, pilot study.

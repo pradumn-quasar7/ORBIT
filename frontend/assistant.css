@@ -49,3 +49,4 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .voice-status.info { color: var(--ink); }
 .voice-status.error { color: var(--contradicted); background: color-mix(in srgb, var(--contradicted) 10%, transparent); padding: 6px 10px; border-radius: 8px; }
 .voice-status code { user-select: all; }
+.msg.tool { font-size: 12.5px; color: var(--muted); background: none; border: 1px dashed var(--line); padding: 4px 10px; }

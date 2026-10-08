@@ -29,3 +29,8 @@ out/
 *.sqlite3
 *.db
 .run/
+
+# Secrets (Phase 19): API keys live only on this computer
+.env
+.env.*
+!.env.example

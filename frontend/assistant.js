@@ -100,10 +100,23 @@ async function setupMic() {
     onInfo(text) { voiceStatus(text, "info"); },
     onLevel(level) { $("level").style.transform = `scaleX(${level.toFixed(3)})`; },
   });
-  if (saved && (saved !== "browser" || Voice.browserAvailable)) voice.engine = saved;
+  if (saved && saved !== "live" && (saved !== "browser" || Voice.browserAvailable)) voice.engine = saved;
   select.value = voice.engine;
-  select.addEventListener("change", () => { voice.engine = select.value; store.set("orbit.voice", select.value); });
-  $("mic").addEventListener("click", () => { if (synth) synth.cancel(); voice.toggle(); });
+  // Realtime conversation with Gemini Live, when ORBIT has a key (Phase 19).
+  const { liveStatus } = await import("./live.js");
+  liveAvailable = (await liveStatus()).configured;
+  const liveOption = select.querySelector('option[value="live"]');
+  liveOption.disabled = !liveAvailable;
+  liveOption.textContent = liveAvailable ? "Gemini Live (realtime)" : "Gemini Live (add a key to .env)";
+  if (liveAvailable && (!saved || saved === "live")) select.value = "live";
+  select.addEventListener("change", () => {
+    store.set("orbit.voice", select.value);
+    if (select.value !== "live") voice.engine = select.value;
+  });
+  $("mic").addEventListener("click", () => {
+    if (synth) synth.cancel();
+    if (select.value === "live") toggleLive(); else voice.toggle();
+  });
   $("copy-link").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(location.href); $("copy-link").textContent = "Copied"; }
     catch { $("copy-link").textContent = "Select the link and copy it"; }
@@ -128,6 +141,63 @@ async function setupMic() {
   }
 }
 
+// ------------------------------------------------------------------- live
+let liveAvailable = false;
+let liveSession = null;
+let liveUser = null, liveOrbi = null; // the chat bubbles being filled as words arrive
+
+async function toggleLive() {
+  if (liveSession) { liveSession.stop(); return; }
+  const { LiveSession } = await import("./live.js");
+  if (!conversation) await startConversation();
+  liveSession = new LiveSession({
+    device: "mac",
+    userId: $("user").value.trim() || "operator",
+    conversationId: conversation.id,
+    on: {
+      state(s) {
+        if (s === "connecting") { $("mic").textContent = "… connecting"; voiceStatus("Connecting to Gemini Live…", "info"); }
+        if (s === "listening") { $("mic").textContent = "■ Stop live"; $("mic").setAttribute("aria-pressed", "true"); setState("listening"); voiceStatus("Live: just talk. You can interrupt Orbi any time.", "ok"); }
+        if (s === "speaking") setState("speaking");
+        if (s === "closed") {
+          liveSession = null; liveUser = liveOrbi = null;
+          $("mic").textContent = "🎙 Talk"; $("mic").setAttribute("aria-pressed", "false"); setState("idle");
+          $("level").style.transform = "scaleX(0)";
+        }
+      },
+      userText(text, final) {
+        if (!liveUser) { liveUser = el("li", "msg user", ""); $("log").append(liveUser); liveOrbi = null; }
+        liveUser.textContent = text;
+        liveUser.scrollIntoView({ block: "end" });
+        if (final) liveUser = null;
+      },
+      orbiText(text, final) {
+        if (!liveOrbi) { liveOrbi = el("li", "msg bot", ""); liveOrbi.append(el("div", "say", "")); $("log").append(liveOrbi); liveUser = null; }
+        liveOrbi.querySelector(".say").textContent = text;
+        liveOrbi.scrollIntoView({ block: "end" });
+        if (final) liveOrbi = null;
+      },
+      tool(name, args, result) {
+        const line = el("li", "msg bot tool" + (result.ok ? "" : " alert"),
+          result.ok ? `✓ ${result.result || result.answer || name}` : `✗ ${result.error}`);
+        $("log").append(line);
+        if (result.waiting_for_user_consent) { avatar.gesture("ASK"); }
+        line.scrollIntoView({ block: "end" });
+      },
+      level(v) { if (v > 0.02) avatar.mouth(v); },
+      micLevel(v) { $("level").style.transform = `scaleX(${v.toFixed(3)})`; },
+      error(message) { voiceStatus(message, "error"); },
+    },
+  });
+  try {
+    await liveSession.start();
+    if (liveSession && liveSession.conversationId !== conversation.id) { conversation = { id: liveSession.conversationId }; listen(); }
+  } catch (err) {
+    voiceStatus(`Gemini Live: ${err.message}`, "error");
+    if (liveSession) liveSession.stop();
+  }
+}
+
 // --------------------------------------------------------------------- api
 async function api(method, path, body) {
   const res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
@@ -147,11 +217,11 @@ async function startConversation() {
 // ---------------------------------------------------------------- realtime
 // Orbi speaks up unasked when the world changes (Phase 17): the server pushes notices
 // for this conversation only.
-let live = null;
+let noticeStream = null;
 let speech = Promise.resolve();
 function listen() {
-  if (live) live.close();
-  live = OrbitLive.connect(`/stream?topics=assistant&conversation=${encodeURIComponent(conversation.id)}`, {
+  if (noticeStream) noticeStream.close();
+  noticeStream = OrbitLive.connect(`/stream?topics=assistant&conversation=${encodeURIComponent(conversation.id)}`, {
     onMessage(msg) { if (msg.type === "NOTICE") addNotice(msg.data); },
     onStatus(state) { OrbitLive.pill($("live"), state); },
   });
@@ -170,7 +240,8 @@ function addNotice(notice) {
   avatar.setAlert(notice.gesture === "ALERT");
   avatar.gesture(notice.gesture);
   // Queue behind whatever Orbi is saying; a new user message still cancels speech.
-  speech = speech.then(() => speak(notice.speech));
+  if (liveSession) liveSession.inform(notice.speech || notice.reply);
+  else speech = speech.then(() => speak(notice.speech));
 }
 
 // -------------------------------------------------------------------- chat
