@@ -14,6 +14,15 @@ class OrbitCapture extends AudioWorkletProcessor {
 }
 registerProcessor("orbit-capture", OrbitCapture);`;
 
+// Google's close reasons, in plain words with the fix.
+export function explainClose(e) {
+  const r = e.reason || "";
+  if (/credit|billing|prepay/i.test(r)) return "Your Gemini project has no credit left. Add credit at ai.studio/projects (Billing), then press Talk again.";
+  if (/quota|rate|exhaust/i.test(r)) return "Gemini's usage limit was reached for now. Wait a minute, or raise the limit at ai.studio.";
+  if (/api key|permission|denied|unauth/i.test(r)) return "Gemini refused the key. Check GEMINI_API_KEY in the .env file.";
+  return r || `Gemini closed the connection (${e.code}).`;
+}
+
 export async function liveStatus() {
   try {
     const res = await fetch("/live/status");
@@ -80,7 +89,7 @@ export class LiveSession {
       };
       ws.onerror = () => { if (!ready) { clearTimeout(timer); reject(new Error("could not connect to Gemini Live")); } };
       ws.onclose = (e) => {
-        if (!ready) { clearTimeout(timer); reject(new Error(e.reason || `Gemini closed the connection (${e.code})`)); return; }
+        if (!ready) { clearTimeout(timer); reject(new Error(explainClose(e))); return; }
         if (this.active) {
           this.emit("error", e.reason ? `Gemini ended the session: ${e.reason}` : "The live session ended.");
           this.stop();
