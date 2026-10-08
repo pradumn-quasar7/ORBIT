@@ -19,7 +19,7 @@ class FakeGroq:
         self.calls = []
 
     def __call__(self, url, body, headers, file=None):
-        self.calls.append((url.rsplit("/", 2)[-2:], body, headers, file))
+        self.calls.append((url.rsplit("/", 2)[-2:], json.loads(json.dumps(body)), headers, file))  # a snapshot
         if "transcriptions" in url:
             return 200, json.dumps({"text": self.heard, "language": "english"}).encode()
         model = body["model"]
@@ -74,9 +74,29 @@ def test_history_carries_the_conversation(lab):
     assert [m["role"] for m in msgs[1:]] == ["user", "assistant", "user"] and msgs[2]["content"] == "First."
 
 
+def test_tool_calls_stay_in_history(lab):
+    groq = FakeGroq("pause it", [tool_call("open_app", app="youtube"), say("Hello there.")])  # the action is spoken directly
+    va = agent(lab, groq)
+    cid = lab.svc.assistant.start("ana", at(1)).id
+    va.respond(cid, "ana", "mac", "open youtube", at(2))
+    va.respond(cid, "ana", "mac", "hello", at(3))
+    roles = [m["role"] for m in groq.calls[-1][1]["messages"][1:]]
+    assert roles == ["user", "assistant", "tool", "assistant", "user"]  # the model sees how actions were done
+
+
+def test_a_claimed_action_without_a_tool_is_made_real(lab):
+    groq = FakeGroq("pause it", [say("Paused. Let me know when to resume."), tool_call("video_control", action="pause"), say("Paused.")])
+    va = agent(lab, groq)
+    va.live.media.control = lambda action, value, device: {"ok": True, "result": "Paused."}
+    out = va.respond(lab.svc.assistant.start("ana", at(1)).id, "ana", "mac", "pause it", at(2))
+    assert [t["name"] for t in out.tools] == ["video_control"] and out.reply == "Paused."
+    chats = [c for c in groq.calls if c[0][-1] == "completions"]
+    assert chats[1][1]["tool_choice"] == "required" and "without calling a tool" in chats[1][1]["messages"][-1]["content"]
+
+
 def test_device_actions_through_groq(lab):
     shell = FakeShell()
-    groq = FakeGroq("open whatsapp in the headset", [tool_call("open_app", app="whatsapp", device="quest"), say("Opening WhatsApp.")])
+    groq = FakeGroq("open whatsapp in the headset", [tool_call("open_app", app="whatsapp", device="quest")])
     out = agent(lab, groq, shell).turn(lab.svc.assistant.start("ana", at(1)).id, "ana", "mac", b"x", "audio/wav", at(2))
     assert out.tools[0]["result"] == {"ok": True, "result": "Opened WhatsApp on the Quest."}
     assert shell.ran("adb", "shell", "monkey", "-p", "com.whatsapp")
@@ -159,3 +179,13 @@ def test_replies_are_spoken_text_and_contacts_are_known(lab, tmp_path):
     devices = DeviceController(runner=FakeShell(), platform="darwin", contacts_file=tmp_path / "c.json", sleep=lambda s: None)
     text = LiveService(lab.svc.assistant, devices, LiveSettings(api_key=None)).instructions("ana", "mac")
     assert "Prof Rao" in text and "rao@uni.edu" not in text and "900" not in text  # names only, never addresses
+
+
+def test_actions_are_spoken_from_their_results_in_one_call(lab):
+    from backend.app.services.voice_agent import spoken
+    groq = FakeGroq("open youtube", [tool_call("open_app", app="youtube")])
+    out = agent(lab, groq).respond(lab.svc.assistant.start("ana", at(1)).id, "ana", "mac", "open youtube", at(2))
+    assert out.reply == "Opened YouTube in the Mac's browser." and len([c for c in groq.calls if c[0][-1] == "completions"]) == 1
+    assert spoken("Paused. Let me know when you want to resume. Paused. Let me know when you want to resume.") == \
+        "Paused. Let me know when you want to resume."
+    assert spoken("Full-screen mode on.Anything else?") == "Full-screen mode on. Anything else?"
