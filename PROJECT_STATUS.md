@@ -339,6 +339,11 @@ the user's Mac and Quest.
 - Singing: new tool `sing(lyrics, style)`; Orbi writes original lyrics (or uses public-domain songs) and the Mac's singing voices perform them (`/speech/sing`: Good News, Cellos, Bells, Organ, Bad News). For real copyrighted songs Orbi offers to play the original on YouTube instead. Played after Orbi's spoken intro in the Groq engine, and from the tool result in the Gemini engine; the headset shows the first lines in Orbi's bubble.
 - Real Groq check: a joke, an original song about the lab, a refusal-plus-YouTube offer for "Tum Ho Toh", and Happy Birthday for a named person.
 
+### Phase 19.5 — Screen control by voice
+- New tool `screen_control` (both voice engines): scroll up/down/left/right ("a little", "a lot", screens), page up/down, top, bottom, back, forward, reload, zoom in/out/reset. `services/screen.py`: on the Quest, the page in front in the Quest browser via DevTools over USB (ORBIT's AR page is never touched); on the Mac, the front app via navigation keys only (System Events; needs Accessibility once).
+- Honest results: scrolling reports whether anything moved ("It's already at the bottom.") and, found on the real headset, a full-screen video now gets "a video is full screen… say 'escape' first" instead of a false "Scrolled down." Instant scrolling (smooth scrolling did not advance) and inner scroll panels are handled.
+- Verified on a real Quest page (0 → 387 → 885 → 719 → 3109 → 0 px) and with real Groq: seven casual phrases ("go down a little more", "move it to the right side", "take me back to the top", "zoom in, the text is small", "scroll up on the mac"…) mapped to the right action and device, 0.5–0.9 s each.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -387,7 +392,7 @@ the user's Mac and Quest.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 696 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 701 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 

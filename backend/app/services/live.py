@@ -97,6 +97,13 @@ TOOLS = [
          "action": {"type": "string", "enum": ["pause", "resume", "fullscreen", "exit_fullscreen", "quality", "mute", "unmute",
                                                "volume", "forward", "back", "speed", "next", "status"]},
          "value": {"type": "string"}, "device": DEVICE}, "required": ["action"]}},
+    {"name": "screen_control", "description": ("Scroll or move the screen the user is looking at: scroll up/down/left/right "
+                                               "(value: 'a little', 'a lot', or screens), page up/down, top, bottom, back, "
+                                               "forward, reload, zoom in/out/reset."),
+     "parameters": {"type": "object", "properties": {
+         "action": {"type": "string", "enum": ["scroll_down", "scroll_up", "scroll_left", "scroll_right", "page_down", "page_up",
+                                               "top", "bottom", "back", "forward", "reload", "zoom_in", "zoom_out", "zoom_reset"]},
+         "value": {"type": "string"}, "device": DEVICE}, "required": ["action"]}},
     {"name": "sing", "description": ("Sing a song aloud. Write ORIGINAL lyrics (4-8 short lines) about what the user asked, or use a "
                                       "public-domain song (Happy Birthday, Twinkle Twinkle). Never real copyrighted lyrics: offer to "
                                       "play those on YouTube instead."),
@@ -120,6 +127,7 @@ How you work:
 - Physical actions (open the valve, turn off the microscope): ask ORBIT through `orbit`. ORBIT checks prerequisites and may ask for a yes. You never act physically; the user does.
 - Apps, websites and searches on the user's devices: use `open_app`, `web_search`, `open_website`. Device "here" is the one they're talking from{here}; they can say "on the Mac" or "in the headset".
 - Videos: "play X" or "open YouTube and play X" → `play_video`; then "full screen", "escape", "1080p", "pause", "skip 30 seconds", "louder" → `video_control`. Say briefly what's playing.
+- Screen: "scroll down", "go up", "move right", "next page", "go back", "zoom in" → `screen_control` (videos use `video_control`).
 - Fun: if asked for a joke, tell one short, clean, original joke yourself (no tool). If asked to sing, call `sing` with lyrics you write (or a public-domain song); for a real film or pop song, offer to play it on YouTube instead.
 - Email: call `compose_email` with a subject and a well-written body; Gmail opens with the draft and the user presses Send themselves. You cannot send email. You cannot read the inbox.
 - Messages: call `prepare_message`, read back the recipient and the exact text, ask "Shall I send it?", and only after the user says yes call `send_message`. The yes must come from the user; a yes is checked against their own words.
@@ -143,6 +151,8 @@ class LiveService:
         self.assistant = assistant
         self.devices = devices
         self.media = MediaController(devices)
+        from backend.app.services.screen import ScreenController
+        self.screen = ScreenController(devices)
         self.settings = settings or LiveSettings.from_env()
         self.transport = transport
         self.message_window = message_window
@@ -233,6 +243,7 @@ class LiveService:
                 "orbit": self._orbit, "open_app": self._open_app, "web_search": self._web_search,
                 "open_website": self._open_website, "compose_email": self._compose_email,
                 "play_video": self._play_video, "video_control": self._video_control, "sing": self._sing,
+                "screen_control": self._screen_control,
                 "prepare_message": self._prepare_message, "send_message": self._send_message,
             }[name]
         except KeyError:
@@ -294,6 +305,9 @@ class LiveService:
         style = args.get("style") if args.get("style") in self.SING_STYLES else "cheerful"
         return {"ok": True, "result": "Here's a little song for you!", "lyrics": lyrics, "style": style,
                 "song_url": "/speech/sing?" + urlencode({"style": style, "text": lyrics})}
+
+    def _screen_control(self, args, conversation_id, device, heard, at):
+        return self.screen.control(str(args.get("action", "")), args.get("value"), self._device(args, device))
 
     def _play_video(self, args, conversation_id, device, heard, at):
         return self.media.play(str(args.get("query", "")), self._device(args, device))

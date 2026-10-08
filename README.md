@@ -79,7 +79,7 @@ send a WhatsApp message after reading it back and hearing your own "yes". Contac
 name come from `.run/contacts.json`, e.g. `{"Mom": "+91 98765 43210", "Prof Rao": {"email": "rao@uni.edu"}}`.
 "Write a mail to Prof Rao that I'll be late" opens a ready Gmail draft; you press Send.
 "Open YouTube and play tum ho toh" finds and plays the video; then "full screen", "escape",
-"1080p", "pause", "skip a minute", "volume 40", "next". In the headset this drives the Quest
+"1080p", "pause", "skip a minute", "volume 40", "next". "Scroll down", "a little more", "go to the top", "go back", "zoom in" move the page in front of you (on the Mac: the front app; allow Accessibility once). In the headset this drives the Quest
 browser over the USB cable; on the Mac ORBIT opens its own Chrome window for videos. Sending from the
 Mac's WhatsApp app needs Accessibility permission for Python (System Settings → Privacy &
 Security → Accessibility); on the Quest the chat opens with the text filled in and you

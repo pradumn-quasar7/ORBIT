@@ -31,11 +31,12 @@ HISTORY_TURNS = 4  # whole turns kept per conversation (the world itself lives i
 # The user asked for something to be *done* (not a joke or a chat): only then must a
 # claimed action be backed by a tool call.
 COMMAND = re.compile(r"\b(play|open|pause|resume|stop|skip|forward|rewind|back|mute|unmute|volume|louder|quieter|full ?screen|"
-                     r"escape|exit|quality|\d{3,4}p|4k|next|search|send|message|mail|email|write|sing|speed)\b", re.I)
+                     r"escape|exit|quality|\d{3,4}p|4k|next|search|send|message|mail|email|write|sing|speed|scroll|zoom|reload|"
+                     r"refresh|page|top|bottom|up|down|left|right)\b", re.I)
 # A reply that says something was done: it must be backed by a tool call in that turn.
 CLAIMS_ACTION = re.compile(r"\b(paused|resumed|playing|now play|skipp?ed|forwarded|rewound|full ?screen|exited|muted|unmuted|"
                            r"volume (set|is|to)|quality (set|is|to|changed)|opened|opening|searching|searched|sent|draft is (ready|open)|"
-                           r"set to \d)\b", re.I)
+                           r"set to \d|scrolled|zoomed|went back|went forward|reloaded|page (up|down))\b", re.I)
 
 # (url, body, headers, files?) -> (status, bytes)
 Transport = Callable[[str, Any, Dict[str, str], Optional[Tuple[str, bytes, str]]], Tuple[int, bytes]]
