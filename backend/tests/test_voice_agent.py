@@ -106,7 +106,9 @@ def test_unavailable_model_falls_back_and_limits_are_explained(lab):
     groq = FakeGroq("hello", [say("Hi!")], status={"openai/gpt-oss-120b": 404})
     out = agent(lab, groq).turn(lab.svc.assistant.start("ana", at(1)).id, "ana", "mac", b"x", "audio/wav", at(2))
     assert out.reply == "Hi!" and out.model == "qwen/qwen3.8-27b"
-    limited = FakeGroq("hello", [], status={"openai/gpt-oss-120b": 429})
+    busy = FakeGroq("hello", [say("Hi from Qwen.")], status={"openai/gpt-oss-120b": 429})  # one model at its limit
+    assert agent(lab, busy).turn(lab.svc.assistant.start("ana", at(1)).id, "ana", "mac", b"x", "audio/wav", at(2)).reply == "Hi from Qwen."
+    limited = FakeGroq("hello", [], status={m: 429 for m in ("openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b")})
     with pytest.raises(VoiceError, match="free limit"):
         agent(lab, limited).turn(lab.svc.assistant.start("ana", at(1)).id, "ana", "mac", b"x", "audio/wav", at(2))
 
@@ -148,3 +150,12 @@ def test_groq_voice_with_system_fallback(client, monkeypatch, tmp_path):
     if speech.available():  # falls back to the Mac voice and remembers why
         assert client.get("/speech", params={"text": "Second sentence."}).status_code == 200
         assert "terms" in speech.voice_status()["groq_problem"] and speech.voice_status()["groq_ready"] is False
+
+
+def test_replies_are_spoken_text_and_contacts_are_known(lab, tmp_path):
+    from backend.app.services.voice_agent import spoken
+    assert spoken("The draft is ready. Press **Send**.\n- `check` it") == "The draft is ready. Press Send. check it"
+    (tmp_path / "c.json").write_text('{"Prof Rao": {"email": "rao@uni.edu", "phone": "+91 900"}}')
+    devices = DeviceController(runner=FakeShell(), platform="darwin", contacts_file=tmp_path / "c.json", sleep=lambda s: None)
+    text = LiveService(lab.svc.assistant, devices, LiveSettings(api_key=None)).instructions("ana", "mac")
+    assert "Prof Rao" in text and "rao@uni.edu" not in text and "900" not in text  # names only, never addresses

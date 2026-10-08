@@ -41,7 +41,11 @@ def shell():
 
 @pytest.fixture
 def devices(shell, tmp_path):
-    (tmp_path / "contacts.json").write_text(json.dumps({"Mom": "+91 98765 43210"}))
+    (tmp_path / "contacts.json").write_text(json.dumps({
+        "Mom": "+91 98765 43210",
+        "Prof Rao": {"phone": "+91 90000 11111", "email": "rao@uni.edu"},
+        "Asha": "asha@example.com",
+    }))
     return DeviceController(runner=shell, platform="darwin", contacts_file=tmp_path / "contacts.json", sleep=lambda s: None)
 
 
@@ -117,7 +121,7 @@ def test_session_uses_a_single_use_token_and_never_the_key(live):
     assert "AIza" not in json.dumps(s)  # the browser never sees the API key
     setup = s["setup"]["setup"]
     assert {t["name"] for t in setup["tools"][0]["functionDeclarations"]} == {
-        "orbit", "open_app", "web_search", "open_website", "prepare_message", "send_message"}
+        "orbit", "open_app", "web_search", "open_website", "compose_email", "prepare_message", "send_message"}
     text = setup["systemInstruction"]["parts"][0]["text"]
     assert "m17" in text and "bench_4" in text and "the Quest headset" in text and "Never guess facts" in text
     assert setup["inputAudioTranscription"] == {} and setup["generationConfig"]["responseModalities"] == ["AUDIO"]
@@ -220,3 +224,33 @@ def test_live_audio_core():
     root = Path(__file__).resolve().parents[2]
     proc = subprocess.run(["node", "--test", "frontend/tests/live_core.test.js"], cwd=root, capture_output=True, text=True, timeout=60)
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+# ---------------------------------------------------------------------- email
+def test_email_is_written_as_a_gmail_draft_never_sent(live, shell):
+    from urllib.parse import parse_qs, urlparse
+    s = live.start("ana", "mac", at(1))
+    r = live.call("compose_email", {"to": "Prof Rao", "subject": "Running late today",
+                                    "body": "Dear Prof. Rao,\n\nI'll be 15 minutes late to the lab meeting.\n\nBest,\nAna"},
+                  s["conversation_id"], "mac", "email professor rao that I'll be late", at(2))
+    assert r["ok"] and "ready for you to review and press Send" in r["result"]
+    opened = [c for c in shell.calls if c[0] == "open" and "mail.google.com" in c[-1]]
+    assert len(opened) == 1
+    q = parse_qs(urlparse(opened[0][-1]).query)
+    assert q["view"] == ["cm"] and q["to"] == ["rao@uni.edu"] and q["su"] == ["Running late today"]
+    assert q["body"][0].startswith("Dear Prof. Rao,\n\nI'll be 15 minutes late")
+    assert not shell.ran("osascript")  # nothing is ever sent automatically
+    assert "email_draft" in [d.kind for d in live.assistant.get(s["conversation_id"]).delegated]
+
+
+def test_email_recipients_and_devices(live, shell):
+    s = live.start("ana", "quest", at(1))
+    r = live.call("compose_email", {"to": "Asha, boss@corp.com", "subject": "Hi", "body": "Hello", "cc": "mom2@example.com"},
+                  s["conversation_id"], "quest", "", at(2))
+    assert r["ok"] and "in the headset" in r["result"]
+    url = [c for c in shell.calls if c[:2] == ["adb", "shell"] and "mail.google.com" in " ".join(c)][0][-2]
+    assert "to=asha%40example.com%2Cboss%40corp.com" in url and "cc=mom2%40example.com" in url
+    bad = live.call("compose_email", {"to": "Rahul", "subject": "x", "body": "y"}, s["conversation_id"], "mac", "", at(2))
+    assert bad["ok"] is False and "contacts.json" in bad["error"]
+    assert live.call("compose_email", {"to": "asha@example.com", "subject": "x", "body": ""}, s["conversation_id"], "mac", "", at(2))["ok"] is False
+    assert live.devices.resolve_number("prof rao") == "919000011111"  # phone still found in the richer format

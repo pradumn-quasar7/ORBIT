@@ -11,6 +11,7 @@ user's own transcribed words (ADR-044, ADR-045).
 """
 import json
 import os
+import re
 import time
 import urllib.request
 import uuid
@@ -21,7 +22,9 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from backend.app.services.live import TOOLS, LiveService
 
 GROQ = "https://api.groq.com/openai/v1"
-CHAT_MODELS = ("openai/gpt-oss-120b", "qwen/qwen3.8-27b")  # both verified to call tools correctly
+# Verified to call tools correctly on the user's account; each has its own free-plan
+# limits, so a busy one hands over to the next.
+CHAT_MODELS = ("openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b")
 STT_MODEL = "whisper-large-v3-turbo"
 MAX_TOOL_ROUNDS = 4
 HISTORY = 16  # messages kept per conversation (the world itself lives in ORBIT, not here)
@@ -54,6 +57,12 @@ def http(url: str, body: Any, headers: Dict[str, str], file: Optional[Tuple[str,
 # What Whisper "hears" in silence or noise: never treat these as the user speaking.
 WHISPER_SILENCE = {"", "you", "thank you", "thanks", "thank you for watching", "thanks for watching", "bye", "okay", "so",
                    "[blank_audio]", "(silence)", "[music]", "uh", "um"}
+
+
+def spoken(text: str) -> str:
+    """Replies are heard, not read: drop markdown that a voice would read out."""
+    text = re.sub(r"\*\*|__|`|^#+\s*|^\s*[-*]\s+", "", text or "", flags=re.M)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 class VoiceError(RuntimeError):
@@ -121,7 +130,7 @@ class VoiceAgent:
             if status == 200:
                 return json.loads(data)["choices"][0]["message"], model
             last = groq_error(status, data)
-            if status not in (400, 404):  # rate limit / auth: another model won't help
+            if status in (401, 403):  # a bad key: no other model will help
                 break
         raise VoiceError(last)
 
@@ -150,6 +159,7 @@ class VoiceAgent:
                 messages.append({"role": "tool", "tool_call_id": call.get("id"), "content": json.dumps(result)})
         else:
             turn.reply = "Sorry, that took too many steps. Could you say it more simply?"
+        turn.reply = spoken(turn.reply)
         if not turn.reply:
             turn.reply = "Done." if turn.tools and all(t["result"].get("ok") for t in turn.tools) else "Sorry, I couldn't do that."
         turn.timings["think"] = round(time.time() - t0, 2)

@@ -25,6 +25,7 @@ from urllib.parse import quote, urlparse
 Runner = Callable[[List[str]], subprocess.CompletedProcess]
 DEVICES = ("quest", "mac")
 PACKAGE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$")
+EMAIL = re.compile(r"[^@\s,;]+@[^@\s,;]+\.[A-Za-z]{2,}")
 CONTACTS = Path(__file__).resolve().parents[3] / ".run" / "contacts.json"
 
 
@@ -159,12 +160,46 @@ class DeviceController:
         return min(hits, key=len) if hits else None
 
     # ------------------------------------------------------------ messages
-    def contacts(self) -> Dict[str, str]:
+    def _contact_book(self) -> Dict[str, Dict[str, str]]:
+        """.run/contacts.json: {"Mom": "+91 98765 43210"} or {"Prof Rao": {"phone": "...", "email": "rao@uni.edu"}}."""
         try:
             data = json.loads(self.contacts_file.read_text())
-            return {k.lower(): re.sub(r"\D", "", str(v)) for k, v in data.items()}
-        except (OSError, ValueError, AttributeError):
+        except (OSError, ValueError):
             return {}
+        book = {}
+        for name, v in (data.items() if isinstance(data, dict) else []):
+            entry = v if isinstance(v, dict) else ({"email": v} if "@" in str(v) else {"phone": str(v)})
+            book[name.strip().lower()] = {k: str(x).strip() for k, x in entry.items()}
+        return book
+
+    def contacts(self) -> Dict[str, str]:
+        return {k: re.sub(r"\D", "", v["phone"]) for k, v in self._contact_book().items() if v.get("phone")}
+
+    def resolve_email(self, to: str) -> str:
+        addresses = []
+        for part in re.split(r"[,;]| and ", to):
+            part = part.strip()
+            if not part:
+                continue
+            if EMAIL.fullmatch(part):
+                addresses.append(part)
+                continue
+            email = self._contact_book().get(part.lower(), {}).get("email")
+            if not email or not EMAIL.fullmatch(email):
+                raise DeviceError(f"I don't have an email address for {part!r}. Say the address, or add it to .run/contacts.json")
+            addresses.append(email)
+        if not addresses:
+            raise DeviceError("who should the email go to?")
+        return ",".join(addresses)
+
+    def open_gmail_draft(self, to: str, subject: str, body: str, device: str, cc: str = "") -> str:
+        """Open Gmail's compose window with everything filled in. Nothing is sent: the user
+        reviews it and presses Send (a browser keypress could land in the wrong window)."""
+        params = {"view": "cm", "fs": "1", "to": to, "su": subject, "body": body}
+        if cc:
+            params["cc"] = cc
+        url = "https://mail.google.com/mail/?" + "&".join(f"{k}={quote(v)}" for k, v in params.items())
+        return self.open_url(url, device)
 
     def resolve_number(self, to: str) -> str:
         digits = re.sub(r"\D", "", to)
