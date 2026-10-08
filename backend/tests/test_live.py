@@ -53,8 +53,8 @@ def devices(shell, tmp_path):
 def test_open_apps_on_each_device(devices, shell):
     assert devices.open_app("WhatsApp", "quest") == "Opened WhatsApp on the Quest."
     assert shell.ran("adb", "shell", "monkey", "-p", "com.whatsapp")
-    assert "Quest browser" in devices.open_app("instagram", "quest")  # no Quest app: its website
-    assert ["adb", "shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", "https://www.instagram.com", "com.oculus.browser"] in shell.calls
+    assert devices.open_app("instagram", "quest") == "Opened Instagram on the Quest."  # the installed VR app, not the website
+    assert shell.ran("adb", "shell", "monkey", "-p", "com.oculus.igvr")
     assert devices.open_app("whats app", "mac") == "Opened WhatsApp on the Mac."
     assert ["open", "-a", "WhatsApp"] in shell.calls
     assert "browser" in devices.open_app("insta", "mac")  # not installed on the Mac: the website
@@ -122,7 +122,7 @@ def test_session_uses_a_single_use_token_and_never_the_key(live):
     setup = s["setup"]["setup"]
     assert {t["name"] for t in setup["tools"][0]["functionDeclarations"]} == {
         "orbit", "open_app", "web_search", "open_website", "compose_email", "prepare_message", "send_message",
-        "play_video", "video_control", "sing", "screen_control"}
+        "play_video", "video_control", "sing", "screen_control", "quest_apps", "quest_close", "quest_home"}
     text = setup["systemInstruction"]["parts"][0]["text"]
     assert "m17" in text and "bench_4" in text and "the Quest headset" in text and "Never guess facts" in text
     assert setup["inputAudioTranscription"] == {} and setup["generationConfig"]["responseModalities"] == ["AUDIO"]
@@ -255,3 +255,18 @@ def test_email_recipients_and_devices(live, shell):
     assert bad["ok"] is False and "contacts.json" in bad["error"]
     assert live.call("compose_email", {"to": "asha@example.com", "subject": "x", "body": ""}, s["conversation_id"], "mac", "", at(2))["ok"] is False
     assert live.devices.resolve_number("prof rao") == "919000011111"  # phone still found in the richer format
+
+
+# ------------------------------------------------------------- Quest home
+def test_quest_apps_open_close_and_home(tmp_path):
+    shell = FakeShell(packages=("com.whatsapp", "com.meta.curio.toybox", "com.beatgames.beatsaber", "com.oculus.helpcenter"))
+    d = DeviceController(runner=shell, platform="darwin", contacts_file=tmp_path / "none.json")
+    names = [a["name"] for a in d.quest_apps()]
+    assert names == ["Beatsaber", "Toybox", "WhatsApp"]  # help center hidden; readable names
+    assert d.open_app("Beat Saber", "quest") == "Opened Beatsaber on the Quest."
+    assert shell.ran("adb", "shell", "monkey", "-p", "com.beatgames.beatsaber")
+    assert d.close_quest_app("toybox") == "Closed Toybox."
+    assert ["adb", "shell", "am", "force-stop", "com.meta.curio.toybox"] in shell.calls
+    assert d.quest_home() == "Back on the Quest home screen."
+    with pytest.raises(DeviceError):
+        d.close_quest_app("pokemon go")

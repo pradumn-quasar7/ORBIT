@@ -60,6 +60,25 @@ ALIASES = {"whats app": "whatsapp", "insta": "instagram", "ig": "instagram", "fb
            "chrome": "browser", "safari": "browser", "web browser": "browser", "google maps": "maps", "mail": "gmail"}
 
 
+# Spoken names for Quest apps whose package name doesn't say what they are.
+QUEST_ALIASES = {"instagram": "com.oculus.igvr", "insta": "com.oculus.igvr", "facebook": "com.oculus.facebook",
+                 "horizonworlds": "com.facebook.horizon", "worlds": "com.facebook.horizon", "measure": "com.meta.curio.ruler",
+                 "ruler": "com.meta.curio.ruler", "quill": "com.facebook.arvr.quillplayer", "browser": "com.oculus.browser",
+                 "store": "com.oculus.store", "metastore": "com.oculus.store", "settings": "com.android.settings",
+                 "firsthand": "com.oculus.samples.firsthand", "toybox": "com.meta.curio.toybox", "whatsapp": "com.whatsapp"}
+QUEST_NAMES = {"com.oculus.igvr": "Instagram", "com.oculus.facebook": "Facebook", "com.facebook.horizon": "Horizon Worlds",
+               "com.meta.curio.ruler": "Measure", "com.facebook.arvr.quillplayer": "Quill", "com.whatsapp": "WhatsApp",
+               "com.oculus.samples.firsthand": "First Hand", "com.meta.curio.toybox": "Toybox",
+               "com.meta.handseducationmodule": "Hands Tutorial", "com.oculus.browser": "Browser"}
+QUEST_HIDDEN = ("accountscenter", "helpcenter", "privacycheckup", "shell.env.")  # system bits, not apps to open
+
+
+def pretty_name(package: str) -> str:
+    """com.beatgames.beatsaber → Beatsaber (a readable fallback name)."""
+    last = package.split(".")[-1]
+    return re.sub(r"[_-]+", " ", last).title()
+
+
 class DeviceError(ValueError):
     pass
 
@@ -134,12 +153,14 @@ class DeviceController:
         app = APPS.get(key)
         where = "Quest" if device == "quest" else "Mac"
         if device == "quest":
-            package = app.quest_package if app else self._find_package(key)
+            # An installed Quest app wins over its website (Instagram VR over instagram.com).
+            package = (app.quest_package if app and app.quest_package else None) or self._find_package(key)
             if package:
                 if not PACKAGE.match(package):
                     raise DeviceError(f"bad package {package!r}")
                 self._check(self.run(["adb", "shell", "monkey", "-p", package, "-c", "android.intent.category.LAUNCHER", "1"]),
                             f"open {name} on the Quest")
+                name = QUEST_NAMES.get(package) or (name if key in APPS or key in QUEST_ALIASES else pretty_name(package))
                 return f"Opened {name} on the Quest."
             if app and app.quest_url:
                 self.open_url(app.quest_url, "quest")
@@ -155,9 +176,51 @@ class DeviceController:
         raise DeviceError(f"I don't know how to open {name!r} on the {where}")
 
     def _find_package(self, word: str) -> Optional[str]:
+        """An installed Quest app by its spoken name: "beat saber" → com.beatgames.beatsaber."""
+        key = re.sub(r"[^a-z0-9]", "", word.lower())
+        if not key:
+            return None
+        if key in QUEST_ALIASES:
+            return QUEST_ALIASES[key]
         out = self.run(["adb", "shell", "pm", "list", "packages"]).stdout
-        hits = [line.split(":", 1)[1].strip() for line in out.splitlines() if line.startswith("package:") and word.replace(" ", "") in line.lower()]
+        hits = [line.split(":", 1)[1].strip() for line in out.splitlines()
+                if line.startswith("package:") and key in re.sub(r"[^a-z0-9]", "", line.lower())]
         return min(hits, key=len) if hits else None
+
+    # ------------------------------------------------------- Quest home
+    def quest_apps(self) -> List[Dict[str, str]]:
+        """Apps and games the user installed on the Quest (plus Meta's own apps they open)."""
+        self._target("quest")
+        out = self.run(["adb", "shell", "pm", "list", "packages", "-3"]).stdout
+        apps = []
+        for line in out.splitlines():
+            if not line.startswith("package:"):
+                continue
+            pkg = line.split(":", 1)[1].strip()
+            if any(skip in pkg for skip in QUEST_HIDDEN):
+                continue
+            apps.append({"package": pkg, "name": QUEST_NAMES.get(pkg) or pretty_name(pkg)})
+        return sorted(apps, key=lambda a: a["name"].lower())
+
+    def current_quest_app(self) -> Optional[str]:
+        out = self.run(["adb", "shell", "dumpsys", "activity", "activities"]).stdout
+        m = re.search(r"topResumedActivity=ActivityRecord\{\S+ \S+ ([\w.]+)/", out)
+        return m.group(1) if m else None
+
+    def close_quest_app(self, name: Optional[str]) -> str:
+        self._target("quest")
+        pkg = self._find_package(name) if name else self.current_quest_app()
+        if not pkg or pkg.startswith(("com.oculus.vrshell", "com.oculus.systemux")):
+            raise DeviceError("nothing is open to close" if not name else f"I can't find {name!r} on the Quest")
+        if not PACKAGE.match(pkg):
+            raise DeviceError(f"bad package {pkg!r}")
+        self._check(self.run(["adb", "shell", "am", "force-stop", pkg]), f"close {pkg}")
+        return f"Closed {QUEST_NAMES.get(pkg) or pretty_name(pkg)}."
+
+    def quest_home(self) -> str:
+        self._target("quest")
+        self._check(self.run(["adb", "shell", "am", "start", "-n", "com.oculus.vrshell/.HomeActivity"]), "go to the Quest home")
+        return "Back on the Quest home screen."
 
     # ------------------------------------------------------------ messages
     def _contact_book(self) -> Dict[str, Dict[str, str]]:

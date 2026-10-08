@@ -352,6 +352,12 @@ the user's Mac and Quest.
 - Saying "stop", "stop listening/talking", "be quiet", "that's all", "go to sleep", "goodbye Orbi", "bas", "chup", "ruk jao" ends the conversation: Orbi says one short line and turns the microphone off. Decided by a fixed phrase rule (server `voice_agent.is_stop` and browser `live_core.isStop`), instantly and without a model call. "Stop the video" still pauses the video; the Gemini engine judges only the whole utterance (a partial "stop…" may be "stop the video"). Orbi also stops listening by itself after 90 s with nobody talking to it.
 - Real check with Groq audio: "Stop listening." stopped in 0.36 s with no model call; "Stop the video." went to video control; Whisper's "Orby, be quiet." first slipped through, so the rule now covers the name's spellings.
 
+### Phase 19.8 — Quest home: apps and games by voice
+- Tools `quest_apps` (installed apps and games, readable names, system bits hidden), `quest_close` (the named app, or whatever is open), `quest_home`; `open_app` on the Quest prefers an installed app over its website (Instagram VR) and finds apps by spoken name in package ids. Apps that live on the Quest open in the headset even when the user talks to the desktop Orbi on the Mac. That's how the user keeps talking while a game is running, since the headset's own Orbi page closes when a game takes over.
+- Orbi does not play games or press buttons for the user, and cannot see the game. It helps by answering questions about controls and strategy.
+- Also: the USB link to the Quest is restored automatically by the server whenever the headset is attached (`serve.keep_quest_linked`); the headset page reports a lost connection and resumes. Place labels in AR are hidden by default, with Show / Hide buttons and voice commands.
+- Real check (read-only on the headset, then real Groq with a pretend headset): installed apps listed; "open toybox", "open instagram in the headset", "go home", and a game tip handled correctly from the Mac. "Close the game" first closed the game only mentioned in a question, not the one open; now it closes what is open unless the user names an app.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -400,7 +406,7 @@ the user's Mac and Quest.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 723 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 725 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 

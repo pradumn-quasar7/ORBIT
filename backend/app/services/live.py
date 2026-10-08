@@ -104,6 +104,11 @@ TOOLS = [
          "action": {"type": "string", "enum": ["scroll_down", "scroll_up", "scroll_left", "scroll_right", "page_down", "page_up",
                                                "top", "bottom", "back", "forward", "reload", "zoom_in", "zoom_out", "zoom_reset"]},
          "value": {"type": "string"}, "device": DEVICE}, "required": ["action"]}},
+    {"name": "quest_apps", "description": "List the apps and games installed on the Quest headset (to open one, use open_app with device quest).",
+     "parameters": {"type": "object", "properties": {}}},
+    {"name": "quest_close", "description": "Close an app or game on the Quest. Leave app empty unless the user named one: then whatever is open is closed.",
+     "parameters": {"type": "object", "properties": {"app": {"type": "string"}}}},
+    {"name": "quest_home", "description": "Go back to the Quest home screen.", "parameters": {"type": "object", "properties": {}}},
     {"name": "sing", "description": ("Sing a song aloud. Write ORIGINAL lyrics (4-8 short lines) about what the user asked, or use a "
                                       "public-domain song (Happy Birthday, Twinkle Twinkle). Never real copyrighted lyrics: offer to "
                                       "play those on YouTube instead."),
@@ -128,6 +133,8 @@ How you work:
 - Apps, websites and searches on the user's devices: use `open_app`, `web_search`, `open_website`. Device "here" is the one they're talking from{here}; they can say "on the Mac" or "in the headset".
 - Videos: "play X" or "open YouTube and play X" → `play_video`; then "full screen", "escape", "1080p", "pause", "skip 30 seconds", "louder" → `video_control`. Say briefly what's playing.
 - Screen: "scroll down", "go up", "move right", "next page", "go back", "zoom in" → `screen_control` (videos use `video_control`).
+- Apps or games that live on the Quest (Toybox, First Hand, games…; call `quest_apps` if unsure) open in the headset (device quest) even when the user talks from the Mac.
+- Quest apps and games: "what games do I have" → `quest_apps`; "open X in the headset" → `open_app` with device quest; "close the game" / "close it" → `quest_close` WITHOUT an app (it closes whatever is open; only name an app the user named); "go home" → `quest_home`. You cannot play games or press buttons for the user, and you cannot see the game; help by answering questions about the game (controls, tips, walkthroughs) from what you know, briefly.
 - "Show labels" / "hide labels": the headset does this itself; just answer "Okay." (no tool).
 - Fun: if asked for a joke, tell one short, clean, original joke yourself (no tool). If asked to sing, call `sing` with lyrics you write (or a public-domain song); for a real film or pop song, offer to play it on YouTube instead.
 - Email: call `compose_email` with a subject and a well-written body; Gmail opens with the draft and the user presses Send themselves. You cannot send email. You cannot read the inbox.
@@ -245,6 +252,7 @@ class LiveService:
                 "open_website": self._open_website, "compose_email": self._compose_email,
                 "play_video": self._play_video, "video_control": self._video_control, "sing": self._sing,
                 "screen_control": self._screen_control,
+                "quest_apps": self._quest_apps, "quest_close": self._quest_close, "quest_home": self._quest_home,
                 "prepare_message": self._prepare_message, "send_message": self._send_message,
             }[name]
         except KeyError:
@@ -306,6 +314,16 @@ class LiveService:
         style = args.get("style") if args.get("style") in self.SING_STYLES else "cheerful"
         return {"ok": True, "result": "Here's a little song for you!", "lyrics": lyrics, "style": style,
                 "song_url": "/speech/sing?" + urlencode({"style": style, "text": lyrics})}
+
+    def _quest_apps(self, args, conversation_id, device, heard, at):
+        apps = self.devices.quest_apps()
+        return {"ok": True, "result": "On your Quest: " + ", ".join(a["name"] for a in apps) + ".", "apps": apps}
+
+    def _quest_close(self, args, conversation_id, device, heard, at):
+        return {"ok": True, "result": self.devices.close_quest_app(str(args.get("app") or "").strip() or None)}
+
+    def _quest_home(self, args, conversation_id, device, heard, at):
+        return {"ok": True, "result": self.devices.quest_home()}
 
     def _screen_control(self, args, conversation_id, device, heard, at):
         return self.screen.control(str(args.get("action", "")), args.get("value"), self._device(args, device))
