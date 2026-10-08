@@ -90,3 +90,26 @@ def speech(text: str = Query(min_length=1, max_length=MAX_CHARS)):
         for old in files[:-MAX_FILES]:
             old.unlink(missing_ok=True)
     return FileResponse(out, media_type="audio/wav", headers={"Cache-Control": "private, max-age=86400"})
+
+
+# Singing (Phase 19.4): macOS novelty voices sing the words to a melody.
+SINGERS = {"cheerful": "Good News", "dramatic": "Cellos", "bells": "Bells", "organ": "Organ", "sad": "Bad News"}
+
+
+@router.get("/speech/sing")
+def sing(text: str = Query(min_length=1, max_length=600), style: str = Query("cheerful")):
+    if not available():
+        raise HTTPException(status_code=501, detail="singing needs the Mac's built-in singing voices")
+    voice = SINGERS.get(style, SINGERS["cheerful"])
+    lines = [" ".join(l.replace("[[", "[").replace("]]", "]").split()) for l in text.splitlines() if l.strip()]
+    clean = ". ".join(lines)  # a short pause between lines keeps the melody phrased
+    CACHE.mkdir(parents=True, exist_ok=True)
+    out = CACHE / f"{hashlib.sha256(f'sing:{voice}|{clean}'.encode()).hexdigest()[:32]}.wav"
+    if not out.exists():
+        try:
+            subprocess.run(["say", "-v", voice, "-r", "150", "-o", str(out), "--data-format=LEI16@22050", "--", clean],
+                           check=True, capture_output=True, timeout=60)
+        except (subprocess.SubprocessError, OSError) as exc:
+            out.unlink(missing_ok=True)
+            raise HTTPException(status_code=500, detail=f"singing failed: {exc}")
+    return FileResponse(out, media_type="audio/wav", headers={"Cache-Control": "private, max-age=86400"})

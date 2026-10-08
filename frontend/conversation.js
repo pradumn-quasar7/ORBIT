@@ -141,13 +141,18 @@ export class HostedConversation {
     for (const t of out.tools || []) this.emit("tool", t.name, t.args, t.result);
     this.emit("orbiText", out.reply, true);
     await this.say(out.reply);
+    if (out.song_url && this.active) await this.play(out.song_url); // Orbi sings
   }
 
   // Speak through ORBIT's /speech voice; the mouth follows the real audio level.
   say(text) {
     if (!text || !this.active) { if (this.active) this.setPhase("listening"); return Promise.resolve(); }
+    return this.play(`/speech?text=${encodeURIComponent(text.slice(0, 400))}`);
+  }
+
+  play(url) {
     return new Promise((resolve) => {
-      const audio = new Audio(`/speech?text=${encodeURIComponent(text.slice(0, 400))}`);
+      const audio = new Audio(url);
       this.audio = audio;
       let raf = 0;
       const done = () => {

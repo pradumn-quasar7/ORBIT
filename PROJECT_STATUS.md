@@ -334,6 +334,11 @@ the user's Mac and Quest.
 - Verified on real YouTube (invisible, muted Chrome): play in 2.4 s; 480p → 1080p → 4K; full screen on/off; pause, +30 s, volume 60%.
 - **Found with real Groq runs and fixed:** (1) after a few actions the model only *said* "Paused." / "Skipped" without calling a tool, having learned the pattern from text-only history. Now history keeps the turns' tool calls and results, and a reply claiming an action with no tool call is sent back with `tool_choice: required`. (2) The free plan's 8,000 tokens/min per model allowed ~2 commands a minute. Now device, video and email results are spoken directly (one model call instead of two), tool descriptions are shorter, gpt-oss reasons at `low`, and memory keeps 4 compact turns. (3) Repeated sentences and run-together text are cleaned before speaking. Result: eight commands in a row, every one executed, 0.3–0.8 s each, with automatic hand-over between models.
 
+### Phase 19.4 — Songs and jokes
+- Jokes: the model tells short, clean, original jokes itself (no tool). The "claimed action" guard now applies only when the user asked for something to be done, so a joke containing "opened" is not mistaken for an action.
+- Singing: new tool `sing(lyrics, style)`; Orbi writes original lyrics (or uses public-domain songs) and the Mac's singing voices perform them (`/speech/sing`: Good News, Cellos, Bells, Organ, Bad News). For real copyrighted songs Orbi offers to play the original on YouTube instead. Played after Orbi's spoken intro in the Groq engine, and from the tool result in the Gemini engine; the headset shows the first lines in Orbi's bubble.
+- Real Groq check: a joke, an original song about the lab, a refusal-plus-YouTube offer for "Tum Ho Toh", and Happy Birthday for a named person.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -382,7 +387,7 @@ the user's Mac and Quest.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 692 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 694 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 

@@ -28,6 +28,10 @@ CHAT_MODELS = ("openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b")
 STT_MODEL = "whisper-large-v3-turbo"
 MAX_TOOL_ROUNDS = 4
 HISTORY_TURNS = 4  # whole turns kept per conversation (the world itself lives in ORBIT, not here)
+# The user asked for something to be *done* (not a joke or a chat): only then must a
+# claimed action be backed by a tool call.
+COMMAND = re.compile(r"\b(play|open|pause|resume|stop|skip|forward|rewind|back|mute|unmute|volume|louder|quieter|full ?screen|"
+                     r"escape|exit|quality|\d{3,4}p|4k|next|search|send|message|mail|email|write|sing|speed)\b", re.I)
 # A reply that says something was done: it must be backed by a tool call in that turn.
 CLAIMS_ACTION = re.compile(r"\b(paused|resumed|playing|now play|skipp?ed|forwarded|rewound|full ?screen|exited|muted|unmuted|"
                            r"volume (set|is|to)|quality (set|is|to|changed)|opened|opening|searching|searched|sent|draft is (ready|open)|"
@@ -115,6 +119,7 @@ class VoiceTurn:
     reply: str
     tools: List[Dict[str, Any]] = field(default_factory=list)
     language: Optional[str] = None
+    song_url: Optional[str] = None
     timings: Dict[str, float] = field(default_factory=dict)
     model: str = ""
 
@@ -177,7 +182,7 @@ class VoiceAgent:
             calls = message.get("tool_calls") or []
             if not calls:
                 text = (message.get("content") or "").strip()
-                if not turn.tools and not nudged and CLAIMS_ACTION.search(text):
+                if not turn.tools and not nudged and COMMAND.search(heard) and CLAIMS_ACTION.search(text):
                     # It says it acted but called no tool: never let a claimed action stand
                     # unexecuted (found in a real Groq run). Make it act, or say it can't.
                     nudged = True
@@ -207,6 +212,7 @@ class VoiceAgent:
                 break
         else:
             turn.reply = turn.reply or "Sorry, that took too many steps. Could you say it more simply?"
+        turn.song_url = next((t["result"].get("song_url") for t in turn.tools if t["result"].get("song_url")), None)
         turn.reply = spoken(turn.reply)
         if not turn.reply:
             turn.reply = "Done." if turn.tools and all(t["result"].get("ok") for t in turn.tools) else "Sorry, I couldn't do that."

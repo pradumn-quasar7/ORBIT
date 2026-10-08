@@ -188,6 +188,8 @@ async function toggleLive() {
           result.ok ? `✓ ${result.result || result.answer || name}` : `✗ ${result.error}`);
         $("log").append(line);
         if (result.waiting_for_user_consent) { avatar.gesture("ASK"); }
+        if (result.song_url && liveEngine === "gemini") new Audio(result.song_url).play().catch(() => {}); // Groq's engine plays it itself
+        if (result.lyrics) avatar.gesture("WAVE");
         line.scrollIntoView({ block: "end" });
       },
       level(v) { if (v > 0.02) avatar.mouth(v); },

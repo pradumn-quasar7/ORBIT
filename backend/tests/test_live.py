@@ -122,7 +122,7 @@ def test_session_uses_a_single_use_token_and_never_the_key(live):
     setup = s["setup"]["setup"]
     assert {t["name"] for t in setup["tools"][0]["functionDeclarations"]} == {
         "orbit", "open_app", "web_search", "open_website", "compose_email", "prepare_message", "send_message",
-        "play_video", "video_control"}
+        "play_video", "video_control", "sing"}
     text = setup["systemInstruction"]["parts"][0]["text"]
     assert "m17" in text and "bench_4" in text and "the Quest headset" in text and "Never guess facts" in text
     assert setup["inputAudioTranscription"] == {} and setup["generationConfig"]["responseModalities"] == ["AUDIO"]

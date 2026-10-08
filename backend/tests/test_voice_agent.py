@@ -189,3 +189,24 @@ def test_actions_are_spoken_from_their_results_in_one_call(lab):
     assert spoken("Paused. Let me know when you want to resume. Paused. Let me know when you want to resume.") == \
         "Paused. Let me know when you want to resume."
     assert spoken("Full-screen mode on.Anything else?") == "Full-screen mode on. Anything else?"
+
+
+# ------------------------------------------------------------ songs and jokes
+def test_orbi_sings_its_own_lyrics(lab, client):
+    groq = FakeGroq("sing me a song about my lab", [tool_call("sing", lyrics="Benches shine at break of day\nOrbi keeps the parts in play", style="cheerful")])
+    out = agent(lab, groq).respond(lab.svc.assistant.start("ana", at(1)).id, "ana", "mac", "sing me a song about my lab", at(2))
+    assert out.reply == "Here's a little song for you!" and out.song_url.startswith("/speech/sing?style=cheerful&text=Benches")
+    from backend.app.api import speech
+    if speech.available():
+        r = client.get(out.song_url)
+        assert r.status_code == 200 and r.content[:4] == b"RIFF"
+    bad = agent(lab, FakeGroq("x", [tool_call("sing", lyrics="la\n" * 20)])).respond(lab.svc.assistant.start("ana", at(1)).id, "ana", "mac", "sing", at(2))
+    assert "too long" in bad.reply
+
+
+def test_jokes_are_just_talk_not_claimed_actions(lab):
+    joke = "Why did the robot go on vacation? It needed to recharge. I opened my circuits to relax!"
+    groq = FakeGroq("tell me a joke", [say(joke)])
+    out = agent(lab, groq).respond(lab.svc.assistant.start("ana", at(1)).id, "ana", "mac", "tell me a joke", at(2))
+    assert out.reply.startswith("Why did the robot") and out.tools == []
+    assert len([c for c in groq.calls if c[0][-1] == "completions"]) == 1  # "opened" in a joke is not a claimed action

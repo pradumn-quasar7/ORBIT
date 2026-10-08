@@ -600,6 +600,8 @@ async function toggleLive() {
         else if (result.waiting_for_user_consent) { orbi.gesture("ASK"); state.pending = { summary: result.waiting_for_user_consent }; buildMenu(); }
         else orbi.gesture("NOD");
         if (name === "orbit") soon(); // the world model may have changed
+        if (result.song_url && liveEngine === "gemini") new Audio(result.song_url).play().catch(() => {});
+        if (result.lyrics) { orbi.gesture("WAVE"); drawBubble(bubble, "♪ " + result.lyrics.split("\n").slice(0, 3).join(" / ") + " ♪"); }
       },
       level(v) { if (v > 0.02) orbi.mouth(v); },
       error(message) { status(message, "error"); drawBubble(bubble, message, "#f87171"); },
