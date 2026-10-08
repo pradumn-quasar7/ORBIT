@@ -808,4 +808,31 @@ async function init() {
   }
 }
 
+// Connection watch (Phase 19.8): over USB the headset reaches ORBIT only while the cable
+// link is up. ORBIT restores the link by itself (serve.keep_quest_linked); this page says
+// when it is lost and when it is back, and resumes on its own.
+let online = true;
+async function watchConnection() {
+  let ok = false;
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 3000);
+    ok = (await fetch("/voice/status", { cache: "no-store", signal: ctl.signal })).ok;
+    clearTimeout(t);
+  } catch { ok = false; }
+  if (!ok && online) {
+    online = false;
+    status("Lost connection to ORBIT — reconnecting… (check the USB cable)", "error");
+    drawBubble(bubble, "I lost my connection to ORBIT. Reconnecting…", "#f87171");
+    orbi.setAlert(true);
+  } else if (ok && !online) {
+    online = true;
+    orbi.setAlert(false);
+    status("Connected to ORBIT again.", "ok");
+    say("I'm back online.", "NOD");
+    soon();
+  }
+}
+setInterval(watchConnection, 5000);
+
 init();
