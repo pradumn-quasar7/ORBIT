@@ -112,7 +112,7 @@ def test_session_uses_a_single_use_token_and_never_the_key(live):
     s = live.start("ana", "quest", at(1))
     url, body, headers = live.google.requests[0]
     assert url.endswith("/v1beta/auth_tokens") and headers == {"x-goog-api-key": "AIza-test"}
-    assert body["uses"] == 1 and body["liveConnectConstraints"]["model"] == "models/gemini-3.8-live"
+    assert body["uses"] == 1 and body["bidiGenerateContentSetup"]["model"] == "models/gemini-3.8-live"
     assert "BidiGenerateContentConstrained?access_token=auth_tokens/ephemeral-123" in s["ws_url"]
     assert "AIza" not in json.dumps(s)  # the browser never sees the API key
     setup = s["setup"]["setup"]

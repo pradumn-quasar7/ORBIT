@@ -186,8 +186,9 @@ class LiveService:
             "uses": 1,
             "expireTime": (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "newSessionExpireTime": (now + timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "liveConnectConstraints": {"model": f"models/{self.settings.model}",
-                                       "config": {"responseModalities": ["AUDIO"], "sessionResumption": {}}},
+            # The token may only open a session on this model (the REST name differs from
+            # the SDKs' "liveConnectConstraints": verified against the live service).
+            "bidiGenerateContentSetup": {"model": f"models/{self.settings.model}"},
         }
         try:
             res = self.transport(f"{API}/{self.settings.api_version}/auth_tokens", body, {"x-goog-api-key": self.settings.api_key})
