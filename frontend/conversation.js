@@ -35,20 +35,37 @@ export class HostedConversation {
     this.active = false;
   }
 
-  emit(name, ...args) { const fn = this.on[name]; if (fn) fn(...args); }
+  emit(name, ...args) {
+    if (name === "error") this.diag("error", args[0]);
+    const fn = this.on[name]; if (fn) fn(...args);
+  }
+
+  // A readable snapshot for diagnosing "Orbi isn't hearing me" (window.__orbiVoice).
+  diag(key, value) {
+    const d = (window.__orbiVoice = window.__orbiVoice || { events: [] });
+    d[key] = value;
+    if (key === "error" || key === "phase") d.events.push(`${new Date().toISOString().slice(11, 19)} ${key}: ${value}`);
+    d.events = d.events.slice(-30);
+  }
 
   setPhase(p) {
+    this.diag("phase", p);
     this.phase = p;
     this.emit("state", p === "recording" ? "listening" : p);
   }
 
   async start() {
     this.emit("state", "connecting");
+    this.diag("phase", "starting: asking for the microphone");
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
     this.ctx = new AudioContext();
-    await this.ctx.resume();
+    this.diag("phase", `audio engine ${this.ctx.state}`);
+    // Inside VR a controller press may not count as a page click, so resume() can wait
+    // forever: never block on it (capture still runs once the engine starts).
+    await Promise.race([this.ctx.resume(), new Promise((r) => setTimeout(r, 1500))]);
+    this.diag("audioState", this.ctx.state);
     const url = URL.createObjectURL(new Blob([CAPTURE], { type: "application/javascript" }));
     await this.ctx.audioWorklet.addModule(url);
     URL.revokeObjectURL(url);
@@ -83,6 +100,12 @@ export class HostedConversation {
   // One 50 ms block of microphone audio through the turn-taking state machine.
   block(samples) {
     const rms = core.rms(samples);
+    const d = window.__orbiVoice || {};
+    d.blocks = (d.blocks || 0) + 1;
+    d.rms = Math.round(rms * 100000) / 100000;
+    d.peakRms = Math.max(d.peakRms || 0, d.rms);
+    d.threshold = this.threshold;
+    window.__orbiVoice = d;
     if (this.threshold === null) { // learn the room's quiet level first (~0.5 s)
       this.floor.push(rms);
       if (this.floor.length >= 10) {
@@ -93,8 +116,11 @@ export class HostedConversation {
     }
     this.emit("micLevel", Math.min(1, rms / (this.threshold * 4)));
     if (this.phase === "listening" && Date.now() - this.lastTalk > IDLE_STOP_MS) {
-      this.emit("orbiText", "I'll stop listening for now. Wake me when you need me.", true);
-      this.stop();
+      // Said out loud: a silent note was easy to miss in the headset.
+      const msg = "I'll stop listening now. Press the grip or click me to talk again.";
+      this.lastTalk = Date.now();
+      this.emit("orbiText", msg, true);
+      this.say(msg).then(() => this.stop());
       return;
     }
     const loud = rms > this.threshold * (this.phase === "speaking" ? 2.2 : 1); // Orbi's own voice must not trigger
@@ -129,6 +155,7 @@ export class HostedConversation {
     if (speech < MIN_SPEECH_MS) { this.setPhase("listening"); return; } // a click or a cough
     this.setPhase("thinking");
     const wav = core.wav(core.normalise(core.resample(audio, this.rate, 16000)), 16000);
+    this.diag("sent", (this.diag.sent = (this.diag.sent || 0) + 1));
     let out;
     try {
       const q = new URLSearchParams({ device: this.device, user_id: this.userId });

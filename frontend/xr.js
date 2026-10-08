@@ -853,5 +853,6 @@ async function watchConnection() {
   }
 }
 setInterval(watchConnection, 5000);
+window.orbiTalk = () => startTalking(); // for the Mac side (diagnosis, remote start)
 
 init();
