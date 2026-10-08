@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orbi</title>
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" } }
+  </script>
+  <style>
+    /* Orbi on the desktop (Phase 19.6): shown in a transparent, frameless window by Orbi.app. */
+    :root { color-scheme: light dark; }
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font: 13px/1.35 system-ui, -apple-system, sans-serif; user-select: none; }
+    #stage { position: absolute; inset: 64px 0 0 0; cursor: pointer; }
+    #stage canvas { width: 100%; height: 100%; display: block; }
+    #bubble {
+      position: absolute; left: 10px; right: 10px; top: 4px; max-height: 76px; overflow: hidden;
+      padding: 8px 11px; border-radius: 14px; background: rgba(16, 20, 27, 0.88); color: #eef2f7;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25); opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .2s;
+    }
+    #bubble.show { opacity: 1; transform: none; }
+    #bubble.alert { box-shadow: 0 0 0 2px #f87171, 0 4px 18px rgba(0, 0, 0, 0.25); }
+    #bubble .you { color: #9aa4b2; font-style: italic; }
+    #state { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; color: #fff; font-size: 11px;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, .8); pointer-events: none; opacity: .9; }
+    #ring { position: absolute; left: 50%; bottom: 26px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: #7aa2ff; }
+    #ring[data-state="listening"] { background: #4ade80; box-shadow: 0 0 0 6px rgba(74, 222, 128, .25); }
+    #ring[data-state="thinking"] { background: #fbbf24; }
+    #ring[data-state="speaking"] { background: #7aa2ff; box-shadow: 0 0 0 6px rgba(122, 162, 255, .25); }
+    #ring[data-state="off"] { background: #6b7280; }
+  </style>
+</head>
+<body>
+  <div id="bubble" role="status" aria-live="polite"></div>
+  <div id="stage" title="Click to talk to Orbi"></div>
+  <div id="ring" data-state="off"></div>
+  <div id="state">click me to talk</div>
+  <script src="realtime.js"></script>
+  <script src="live_core.js"></script>
+  <script type="module" src="orbi.js"></script>
+</body>
+</html>

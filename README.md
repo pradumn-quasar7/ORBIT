@@ -85,6 +85,14 @@ Mac's WhatsApp app needs Accessibility permission for Python (System Settings �
 Security → Accessibility); on the Quest the chat opens with the text filled in and you
 tap send. Facts about your workspace still come only from ORBIT's evidence.
 
+### Orbi on your Mac desktop
+```bash
+scripts/build_orbi_app.sh --open
+```
+installs **Orbi.app** in `~/Applications`: Orbi floats on your desktop (always on top, no
+browser); click it to talk, drag the bar under it to move it, and use the ◎ menu-bar icon
+for Show/Hide, the dashboard and Open at Login. It starts the ORBIT server if needed.
+
 ### Meta Quest (mixed reality)
 ```bash
 scripts/run_demo.sh --lan

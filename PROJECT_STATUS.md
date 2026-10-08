@@ -344,6 +344,10 @@ the user's Mac and Quest.
 - Honest results: scrolling reports whether anything moved ("It's already at the bottom.") and, found on the real headset, a full-screen video now gets "a video is full screen… say 'escape' first" instead of a false "Scrolled down." Instant scrolling (smooth scrolling did not advance) and inner scroll panels are handled.
 - Verified on a real Quest page (0 → 387 → 885 → 719 → 3109 → 0 px) and with real Groq: seven casual phrases ("go down a little more", "move it to the right side", "take me back to the top", "zoom in, the text is small", "scroll up on the mac"…) mapped to the right action and device, 0.5–0.9 s each.
 
+### Phase 19.6 — Orbi on the Mac desktop (no browser)
+- `desktop/Orbi/main.swift` → **Orbi.app** (`scripts/build_orbi_app.sh` builds, ad-hoc signs and installs it in `~/Applications`): a frameless, transparent, always-on-top panel (all Spaces, beside full-screen apps) showing `/ui/orbi.html`, the avatar with its speech bubble and hands-free voice (Groq, else Gemini Live), ORBIT notices, and a drag handle (the position is remembered). A ◎ menu-bar item: Talk, Show/Hide, dashboard, Open at Login (SMAppService), restart the server, Quit. No Dock icon. The app starts the ORBIT server (`run_demo.sh --lan`) if it isn't running. The microphone is granted only to ORBIT's own page (`localhost:8765`).
+- Verified: compiles with Swift 6.4 on macOS 26; launched, loaded the page from the server, and a screenshot shows Orbi floating over other windows with a transparent background. The first click asks macOS for microphone permission.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
