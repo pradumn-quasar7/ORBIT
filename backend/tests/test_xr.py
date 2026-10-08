@@ -118,3 +118,21 @@ def test_pairing_code_survives_restarts_until_renewed(tmp_path, monkeypatch):
     assert serve.pairing_code() == first
     assert serve.pairing_code(renew=True) != first
     assert (tmp_path / "pair-code").stat().st_mode & 0o077 == 0
+
+
+# ------------------------------------------------------------ server voice
+@pytest.mark.skipif(not __import__("backend.app.api.speech", fromlist=["available"]).available(), reason="no macOS `say`")
+def test_server_speaks_for_clients_without_a_voice(client, tmp_path, monkeypatch):
+    from backend.app.api import speech
+    monkeypatch.setattr(speech, "CACHE", tmp_path)
+    r = client.get("/speech", params={"text": "The valve is open. [[slnc 5000]]"})
+    assert r.status_code == 200 and r.headers["content-type"] == "audio/wav" and r.content[:4] == b"RIFF"
+    assert len(list(tmp_path.glob("*.wav"))) == 1
+    assert client.get("/speech", params={"text": "The valve is open. [[slnc 5000]]"}).content == r.content  # cached
+    assert client.get("/speech", params={"text": "x" * 401}).status_code == 422
+
+
+def test_no_system_voice_is_reported(client, monkeypatch):
+    from backend.app.api import speech
+    monkeypatch.setattr(speech, "available", lambda: False)
+    assert client.get("/speech", params={"text": "hi"}).status_code == 501

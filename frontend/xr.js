@@ -191,6 +191,7 @@ function say(text, gesture, tone) {
   if (gesture) orbi.gesture(gesture);
   orbi.setAlert(gesture === "ALERT");
   speechChain = speechChain.then(() => new Promise((resolve) => {
+    if (!synth && text) return serverVoice(text).then(resolve);
     if (!synth || !text) { orbi.setState("speaking"); setTimeout(() => { orbi.setState("idle"); resolve(); }, Math.min(5000, 500 + text.length * 40)); return; }
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.03;
@@ -199,6 +200,40 @@ function say(text, gesture, tone) {
     u.onend = u.onerror = () => { orbi.setState("idle"); resolve(); };
     synth.speak(u);
   }));
+}
+
+// The Quest browser has no speechSynthesis: the ORBIT server (your computer) speaks
+// for Orbi and the headset plays the audio, mouth moving with the sound.
+let audioCtx = null;
+function serverVoice(text) {
+  return new Promise((resolve) => {
+    const audio = new Audio(`/speech?text=${encodeURIComponent(text.slice(0, 400))}`);
+    let raf = 0;
+    const done = () => { cancelAnimationFrame(raf); orbi.setState("idle"); resolve(); };
+    audio.onplay = () => {
+      orbi.setState("speaking");
+      try {
+        audioCtx = audioCtx || new AudioContext();
+        const an = audioCtx.createAnalyser();
+        an.fftSize = 512;
+        const src = audioCtx.createMediaElementSource(audio);
+        src.connect(an);
+        an.connect(audioCtx.destination);
+        const data = new Float32Array(an.fftSize);
+        const tick = () => {
+          an.getFloatTimeDomainData(data);
+          let s = 0;
+          for (const v of data) s += v * v;
+          orbi.mouth(Math.min(1, Math.sqrt(s / data.length) * 8));
+          raf = requestAnimationFrame(tick);
+        };
+        tick();
+      } catch { /* audio still plays; the mouth uses its default motion */ }
+    };
+    audio.onended = done;
+    audio.onerror = done;
+    audio.play().catch(done);
+  });
 }
 
 // -------------------------------------------------------------- place cards

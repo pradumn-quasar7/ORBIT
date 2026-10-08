@@ -23,13 +23,24 @@ export function explain(code) {
     "service-not-allowed": "This browser doesn't allow its speech service here; switching to on-device recognition.",
     network: "The browser's online speech service can't be reached; switching to on-device recognition.",
     "language-not-supported": "The browser's speech service doesn't support this language; switching to on-device recognition.",
-    "no-speech": "I didn't hear anything. Check the input level meter, and your input device in System Settings → Sound → Input.",
+    "no-speech": "I didn't catch any words. Hold the grip (or press Talk), speak, then pause. If the level bar doesn't move, check the input device.",
     "audio-capture": "No microphone was found. Plug one in or pick an input device in System Settings → Sound → Input.",
     NotFoundError: "No microphone was found. Plug one in or pick an input device in System Settings → Sound → Input.",
     NotReadableError: "The microphone is in use by another app (or blocked by the system). Close other apps using it and try again.",
     unsupported: "This browser has no microphone support on this page.",
   }[code] || `Voice error: ${code}`;
 }
+// Peak-normalise quiet recordings (headset mics) so Whisper hears speech at a normal level.
+export function normalise(samples) {
+  let peak = 0;
+  for (const v of samples) peak = Math.max(peak, Math.abs(v));
+  if (peak === 0 || peak > 0.5) return samples;
+  const gain = Math.min(0.9 / peak, 60);
+  const out = new Float32Array(samples.length);
+  for (let i = 0; i < samples.length; i++) out[i] = samples[i] * gain;
+  return out;
+}
+
 const FALLBACK_CODES = new Set(["network", "service-not-allowed", "language-not-supported"]);
 
 export class Voice {
@@ -68,7 +79,11 @@ export class Voice {
       analyser.getFloatTimeDomainData(data);
       let sum = 0;
       for (const v of data) sum += v * v;
-      this.level = Math.min(1, Math.sqrt(sum / data.length) * 6);
+      this.rms = Math.sqrt(sum / data.length);
+      // Meter relative to the room's own quiet level: headset mics with noise
+      // suppression are ~20x quieter than a laptop's (Phase 18 Quest test).
+      const ref = Math.max(0.004, (this.speechThreshold || 0.0025) * 4);
+      this.level = Math.min(1, this.rms / ref);
       this._emit("onLevel", this.level);
       raf = requestAnimationFrame(loop);
     };
@@ -147,13 +162,24 @@ export class Voice {
     recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     const stopMeter = await this._meter(stream);
     // End of speech: ~1.2 s of quiet after something was said, or 15 s at most.
-    let heard = false, quietSince = 0;
+    // Adaptive end-of-speech: learn the room's noise floor in the first 0.4 s, then
+    // "speech" is anything clearly above it (never a fixed level: mics differ ~20x).
+    let heard = false, quietSince = 0, peak = 0;
+    const floor = [];
+    this.speechThreshold = null;
     const started = performance.now();
     const vad = setInterval(() => {
       const now = performance.now();
-      if (this.level > 0.08) { heard = true; quietSince = 0; }
+      const rms = this.rms || 0;
+      peak = Math.max(peak, rms);
+      if (now - started < 400) { floor.push(rms); return; }
+      if (this.speechThreshold === null) {
+        const sorted = floor.sort((a, b) => a - b);
+        this.speechThreshold = Math.max(0.0012, (sorted[Math.floor(sorted.length / 2)] || 0) * 3.5);
+      }
+      if (rms > this.speechThreshold) { heard = true; quietSince = 0; }
       else if (heard && !quietSince) quietSince = now;
-      if ((heard && quietSince && now - quietSince > 1200) || now - started > 15000 || (!heard && now - started > 6000)) stop();
+      if ((heard && quietSince && now - quietSince > 1200) || now - started > 15000 || (!heard && now - started > 7000)) stop();
     }, 100);
     const stop = () => { if (recorder.state === "recording") recorder.stop(); };
     this.active = { stop };
@@ -162,14 +188,16 @@ export class Voice {
       stopMeter();
       stream.getTracks().forEach((t) => t.stop());
       this.active = null;
-      if (!heard) { this._emit("onState", "idle", "local"); return this._fail("no-speech"); }
+      console.info("[orbit voice]", JSON.stringify({ threshold: this.speechThreshold, peak, heard, ms: Math.round(performance.now() - started) }));
+      // Even if the level never crossed the threshold, let Whisper judge the audio:
+      // a quiet mic is not the same as silence.
       this._emit("onState", "transcribing", "local");
       try {
         const asr = await loading;
         if (!asr) return;
         const buf = await new Blob(chunks).arrayBuffer();
         const ctx = new OfflineAudioContext(1, 16000, 16000);
-        const audio = (await ctx.decodeAudioData(buf)).getChannelData(0);
+        const audio = normalise((await ctx.decodeAudioData(buf)).getChannelData(0));
         const text = ((await asr(audio)).text || "").trim();
         if (text && !/^\[.*\]$|^\(.*\)$/.test(text)) this._emit("onFinal", text); // Whisper marks silence as [BLANK_AUDIO]
         else this._fail("no-speech");

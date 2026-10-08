@@ -287,6 +287,28 @@ class AssistantService:
             return f"is powered {value}"
         return f"has {attribute} {value}"
 
+    def _spoken_contents(self, anchor_id: str, at: datetime) -> str:
+        """ "What's on bench 3?" said the way a person would: what is confirmed there,
+        what was last seen there (may have moved), what is confirmed gone."""
+        anchor = self.repo.get_anchor(anchor_id)
+        place = anchor.name if anchor and anchor.name else anchor_id.replace("_", " ")
+        items = self.agent.memory.contents(anchor_id, at)
+        if not items:
+            return f"Nothing is recorded at {place}. That doesn't mean it's empty; I just haven't seen anything there."
+
+        def names(cs) -> str:
+            ns = [self._name(c.entity_id) for c in cs]
+            return ns[0] if len(ns) == 1 else ", ".join(ns[:-1]) + " and " + ns[-1]
+        here = [c for c in items if c.assessment.supportable]
+        gone = [c for c in items if not c.assessment.supportable and "confirmed absent" in c.assessment.reason]
+        maybe = [c for c in items if not c.assessment.supportable and c not in gone]
+        parts = [f"At {place}: {names(here)}." if here else f"Nothing is confirmed at {place} right now."]
+        if maybe:
+            parts.append(f"Last seen there, but may have moved: {names(maybe)}.")
+        if gone:
+            parts.append(f"Confirmed gone: {names(gone)}.")
+        return " ".join(parts)
+
     def _spoken_changes(self, response: GroundedResponse) -> str:
         """Speak the world changes first (objects moved, appeared, contested), task
         bookkeeping last; the full list stays on screen."""
@@ -364,6 +386,8 @@ class AssistantService:
             turn.reply = f"{response.answer} {response.summary}"
         if response.intent.kind == QueryKind.WHAT_CHANGED and response.changes:
             turn.speech = self._spoken_changes(response)
+        if response.intent.kind == QueryKind.CONTENTS and response.intent.anchor_id:
+            turn.speech = self._spoken_contents(response.intent.anchor_id, response.intent.as_of or at)
         turn.gesture = Gesture.EXPLAIN if not response.abstained else (Gesture.THINK if response.requested_observation else Gesture.SHRUG)
         if response.conflicts:
             turn.gesture = Gesture.ALERT
@@ -623,7 +647,8 @@ class AssistantService:
                       "tell me 'I put the notebook on bench 4' or 'I finished step 7'; say 'pause the task' or 'continue'; "
                       "ask 'what should I check?'. For physical actions like 'open the valve' I check the prerequisites and ask "
                       "for your yes. You do the action, I verify the result.")
-        turn.speech = "Ask me where things are or what changed, tell me what you did, or ask me to prepare an action for your approval."
+        turn.speech = ("Ask me where things are or what changed, or tell me what you did. To get an action approved, "
+                       "just name it, like: open the valve. I'll check it's safe and ask for your yes.")
         turn.gesture = Gesture.EXPLAIN
 
     def _heard(self, conv: Conversation, command: Command, turn: AssistantTurn, at: datetime) -> None:

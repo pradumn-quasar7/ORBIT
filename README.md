@@ -72,6 +72,14 @@ sure it is, live. Hold the grip button to talk to Orbi. If macOS asks whether Py
 accept incoming connections, allow it. The Quest browser gives web pages no camera
 pixels, so the webcam page keeps doing perception.
 
+**USB instead of Wi-Fi** (Developer Mode on, cable plugged in, "Allow USB debugging" accepted):
+```bash
+adb reverse tcp:8765 tcp:8765
+```
+then open `http://localhost:8765/ui/xr.html` in the Quest browser — no certificate warning
+and no pairing code. The Quest browser cannot speak, so Orbi's voice is rendered by your
+Mac and played in the headset.
+
 ### Realtime
 Every page is live: the Inspector redraws and shows a ticker the moment ORBIT commits a
 change, and Orbi speaks up unasked (e.g. "Verified: the result of 'open the valve' is now

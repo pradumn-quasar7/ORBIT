@@ -89,13 +89,16 @@ NO = re.compile(r"^(no|nope|nah|cancel|don t|do not|deny|denied|stop|never ?mind
 QUESTION_START = re.compile(r"^(where|what|whats|which|who|whos|when|why|how|is|are|was|were|does|do|did|has|have|can i|could i|should i|tell me|show me|any)\b")
 POLITE = re.compile(r"^(?:(?:hey |ok |okay )?orbit,? )?(?:please |kindly |can you |could you |would you |will you |go ahead and |i want you to |i d like you to |i need you to )*")
 # Speech-to-text renders "Orbi" in many ways ("orby", "orbit", "aur bhi" with an Indian accent).
-NAME = r"(orbi|orby|orbie|orbee|orbit|aur ?bhi|aur ?be|or be|orb)"
-GREETING = re.compile(rf"^((hi|hello|hey|hay|hai|good (morning|afternoon|evening)|namaste)( {NAME})?|{NAME})$")
-ADDRESS = re.compile(rf"^(?:(?:hi|hey|hay|hai|ok|okay|hello)\s+)?{NAME}\s+(?=\S)")
+# ...and the Quest's Whisper heard "Hey R.B." (Phase 18.1 headset test).
+NAME = r"(orbi|orby|orbie|orbee|orbit|arby|arbi|aur ?bhi|aur ?be|or be|orb|r ?b|r ?bee|our bee)"
+_HELLO = r"(hi|hello|hey|hay|hai|good (morning|afternoon|evening)|namaste)"
+GREETING = re.compile(rf"^(({_HELLO} ?)+( {NAME})?|{NAME})$")
+ADDRESS = re.compile(rf"^(?:(?:{_HELLO}|ok|okay)\s+)*{NAME}\s+(?=\S)")
+LEADING_FILLER = re.compile(r"^((ok|okay|so|um+|uh+|well|right|alright|now)\s+)+(?=\S)")
 HEARD = re.compile(r"\b(can|do|did) you (hear|listen to|understand) me\b|\b(am i|i am|i m|im) (audible|clear|loud enough)\b"
                    r"|\bare you (listening|there|working|alive|awake)\b|\b(is|was) (this|it|that) working\b|^(testing|test|mic test|check)( (1|one|2|two|3|three|testing))*$")
 FILLER = re.compile(r"^((ok|okay|so|like|um+|uh+|hmm+|mm+|yeah|right|well|and|but|actually|wait|hold on|let me see|let me think)\s*)+$")
-HELP = re.compile(r"\b(help|what can you do|how do i use you|what do you do)\b")
+HELP = re.compile(r"\b(help|what can you do|how do i use you|what do you do|how do i (approve|authori[sz]e|get an action)|(get )?an action approved|approve an action)\b")
 RECAP = re.compile(r"\bwhat (did|have) you (do|done)\b|\bwhat have you done\b|\byour actions\b")
 CHECKS = re.compile(r"\bwhat (should|do) i (check|look at|verify|inspect)\b|\bwhat needs (checking|verifying|a look)\b|\bwhat should i look at\b")
 INTERRUPT = re.compile(r"\b(pause|interrupt|hold|suspend) (the )?(task|work|job)\b|\b(i m|im|i am) (taking a break|stopping|going for (lunch|a break))\b|\btake a break\b")
@@ -232,6 +235,8 @@ class RuleBasedCommandProvider(CommandProvider):
         question = raw.strip().endswith("?") or bool(QUESTION_START.match(t))
 
         t = ADDRESS.sub("", t, count=1)  # "hey orbi, where is…" → "where is…"
+        if not FILLER.match(t):
+            t = LEADING_FILLER.sub("", t, count=1)  # "okay tell me where…" → "tell me where…"
         if context.pending_confirmation:
             if YES.match(t) and not question:
                 return Command(kind=CommandKind.CONFIRM, raw=raw)
