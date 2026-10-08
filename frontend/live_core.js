@@ -100,5 +100,38 @@
     return pcm16ToBase64(floatToPcm16(applyGain(resample(float32, rate, 16000), gain)));
   }
 
-  return { resample, applyGain, floatToPcm16, pcm16ToFloat, bytesToBase64, base64ToBytes, pcm16ToBase64, base64ToPcm16, rms, encodeChunk };
+  function concat(chunks) {
+    const out = new Float32Array(chunks.reduce((n, c) => n + c.length, 0));
+    let o = 0;
+    for (const c of chunks) { out.set(c, o); o += c.length; }
+    return out;
+  }
+
+  // Peak-normalise a quiet utterance (headset mics) so speech recognition hears it clearly.
+  function normalise(samples, target = 0.9, maxGain = 40) {
+    let peak = 0;
+    for (const v of samples) peak = Math.max(peak, Math.abs(v));
+    if (peak === 0) return samples;
+    const gain = Math.min(target / peak, maxGain);
+    if (gain <= 1) return samples;
+    const out = new Float32Array(samples.length);
+    for (let i = 0; i < samples.length; i++) out[i] = samples[i] * gain;
+    return out;
+  }
+
+  // A complete 16-bit mono WAV file (bytes) — what the hosted speech recogniser receives.
+  function wav(float32, rate) {
+    const pcm = floatToPcm16(float32);
+    const bytes = new Uint8Array(44 + pcm.length * 2);
+    const view = new DataView(bytes.buffer);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) bytes[o + i] = s.charCodeAt(i); };
+    str(0, "RIFF"); view.setUint32(4, 36 + pcm.length * 2, true); str(8, "WAVE");
+    str(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+    view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+    str(36, "data"); view.setUint32(40, pcm.length * 2, true);
+    for (let i = 0; i < pcm.length; i++) view.setInt16(44 + i * 2, pcm[i], true);
+    return bytes;
+  }
+
+  return { concat, normalise, wav, resample, applyGain, floatToPcm16, pcm16ToFloat, bytesToBase64, base64ToBytes, pcm16ToBase64, base64ToPcm16, rms, encodeChunk };
 });

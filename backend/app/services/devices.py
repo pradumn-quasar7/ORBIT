@@ -53,6 +53,8 @@ APPS: Dict[str, App] = {
     "spotify": App(quest_url="https://open.spotify.com", mac_app="Spotify", mac_url="https://open.spotify.com"),
     "orbit": App(quest_url="http://localhost:8765/ui/xr.html", mac_url="http://localhost:8765/ui/"),
 }
+DISPLAY = {"whatsapp": "WhatsApp", "instagram": "Instagram", "facebook": "Facebook", "youtube": "YouTube", "browser": "the browser",
+           "google": "Google", "gmail": "Gmail", "maps": "Google Maps", "spotify": "Spotify", "orbit": "ORBIT"}
 ALIASES = {"whats app": "whatsapp", "insta": "instagram", "ig": "instagram", "fb": "facebook", "yt": "youtube",
            "chrome": "browser", "safari": "browser", "web browser": "browser", "google maps": "maps", "mail": "gmail"}
 
@@ -126,6 +128,7 @@ class DeviceController:
 
     def open_app(self, name: str, device: str) -> str:
         key = ALIASES.get(name.strip().lower(), name.strip().lower())
+        name = DISPLAY.get(key, name.strip())
         device = self._target(device)
         app = APPS.get(key)
         where = "Quest" if device == "quest" else "Mac"

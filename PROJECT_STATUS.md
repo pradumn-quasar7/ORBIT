@@ -303,6 +303,18 @@ the user's Mac and Quest.
 - ADR-044. Tests: `test_live.py` (device commands per device, unsafe URLs, Quest not connected, contacts; token never exposes the key, setup contents; orbit tool grounded with `heard`; consent matrix; device tools; message prepare → refuse → send once → expire; Quest messages opened not sent; API; `.env` loading), `live_core.test.js`.
 - **Not yet verified against Google's servers**: no key was available at build time. The protocol follows the current API reference; the client falls back between `v1beta` and `v1alpha` for the token endpoint.
 
+### Phase 19.1 — Hosted speech-to-speech on Groq's free plan
+**Planned**
+- The Gemini project had no credit, and the user did not want to pay or run models locally. Use Groq's free hosted models instead: speech to text, a tool-calling chat model, text to speech, as a continuous, interruptible voice conversation.
+
+**Implemented**
+- Verified with the user's key first: Whisper `whisper-large-v3-turbo` (0.3 s, word-perfect); tool calling with `openai/gpt-oss-120b` and `qwen/qwen3.8-27b` (≈0.3 s; `llama-3.3-70b-versatile` is not available to this account); Orpheus TTS needs a one-time terms acceptance in the Groq console.
+- `services/voice_agent.py` `VoiceAgent`: one turn = Groq Whisper → chat model with **the same six tools, instructions and consent rules as the Gemini engine** (`LiveService.call`, consent judged on the transcript) → reply. Model fallback on 404, plain errors for limits/keys, per-conversation history (16 messages), Whisper silence hallucinations ("Thank you.", "you") ignored. `api/voice.py`: `GET /voice/status`, `POST /voice/turn` (raw audio body).
+- `/speech` now prefers Groq's Orpheus voice and falls back to the Mac voice (retrying Groq after 2 min); Hindi text uses the Mac Hindi voice.
+- `frontend/conversation.js` `HostedConversation`: hands-free turn-taking in the browser. Adaptive speech detection, 0.5 s pre-roll, end after 0.9 s of quiet, normalised 16 kHz WAV, barge-in that stops Orbi when the user talks over it (threshold raised while Orbi speaks), the same callbacks as the Gemini engine. Both pages choose Groq, else Gemini, else the previous method. `live_core.js` gained `concat`, `normalise` (gain capped at 40×) and `wav`.
+- Real round trips through ORBIT with Groq (synthesised speech): "where is the microscope" → `orbit("where is m17")` → an answer that keeps ORBIT's staleness; "can you open the valve" → the action prepared, consent pending. 1–2.5 s per turn. Fixed from that test: Orbi asked the user to point the *headset* camera; it now asks for the webcam or the user's own check.
+- Tests: `test_voice_agent.py` (turn pipeline, history, device tools, the model cannot give consent, silence, model fallback and limits, API, Groq voice with fallback), `live_core.test.js` (WAV, normalisation).
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -351,7 +363,7 @@ the user's Mac and Quest.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 648 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 666 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
@@ -378,6 +390,7 @@ the user's Mac and Quest.
 - ADR-042 Voice input: browser speech service with on-device Whisper fallback
 - ADR-043 Quest client: memory pinned to the room, no camera pixels, paired LAN access over HTTPS
 - ADR-044 Gemini Live: realtime voice, tools executed by ORBIT, consent from the user's own words
+- ADR-045 Groq free-plan speech-to-speech as the default hosted voice engine
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.

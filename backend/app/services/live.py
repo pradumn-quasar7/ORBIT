@@ -137,6 +137,7 @@ How you work:
 - Messages: call `prepare_message`, read back the recipient and the exact text, ask "Shall I send it?", and only after the user says yes call `send_message`. The yes must come from the user; a yes is checked against their own words.
 - Consent: never answer yes on the user's behalf and never treat your own words as consent.
 - Keep replies short and spoken: one or two sentences. Use the user's language (they may mix Hindi and English).
+- When ORBIT needs a fresh look, ask the user to show it to the webcam (the ORBIT camera page) or to check and tell you. The headset cannot send camera images to ORBIT.
 - If you're not sure what the user wants, ask a short question.
 
 Workspace vocabulary (use these ids with `orbit`):
@@ -205,7 +206,8 @@ class LiveService:
             raise LiveNotConfigured("Gemini returned no session token")
         return token
 
-    def setup_message(self, user_id: str, device: str) -> Dict[str, Any]:
+    def instructions(self, user_id: str, device: str) -> str:
+        """Orbi's instructions with the live workspace vocabulary (shared by every voice engine)."""
         vocab = self.assistant.agent.vocabulary()
         repo = self.assistant.repo
         objects = "; ".join(f"{eid} ({', '.join(f for f in forms if f != eid) or vocab.entity_types.get(eid)})"
@@ -214,8 +216,11 @@ class LiveService:
         tasks = "; ".join(f"{t.id} '{t.goal}': " + ", ".join(f"step {s.step_order} {s.description} [{s.status.value}]" for s in t.steps)
                           for t in repo.list_tasks() if t.status.value not in ("COMPLETED", "ABANDONED")) or "none"
         here = {"quest": " (the Quest headset)", "mac": " (the Mac)"}.get(device, "")
-        text = INSTRUCTIONS.format(user=user_id, where=f", through {here.strip(' ()')}" if here else "", here=here,
+        return INSTRUCTIONS.format(user=user_id, where=f", through {here.strip(' ()')}" if here else "", here=here,
                                    objects=objects, places=places, tasks=tasks, apps=", ".join(sorted(APPS)))
+
+    def setup_message(self, user_id: str, device: str) -> Dict[str, Any]:
+        text = self.instructions(user_id, device)
         return {"setup": {
             "model": f"models/{self.settings.model}",
             "generationConfig": {

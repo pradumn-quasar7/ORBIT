@@ -15,6 +15,7 @@ from backend.app.services.actions import ActionSafetyService
 from backend.app.services.assistant import AssistantService
 from backend.app.services.devices import DeviceController
 from backend.app.services.live import LiveService
+from backend.app.services.voice_agent import VoiceAgent
 from backend.app.services.active_perception import ActivePerceptionPlanner
 from backend.app.services.hypotheses import HypothesisService
 from backend.app.services.identity import IdentityService
@@ -71,6 +72,7 @@ class OrbitServices:
     assistant: AssistantService
     bus: EventBus
     live: LiveService
+    voice: VoiceAgent
 
     config: OrbitConfig = OrbitConfig()
 
@@ -112,6 +114,7 @@ class OrbitServices:
         assistant.ensure_principal(clock.now())
         if realtime and not sandbox:
             repo.on_commit(publish_committed(bus))
+        live = LiveService(assistant, DeviceController())
         return cls(
             repo=repo,
             clock=clock,
@@ -132,7 +135,8 @@ class OrbitServices:
             camera=CameraService(repo, engine, search),
             assistant=assistant,
             bus=bus,
-            live=LiveService(assistant, DeviceController()),
+            live=live,
+            voice=VoiceAgent(live),
             config=config,
         )
 

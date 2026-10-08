@@ -42,3 +42,20 @@ test("gain lifts a quiet headset mic without hard clipping", () => {
   const chunk = core.encodeChunk(Float32Array.from({ length: 4800 }, () => 0.1), 48000, 1);
   assert.equal(core.base64ToPcm16(chunk).length, 1600);
 });
+
+test("utterances become normalised 16 kHz WAV files", () => {
+  const quiet = core.concat([Float32Array.from({ length: 800 }, () => 0.025), Float32Array.from({ length: 800 }, () => -0.05)]);
+  assert.equal(quiet.length, 1600);
+  const loud = core.normalise(quiet);
+  assert.ok(Math.abs(Math.max(...loud.map(Math.abs)) - 0.9) < 1e-5); // float32 precision
+  assert.equal(core.normalise(Float32Array.from([0.95, -0.5]))[0], Math.fround(0.95)); // already loud: unchanged
+  assert.ok(Math.max(...core.normalise(Float32Array.from([0.001, -0.001])).map(Math.abs)) <= 0.0401); // gain capped at 40x: noise stays small
+  const bytes = core.wav(loud, 16000);
+  const b = Buffer.from(bytes);
+  assert.equal(b.toString("ascii", 0, 4), "RIFF");
+  assert.equal(b.toString("ascii", 8, 12), "WAVE");
+  assert.equal(b.readUInt32LE(24), 16000);
+  assert.equal(b.readUInt16LE(34), 16);
+  assert.equal(b.readUInt32LE(40), 1600 * 2);
+  assert.equal(bytes.length, 44 + 3200);
+});

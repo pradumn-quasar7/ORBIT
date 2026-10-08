@@ -59,7 +59,14 @@ language — this sends the workspace vocabulary to the Anthropic API:
 ORBIT_ASSISTANT_LLM=anthropic ANTHROPIC_API_KEY=... ORBIT_DATABASE_URL=sqlite:///./orbit_demo.db .venv/bin/uvicorn backend.app.main:app --port 8765
 ```
 
-### Realtime voice with Gemini Live
+### Realtime voice with Groq (free) or Gemini Live
+**Groq (free plan, recommended):** create a key at console.groq.com → API Keys and add it
+to `.env` as `GROQ_API_KEY=gsk_...`, then restart. Talk hands-free: speak, pause, Orbi
+answers aloud and listens again; talk over Orbi to interrupt. For Groq's natural voice,
+accept the Orpheus terms once at
+https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english (until then
+Orbi uses the Mac's voice).
+
 Put your Gemini API key in the `.env` file in the project folder (it is git-ignored and
 private to your user):
 ```
