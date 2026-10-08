@@ -59,6 +59,21 @@ language — this sends the workspace vocabulary to the Anthropic API:
 ORBIT_ASSISTANT_LLM=anthropic ANTHROPIC_API_KEY=... ORBIT_DATABASE_URL=sqlite:///./orbit_demo.db .venv/bin/uvicorn backend.app.main:app --port 8765
 ```
 
+### Realtime voice with Gemini Live
+Put your Gemini API key in the `.env` file in the project folder (it is git-ignored and
+private to your user):
+```
+GEMINI_API_KEY=AIza...your key...
+```
+Restart with `scripts/run_demo.sh --lan`. The assistant page and the Quest then talk in
+real time (interrupt Orbi any time). Orbi can open apps and websites and search on the
+Mac or the Quest ("open WhatsApp in the headset", "search 3D printers on the Mac"), and
+send a WhatsApp message after reading it back and hearing your own "yes". Contacts by
+name come from `.run/contacts.json`, e.g. `{"Mom": "+91 98765 43210"}`. Sending from the
+Mac's WhatsApp app needs Accessibility permission for Python (System Settings → Privacy &
+Security → Accessibility); on the Quest the chat opens with the text filled in and you
+tap send. Facts about your workspace still come only from ORBIT's evidence.
+
 ### Meta Quest (mixed reality)
 ```bash
 scripts/run_demo.sh --lan

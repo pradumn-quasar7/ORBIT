@@ -23,6 +23,7 @@ from typing import List, Optional
 import uvicorn
 
 from backend.app.core.container import default_repository
+from backend.app.core.secrets import load_env
 from backend.app.core.pairing import new_code
 from backend.app.main import create_app
 
@@ -68,6 +69,7 @@ def pairing_code(renew: bool = False) -> str:
 
 
 async def serve(args) -> None:
+    load_env()  # GEMINI_API_KEY etc. from the git-ignored .env
     code = url = None
     ip = lan_ip() if args.lan else None
     if args.lan and not ip:

@@ -90,6 +90,7 @@ class AssistantTurn(BaseModel):
     conversation_id: str
     at: UTCDateTime
     user_text: str
+    heard: Optional[str] = None  # the user's own transcribed words, when a voice model wrote user_text
     command: Command
     reply: str
     speech: str  # the reply as the avatar says it (names instead of ids, short)
@@ -196,15 +197,19 @@ class AssistantService:
         return conv
 
     # -------------------------------------------------------------------- turn
-    def say(self, conversation_id: str, text: str, at: datetime) -> AssistantTurn:
+    def say(self, conversation_id: str, text: str, at: datetime, heard: Optional[str] = None) -> AssistantTurn:
+        """``heard``: when a voice model (Gemini Live) wrote ``text`` on the user's behalf,
+        the user's own transcribed words. Consent is then judged on those words only."""
         with self._lock:
             self._local.speaking = conversation_id  # its own writes are answered in the reply, not as notices
+            self._local.heard = heard
             try:
-                return self._say(conversation_id, text, at)
+                return self._say(conversation_id, text, at, heard)
             finally:
                 self._local.speaking = None
+                self._local.heard = None
 
-    def _say(self, conversation_id: str, text: str, at: datetime) -> AssistantTurn:
+    def _say(self, conversation_id: str, text: str, at: datetime, heard: Optional[str] = None) -> AssistantTurn:
         conv = self.get(conversation_id)
         text = spoken_numbers(text)
         if conv.pending and at > conv.pending.expires_at:
@@ -231,7 +236,15 @@ class AssistantService:
             CommandKind.HEARD: self._heard,
             CommandKind.GREET: self._greet,
         }[command.kind]
-        turn = AssistantTurn(conversation_id=conv.id, at=at, user_text=text, command=command, reply="", speech="", gesture=Gesture.EXPLAIN)
+        turn = AssistantTurn(conversation_id=conv.id, at=at, user_text=text, heard=heard, command=command, reply="", speech="", gesture=Gesture.EXPLAIN)
+        if command.kind == CommandKind.CONFIRM and heard is not None and not self._user_said_yes(heard):
+            # A model may relay "yes"; only the user's own words can authorise (ADR-040, ADR-044).
+            turn.reply = "I need to hear the yes from you: please say \"yes\" if you want me to go ahead."
+            turn.gesture = Gesture.ASK
+            turn.speech = turn.reply
+            turn.pending = conv.pending
+            conv.turns.append(turn)
+            return turn
         if command.ambiguous and not command.entity_id and command.kind in (CommandKind.TELL, CommandKind.ACT):
             self._clarify(turn, command)
         else:
@@ -340,8 +353,17 @@ class AssistantService:
     def _record(self, turn: AssistantTurn, at: datetime, kind: str, summary: str, refs: List[str]) -> None:
         turn.done.append(DelegatedAction(at=at, kind=kind, summary=summary, refs=refs))
 
+    @staticmethod
+    def _user_said_yes(heard: str) -> bool:
+        from backend.app.providers.commands import ADDRESS, YES, normalise
+        return bool(YES.match(ADDRESS.sub("", normalise(spoken_numbers(heard)), count=1)))
+
     def _provenance(self, conv: Conversation, text: str) -> Dict[str, Any]:
-        return {"actor": conv.user_id, "via": ASSISTANT, "conversation": conv.id, "utterance": text}
+        out = {"actor": conv.user_id, "via": ASSISTANT, "conversation": conv.id, "utterance": text}
+        heard = getattr(self._local, "heard", None)
+        if heard:
+            out["heard"] = heard  # the user's own words, when a voice model phrased the request
+        return out
 
     def _step(self, command: Command) -> Optional[Tuple[str, str]]:
         """Resolve the command's step reference to (task id, step id)."""

@@ -1,12 +1,13 @@
 # ORBIT Project Status
 
 ## Current Phase
-**Phase 18 — Meta Quest 3S mixed reality (COMPLETE, untested on a headset).** ORBIT v0.1
-(Phases 0–9) is complete; Phases 10–17 added counterfactual sandboxes, decision-aware
-perception, risk-graded verification, identity curation, a generated benchmark, live
-webcam perception, Orbi the conversational assistant, and realtime updates; Phase 18 puts
-ORBIT's memory into the real room on a Quest headset, after fixing what the first live
-webcam test exposed.
+**Phase 19 — Realtime voice with Gemini Live + device actions (COMPLETE; awaiting the user's API key for a live test).**
+ORBIT v0.1 (Phases 0–9) is complete; Phases 10–18 added counterfactual sandboxes,
+decision-aware perception, risk-graded verification, identity curation, a generated
+benchmark, live webcam perception, Orbi the assistant, realtime updates and the Quest
+mixed-reality client (tested on a real Quest 3S in 18.1). Phase 19 makes the conversation
+truly realtime with Gemini Live and lets Orbi open apps, search and send messages on
+the user's Mac and Quest.
 
 ## Phase Log
 
@@ -288,6 +289,20 @@ webcam test exposed.
 - **Understanding** (from the real transcripts): "Hey R.B." / "Arby" are Orbi's name; leading fillers ("okay tell me…") are dropped; "where is bench 3" (a place) answers what is there; an unknown object gets "I know about: …"; "get an action approved" explains how. Place contents are spoken naturally ("At Bench 4: … Last seen there, but may have moved: … Confirmed gone: …").
 - Tests: transcripts from the session, place-contents speech, speech endpoint (WAV, cache, length cap, unavailable).
 
+### Phase 19 — Realtime voice (Gemini Live) and device actions
+**Planned**
+- The user asked for a complete, realtime conversational agent on their Google Gemini key that also does what they say: "open Instagram", "open WhatsApp", "search this in the browser". Decisions (asked): both devices (Quest and Mac); an `AIza…` API key; WhatsApp messages may be sent, but only after the user's own yes.
+- Checked against Google's current docs: Live API over WebSocket, model `gemini-3.8-live` (native audio, function calling, barge-in, input/output transcription), 16 kHz PCM in, 24 kHz PCM out, ephemeral tokens recommended for clients.
+
+**Implemented**
+- `services/live.py` `LiveService`: mints a **single-use ephemeral token** per session (`POST /v1beta/auth_tokens`, 30 min, 2 min to start); the API key never reaches a browser. Writes the session setup: Orbi's instructions (never state facts about the room except from ORBIT; relay uncertainty; never give consent), the live workspace vocabulary, voice, transcription. Six tools: `orbit` (anything about the world, tasks and physical actions → the existing assistant, evidence gate and action-safety boundary), `open_app`, `web_search`, `open_website`, `prepare_message`, `send_message`.
+- **Consent stays deterministic**: every tool call carries the user's own transcribed words for that turn (`heard`). A "yes" that authorises an action (assistant) or sends a message (live service) must be the user's whole utterance; a model-relayed "yes" is refused ("I need to hear the yes from you"). The user's words are stored in evidence provenance. ORBIT notices are injected into the conversation as notices, never as user words.
+- `services/devices.py` `DeviceController`: Quest via adb (apps by package; web pages in the Quest browser; Instagram/YouTube etc. as websites since no Quest apps), Mac via `open`. Argument lists only, URLs must be web addresses, package names validated. WhatsApp: chat opened with the text filled in; on the Mac's WhatsApp app it is sent (app activated, then Return, needs Accessibility permission), on the Quest the user taps send. Contacts from `.run/contacts.json` or a spoken number. Messages expire after 2 min and send once.
+- `api/live.py`: `GET /live/status`, `POST /live/session`, `POST /live/tool`. `core/secrets.py`: `.env` (git-ignored, owner-only) loaded at start.
+- Frontend: `live_core.js` (resampling, soft gain for the quiet Quest mic, PCM16 ↔ base64; unit-tested), `live.js` (`LiveSession`: AudioWorklet capture → 100 ms chunks, gapless 24 kHz playback with barge-in flush, transcripts, tool round-trips). The assistant page gets "Gemini Live (realtime)" (default when a key exists), with live transcript bubbles and ✓/✗ tool lines. In the Quest, grip / Talk opens a live conversation; Orbi's mouth follows its real voice; a consent request shows the Yes/No buttons.
+- ADR-044. Tests: `test_live.py` (device commands per device, unsafe URLs, Quest not connected, contacts; token never exposes the key, setup contents; orbit tool grounded with `heard`; consent matrix; device tools; message prepare → refuse → send once → expire; Quest messages opened not sent; API; `.env` loading), `live_core.test.js`.
+- **Not yet verified against Google's servers**: no key was available at build time. The protocol follows the current API reference; the client falls back between `v1beta` and `v1alpha` for the token endpoint.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -336,7 +351,7 @@ webcam test exposed.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 618 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 648 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 
@@ -362,6 +377,7 @@ webcam test exposed.
 - ADR-041 Realtime: commit-time notifications, SSE with replay, proactive assistant notices
 - ADR-042 Voice input: browser speech service with on-device Whisper fallback
 - ADR-043 Quest client: memory pinned to the room, no camera pixels, paired LAN access over HTTPS
+- ADR-044 Gemini Live: realtime voice, tools executed by ORBIT, consent from the user's own words
 
 ## Research Experiments Enabled
 - A (persistent identity), B (world diff, incl. B-0), C (stale-memory resistance), D (task resumption), E (evidence and causality), F (active perception) — all runnable via ORBIT-BENCH or dedicated tests, each with its ablation baseline.
@@ -370,4 +386,4 @@ webcam test exposed.
 - G (AR utility) — deferred (needs an AR client).
 
 ## Last Updated
-- 2026-10-05 (Phase 18)
+- 2026-10-08 (Phase 19)

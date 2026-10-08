@@ -562,10 +562,54 @@ async function setupVoice() {
   }
 }
 
-function startTalking() {
+// Realtime conversation (Phase 19): with a Gemini key on the ORBIT server, Talk opens a
+// live, interruptible conversation; otherwise one utterance at a time (voice.js).
+const DEVICE = /OculusBrowser|Quest/.test(navigator.userAgent) ? "quest" : "mac";
+let liveAvailable = false;
+let liveSession = null;
+
+async function startTalking() {
+  if (liveAvailable) return toggleLive();
   if (!state.voice) return say("Voice isn't available in this browser.", "SHRUG");
   if (synth) synth.cancel();
   state.voice.toggle();
+}
+
+async function toggleLive() {
+  if (liveSession) { liveSession.stop(); return; }
+  const { LiveSession } = await import("./live.js");
+  if (!state.conversation) await startConversation();
+  let heardLine = "";
+  liveSession = new LiveSession({
+    device: DEVICE,
+    userId: $("user").value.trim() || "operator",
+    conversationId: state.conversation.id,
+    on: {
+      state(s) {
+        if (s === "connecting") drawBubble(bubble, "Connecting…", "#9aa4b2");
+        if (s === "listening") { orbi.setState("listening"); if (!heardLine) drawBubble(bubble, "I'm listening — just talk.", "#4ade80"); }
+        if (s === "speaking") orbi.setState("speaking");
+        if (s === "closed") { liveSession = null; orbi.setState("idle"); drawBubble(bubble, "Live conversation ended. Talk again any time.", "#9aa4b2"); }
+      },
+      userText(text) { heardLine = text; drawBubble(bubble, `“${text}”`, "#9aa4b2"); },
+      orbiText(text, final) { drawBubble(bubble, text); if (final) heardLine = ""; },
+      tool(name, args, result) {
+        if (!result.ok) { orbi.gesture("SHRUG"); status(result.error, "error"); }
+        else if (result.waiting_for_user_consent) { orbi.gesture("ASK"); state.pending = { summary: result.waiting_for_user_consent }; buildMenu(); }
+        else orbi.gesture("NOD");
+        if (name === "orbit") soon(); // the world model may have changed
+      },
+      level(v) { if (v > 0.02) orbi.mouth(v); },
+      error(message) { status(message, "error"); drawBubble(bubble, message, "#f87171"); },
+    },
+  });
+  try {
+    await liveSession.start();
+    if (liveSession && liveSession.conversationId !== state.conversation.id) state.conversation = { id: liveSession.conversationId };
+  } catch (err) {
+    say(`I can't start the live conversation: ${err.message}`, "ALERT", "#f87171");
+    if (liveSession) liveSession.stop();
+  }
 }
 
 // -------------------------------------------------------------- assistant
@@ -583,7 +627,11 @@ async function startConversation() {
   state.conversation = await api("POST", "/assistant/conversations", { user_id: user });
   if (assistantLive) assistantLive.close();
   assistantLive = OrbitLive.connect(`/stream?topics=assistant&conversation=${encodeURIComponent(state.conversation.id)}`, {
-    onMessage(msg) { if (msg.type === "NOTICE") say(msg.data.speech || msg.data.reply, msg.data.gesture); },
+    onMessage(msg) {
+      if (msg.type !== "NOTICE") return;
+      if (liveSession) { liveSession.inform(msg.data.speech || msg.data.reply); orbi.gesture(msg.data.gesture); }
+      else say(msg.data.speech || msg.data.reply, msg.data.gesture);
+    },
   });
 }
 
@@ -723,6 +771,10 @@ async function init() {
   connectPanel();
   await refreshPlaces();
   setupVoice();
+  import("./live.js").then(async ({ liveStatus }) => {
+    liveAvailable = (await liveStatus()).configured;
+    if (liveAvailable) status("Gemini Live is on: press Talk (or hold the grip in AR) and just talk.", "ok");
+  });
   OrbitLive.connect("/stream?topics=world,observation", {
     onMessage: soon,
     onStatus(s) { OrbitLive.pill($("live"), s); if (s === "live") soon(); },

@@ -41,6 +41,7 @@
             <option value="auto">Auto</option>
             <option value="browser">Browser service (online)</option>
             <option value="local">On this device (private)</option>
+            <option value="live" disabled>Gemini Live (realtime)</option>
           </select>
         </label>
         <label class="toggle"><input type="checkbox" id="speak" checked> Speak replies</label>
@@ -65,6 +66,7 @@
   </main>
 
   <script src="realtime.js"></script>
+  <script src="live_core.js"></script>
   <script type="module" src="assistant.js"></script>
 </body>
 </html>

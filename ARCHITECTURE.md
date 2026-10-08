@@ -74,6 +74,8 @@ backend/app/
     perception_gateway.py frame ingestion, retention, redaction
     camera.py             live camera: calibration (regions as anchor frames), snapshots, scans
     assistant.py          conversational assistant: delegation inside ORBIT, consent-bound action prep
+    live.py               Gemini Live sessions: ephemeral tokens, setup, tool execution, consent from heard words
+    devices.py            device actions on the Mac (open) and Quest (adb): apps, web, WhatsApp
     dashboard.py          inspection read model
     grading.py            status of a version from its supports (shared)
     projection.py         world as known at T (id-preserving copy)
@@ -81,7 +83,7 @@ backend/app/
     counterfactual.py     what-if premises, decision comparison, sensitivity analysis
     replay.py             frame-by-frame history
   evaluation/      metrics.py (P/R etc.), bench.py (ORBIT-BENCH runner), counterfactual_eval.py (Experiment H), decision_perception_eval.py (Experiment F2), generator.py + generated.py + stats.py (generated worlds, bootstrap CIs)
-  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual, identity, camera, assistant, realtime /stream, xr)
+  api/             FastAPI routers (world, spatial, evidence, memory, queries, actions, inspect, counterfactual, identity, camera, assistant, realtime /stream, xr, speech, live)
   main.py          create_app(repository, clock, pair_code, lan_url) factory; lazy module-level `app`
   serve.py         launcher: localhost HTTP + optional LAN HTTPS listener in one process
 database/          Alembic migrations 0001–0009, migrate.py
