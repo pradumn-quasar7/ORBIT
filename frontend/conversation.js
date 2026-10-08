@@ -16,6 +16,7 @@ const PREROLL_MS = 500;
 const END_SILENCE_MS = 900;
 const MIN_SPEECH_MS = 250;
 const MAX_UTTERANCE_MS = 15000;
+const IDLE_STOP_MS = 90000; // nobody talked to Orbi for 90 s: stop listening
 
 export async function voiceStatus() {
   try {
@@ -62,6 +63,7 @@ export class HostedConversation {
     this.threshold = null;
     this.speechMs = 0;
     this.silenceMs = 0;
+    this.lastTalk = Date.now();
     this.active = true;
     node.port.onmessage = (e) => {
       if (!this.active) return;
@@ -90,6 +92,11 @@ export class HostedConversation {
       return;
     }
     this.emit("micLevel", Math.min(1, rms / (this.threshold * 4)));
+    if (this.phase === "listening" && Date.now() - this.lastTalk > IDLE_STOP_MS) {
+      this.emit("orbiText", "I'll stop listening for now. Wake me when you need me.", true);
+      this.stop();
+      return;
+    }
     const loud = rms > this.threshold * (this.phase === "speaking" ? 2.2 : 1); // Orbi's own voice must not trigger
     if (this.phase === "listening") {
       this.ring.push(samples);
@@ -137,7 +144,14 @@ export class HostedConversation {
     if (!this.active) return;
     this.conversationId = out.conversation_id;
     if (!out.heard) { this.setPhase("listening"); return; } // noise, not words
+    this.lastTalk = Date.now();
     this.emit("userText", out.heard, true);
+    if (out.end_session || core.isStop(out.heard)) { // "stop": a short goodbye, then mic off
+      this.emit("orbiText", out.reply || "Okay, I'll stop listening.", true);
+      await this.say(out.reply || "Okay, I'll stop listening.");
+      this.stop();
+      return;
+    }
     for (const t of out.tools || []) this.emit("tool", t.name, t.args, t.result);
     this.emit("orbiText", out.reply, true);
     await this.say(out.reply);

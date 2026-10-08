@@ -348,6 +348,10 @@ the user's Mac and Quest.
 - `desktop/Orbi/main.swift` → **Orbi.app** (`scripts/build_orbi_app.sh` builds, ad-hoc signs and installs it in `~/Applications`): a frameless, transparent, always-on-top panel (all Spaces, beside full-screen apps) showing `/ui/orbi.html`, the avatar with its speech bubble and hands-free voice (Groq, else Gemini Live), ORBIT notices, and a drag handle (the position is remembered). A ◎ menu-bar item: Talk, Show/Hide, dashboard, Open at Login (SMAppService), restart the server, Quit. No Dock icon. The app starts the ORBIT server (`run_demo.sh --lan`) if it isn't running. The microphone is granted only to ORBIT's own page (`localhost:8765`).
 - Verified: compiles with Swift 6.4 on macOS 26; launched, loaded the page from the server, and a screenshot shows Orbi floating over other windows with a transparent background. The first click asks macOS for microphone permission.
 
+### Phase 19.7 — "Stop" means stop
+- Saying "stop", "stop listening/talking", "be quiet", "that's all", "go to sleep", "goodbye Orbi", "bas", "chup", "ruk jao" ends the conversation: Orbi says one short line and turns the microphone off. Decided by a fixed phrase rule (server `voice_agent.is_stop` and browser `live_core.isStop`), instantly and without a model call. "Stop the video" still pauses the video; the Gemini engine judges only the whole utterance (a partial "stop…" may be "stop the video"). Orbi also stops listening by itself after 90 s with nobody talking to it.
+- Real check with Groq audio: "Stop listening." stopped in 0.36 s with no model call; "Stop the video." went to video control; Whisper's "Orby, be quiet." first slipped through, so the rule now covers the name's spellings.
+
 ## MVP Acceptance (spec §36)
 
 | Criterion | Evidence (test) |
@@ -396,7 +400,7 @@ the user's Mac and Quest.
 4. Per-attribute pre-action windows (e.g. pressure vs lockout tag) instead of one HIGH window.
 
 ## Tests
-- `.venv/bin/pytest` → 701 passed (every engine test runs on both in-memory and SQL backends).
+- `.venv/bin/pytest` → 723 passed (every engine test runs on both in-memory and SQL backends).
 - `.venv/bin/python experiments/runners/run_generated_bench.py` → generated-world report with confidence intervals.
 - `.venv/bin/python experiments/runners/run_bench.py` → ORBIT-BENCH report.
 

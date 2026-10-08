@@ -116,6 +116,15 @@ export class LiveSession {
       for (const part of (sc.modelTurn && sc.modelTurn.parts) || []) {
         if (part.inlineData && part.inlineData.data && /audio/.test(part.inlineData.mimeType || "audio")) this.play(part.inlineData.data);
       }
+      if (sc.turnComplete || sc.generationComplete) {
+        // Judged on the whole utterance (a partial "stop…" may be "stop the video").
+        if (core.isStop(this.heard)) {
+          this.emit("userText", this.heard.trim(), true);
+          this.emit("orbiText", "Okay, I'll stop listening.", true);
+          this.stop();
+          return;
+        }
+      }
       if (sc.turnComplete) {
         if (this.heard.trim()) this.emit("userText", this.heard.trim(), true);
         if (this.said.trim()) this.emit("orbiText", this.said.trim(), true);

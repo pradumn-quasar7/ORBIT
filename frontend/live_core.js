@@ -133,5 +133,12 @@
     return bytes;
   }
 
-  return { concat, normalise, wav, resample, applyGain, floatToPcm16, pcm16ToFloat, bytesToBase64, base64ToBytes, pcm16ToBase64, base64ToPcm16, rms, encodeChunk };
+  // "Stop" means: stop talking and stop listening (end the conversation) — unless it is
+  // clearly about something else ("stop the video" pauses the video instead).
+  const STOP = /^(?:(?:ok(?:ay)?|hey|hi|please|orbi|orby|orbie|orbee|orbit|arby|r\.? ?b\.?)[ ,]+)*(?:stop(?: (?:listening|talking|it|now|please|orbi|orbit|that))*|be quiet|quiet|shut up|enough|that'?s (?:all|enough|it)|go to sleep|sleep|goodbye(?: orbi| orby| orbit)?|bye(?: orbi| orby| orbit)?|thanks?,? that'?s all|bas(?: karo| kar do)?|chup(?: ho jao| raho)?|ruk(?: jao)?|band karo)[.!? ]*$/i;
+  function isStop(text) {
+    return STOP.test(String(text || "").trim().replace(/[“”"]/g, ""));
+  }
+
+  return { isStop, concat, normalise, wav, resample, applyGain, floatToPcm16, pcm16ToFloat, bytesToBase64, base64ToBytes, pcm16ToBase64, base64ToPcm16, rms, encodeChunk };
 });

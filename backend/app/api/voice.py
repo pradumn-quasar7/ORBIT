@@ -39,5 +39,5 @@ async def turn(request: Request, conversation_id: Optional[str] = Query(None), u
     except VoiceError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     return {"conversation_id": conv.id, "heard": out.heard, "reply": out.reply, "tools": out.tools,
-            "language": out.language, "timings": out.timings, "model": out.model, "song_url": out.song_url,
+            "language": out.language, "timings": out.timings, "model": out.model, "song_url": out.song_url, "end_session": out.end_session,
             "pending": conv.pending.summary if conv.pending else None}

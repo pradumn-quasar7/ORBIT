@@ -59,3 +59,13 @@ test("utterances become normalised 16 kHz WAV files", () => {
   assert.equal(b.readUInt32LE(40), 1600 * 2);
   assert.equal(bytes.length, 44 + 3200);
 });
+
+test("'stop' ends the conversation, 'stop the video' does not", () => {
+  for (const t of ["stop", "Stop.", "stop listening", "Stop talking!", "okay stop", "Orbi, stop", "be quiet", "shut up",
+                   "that's all", "go to sleep", "goodbye Orbi", "bas", "chup", "ruk jao", "thanks, that's all", "Orby, be quiet.", "R.B. stop"]) {
+    assert.equal(core.isStop(t), true, t);
+  }
+  for (const t of ["stop the video", "don't stop", "stop at bench 3", "where is the stop button", "is the valve stopped", "pause"]) {
+    assert.equal(core.isStop(t), false, t);
+  }
+});

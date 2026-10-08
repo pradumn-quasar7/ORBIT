@@ -63,6 +63,17 @@ def http(url: str, body: Any, headers: Dict[str, str], file: Optional[Tuple[str,
         return exc.code, exc.read()
 
 
+# "Stop" ends the conversation (stop talking, stop listening) — decided here, instantly,
+# without the model (and without spending the free plan). Same rule as live_core.isStop.
+STOP = re.compile(r"^(?:(?:ok(?:ay)?|hey|hi|please|orbi|orby|orbie|orbee|orbit|arby|r\.? ?b\.?)[ ,]+)*(?:stop(?: (?:listening|talking|it|now|please|orbi|orbit|that))*|"
+                  r"be quiet|quiet|shut up|enough|that'?s (?:all|enough|it)|go to sleep|sleep|goodbye(?: orbi| orby| orbit)?|"
+                  r"bye(?: orbi| orby| orbit)?|thanks?,? that'?s all|bas(?: karo| kar do)?|chup(?: ho jao| raho)?|ruk(?: jao)?|band karo)[.!? ]*$", re.I)
+
+
+def is_stop(text: str) -> bool:
+    return bool(STOP.match((text or "").strip().replace("“", "").replace("”", "").replace('"', "")))
+
+
 # What Whisper "hears" in silence or noise: never treat these as the user speaking.
 WHISPER_SILENCE = {"", "you", "thank you", "thanks", "thank you for watching", "thanks for watching", "bye", "okay", "so",
                    "[blank_audio]", "(silence)", "[music]", "uh", "um"}
@@ -121,6 +132,7 @@ class VoiceTurn:
     tools: List[Dict[str, Any]] = field(default_factory=list)
     language: Optional[str] = None
     song_url: Optional[str] = None
+    end_session: bool = False  # the user said "stop": stop talking and listening
     timings: Dict[str, float] = field(default_factory=dict)
     model: str = ""
 
@@ -232,6 +244,8 @@ class VoiceAgent:
         hear = round(time.time() - t0, 2)
         if not heard or heard.strip(" .").lower() in WHISPER_SILENCE:
             return VoiceTurn(heard="", reply="", timings={"hear": hear})  # silence or noise, not words
+        if is_stop(heard):
+            return VoiceTurn(heard=heard, reply="Okay, I'll stop listening.", end_session=True, timings={"hear": hear})
         out = self.respond(conversation_id, user_id, device, heard, at)
         out.language = language
         out.timings["hear"] = hear

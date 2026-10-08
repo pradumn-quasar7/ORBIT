@@ -210,3 +210,17 @@ def test_jokes_are_just_talk_not_claimed_actions(lab):
     out = agent(lab, groq).respond(lab.svc.assistant.start("ana", at(1)).id, "ana", "mac", "tell me a joke", at(2))
     assert out.reply.startswith("Why did the robot") and out.tools == []
     assert len([c for c in groq.calls if c[0][-1] == "completions"]) == 1  # "opened" in a joke is not a claimed action
+
+
+# ----------------------------------------------------------------- "stop"
+@pytest.mark.parametrize("heard, stops", [("Stop.", True), ("stop listening", True), ("Orbi, stop talking", True), ("be quiet", True), ("Orby, be quiet.", True),
+                                          ("that's all", True), ("bas", True), ("chup", True), ("goodbye Orbi", True),
+                                          ("stop the video", False), ("where is the stop valve", False)])
+def test_stop_ends_the_conversation_without_the_model(lab, heard, stops):
+    groq = FakeGroq(heard, [say("ok")])
+    out = agent(lab, groq).turn(lab.svc.assistant.start("ana", at(1)).id, "ana", "mac", b"x", "audio/wav", at(2))
+    assert out.end_session is stops
+    chats = [c for c in groq.calls if c[0][-1] == "completions"]
+    assert (len(chats) == 0) is stops  # "stop" costs no model call
+    if stops:
+        assert out.reply == "Okay, I'll stop listening."
