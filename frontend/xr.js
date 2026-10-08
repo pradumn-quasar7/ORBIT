@@ -566,6 +566,7 @@ async function setupVoice() {
 // live, interruptible conversation; otherwise one utterance at a time (voice.js).
 const DEVICE = /OculusBrowser|Quest/.test(navigator.userAgent) ? "quest" : "mac";
 let liveAvailable = false;
+let liveEngine = null; // "groq" | "gemini"
 let liveSession = null;
 
 async function startTalking() {
@@ -577,10 +578,10 @@ async function startTalking() {
 
 async function toggleLive() {
   if (liveSession) { liveSession.stop(); return; }
-  const { LiveSession } = await import("./live.js");
+  const Engine = liveEngine === "groq" ? (await import("./conversation.js")).HostedConversation : (await import("./live.js")).LiveSession;
   if (!state.conversation) await startConversation();
   let heardLine = "";
-  liveSession = new LiveSession({
+  liveSession = new Engine({
     device: DEVICE,
     userId: $("user").value.trim() || "operator",
     conversationId: state.conversation.id,
@@ -588,6 +589,7 @@ async function toggleLive() {
       state(s) {
         if (s === "connecting") drawBubble(bubble, "Connecting…", "#9aa4b2");
         if (s === "listening") { orbi.setState("listening"); if (!heardLine) drawBubble(bubble, "I'm listening — just talk.", "#4ade80"); }
+        if (s === "thinking") orbi.setState("thinking");
         if (s === "speaking") orbi.setState("speaking");
         if (s === "closed") { liveSession = null; orbi.setState("idle"); drawBubble(bubble, "Live conversation ended. Talk again any time.", "#9aa4b2"); }
       },
@@ -771,9 +773,11 @@ async function init() {
   connectPanel();
   await refreshPlaces();
   setupVoice();
-  import("./live.js").then(async ({ liveStatus }) => {
-    liveAvailable = (await liveStatus()).configured;
-    if (liveAvailable) status("Gemini Live is on: press Talk (or hold the grip in AR) and just talk.", "ok");
+  import("./conversation.js").then(async ({ voiceStatus }) => {
+    const st = await voiceStatus();
+    liveEngine = st && st.engines.groq ? "groq" : st && st.engines.gemini ? "gemini" : null;
+    liveAvailable = !!liveEngine;
+    if (liveAvailable) status("Realtime conversation is on: press the grip once in AR (or Talk) and just talk. Press again to stop.", "ok");
   });
   OrbitLive.connect("/stream?topics=world,observation", {
     onMessage: soon,

@@ -102,12 +102,16 @@ async function setupMic() {
   });
   if (saved && saved !== "live" && (saved !== "browser" || Voice.browserAvailable)) voice.engine = saved;
   select.value = voice.engine;
-  // Realtime conversation with Gemini Live, when ORBIT has a key (Phase 19).
-  const { liveStatus } = await import("./live.js");
-  liveAvailable = (await liveStatus()).configured;
+  // Realtime conversation on a hosted service, when ORBIT has a key (Phase 19):
+  // Groq (free plan) first, else Gemini Live.
+  const { voiceStatus: hostedStatus } = await import("./conversation.js");
+  const st = await hostedStatus();
+  liveEngine = st && st.engines.groq ? "groq" : st && st.engines.gemini ? "gemini" : null;
+  liveAvailable = !!liveEngine;
   const liveOption = select.querySelector('option[value="live"]');
   liveOption.disabled = !liveAvailable;
-  liveOption.textContent = liveAvailable ? "Gemini Live (realtime)" : "Gemini Live (add a key to .env)";
+  liveOption.textContent = liveEngine === "groq" ? "Realtime conversation (Groq)" : liveEngine === "gemini" ? "Gemini Live (realtime)"
+    : "Realtime (add a Groq or Gemini key to .env)";
   if (liveAvailable && (!saved || saved === "live")) select.value = "live";
   select.addEventListener("change", () => {
     store.set("orbit.voice", select.value);
@@ -143,21 +147,23 @@ async function setupMic() {
 
 // ------------------------------------------------------------------- live
 let liveAvailable = false;
+let liveEngine = null; // "groq" | "gemini"
 let liveSession = null;
 let liveUser = null, liveOrbi = null; // the chat bubbles being filled as words arrive
 
 async function toggleLive() {
   if (liveSession) { liveSession.stop(); return; }
-  const { LiveSession } = await import("./live.js");
+  const Engine = liveEngine === "groq" ? (await import("./conversation.js")).HostedConversation : (await import("./live.js")).LiveSession;
   if (!conversation) await startConversation();
-  liveSession = new LiveSession({
+  liveSession = new Engine({
     device: "mac",
     userId: $("user").value.trim() || "operator",
     conversationId: conversation.id,
     on: {
       state(s) {
-        if (s === "connecting") { $("mic").textContent = "… connecting"; voiceStatus("Connecting to Gemini Live…", "info"); }
-        if (s === "listening") { $("mic").textContent = "■ Stop live"; $("mic").setAttribute("aria-pressed", "true"); setState("listening"); voiceStatus("Live: just talk. You can interrupt Orbi any time.", "ok"); }
+        if (s === "connecting") { $("mic").textContent = "… connecting"; voiceStatus("Starting the conversation…", "info"); }
+        if (s === "listening") { $("mic").textContent = "■ Stop"; $("mic").setAttribute("aria-pressed", "true"); setState("listening"); voiceStatus("Just talk, then pause. You can interrupt Orbi any time.", "ok"); }
+        if (s === "thinking") setState("thinking");
         if (s === "speaking") setState("speaking");
         if (s === "closed") {
           liveSession = null; liveUser = liveOrbi = null;

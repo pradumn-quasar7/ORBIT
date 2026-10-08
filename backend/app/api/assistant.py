@@ -14,7 +14,7 @@ router = APIRouter()
 
 class AssistantInfo(BaseModel):
     parser: str
-    llm: bool
+    llm: bool 
     confirm_window_seconds: int
     can: List[str]
     cannot: List[str]
