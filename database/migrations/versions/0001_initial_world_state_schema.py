@@ -65,7 +65,7 @@ def upgrade() -> None:
     sa.Column('id', sa.String(length=128), nullable=False),
     sa.Column('seq', sa.Integer(), nullable=False),
     sa.Column('source_type', sa.String(length=64), nullable=False),
-    sa.Column('source_reference', sa.String(length=256), nullable=False),
+    sa.Column('source_reference', sa.String(length=256), nullable=False), 
     sa.Column('timestamp', backend.app.repositories.sql.tables.UTCDateTimeType(timezone=True), nullable=False),
     sa.Column('quality', sa.Float(), nullable=False),
     sa.Column('authority', sa.Float(), nullable=False),
