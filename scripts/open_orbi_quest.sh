@@ -32,7 +32,9 @@ for _ in range(20):  # wait until the page has loaded and is in front
     if c.evaluate("document.readyState === 'complete' && document.visibilityState === 'visible' && !!window.orbiTalk"):
         break
     time.sleep(0.5)
-if c.evaluate("document.getElementById('mode').textContent") != "in the headset":
+for _ in range(3):  # entering AR right after the page appears can be too early: retry
+    if c.evaluate("document.getElementById('mode').textContent") == "in the headset":
+        break
     c.evaluate("document.getElementById('enter').click()", gesture=True)
     time.sleep(4)
 mode = c.evaluate("document.getElementById('mode').textContent")
