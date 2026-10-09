@@ -104,6 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         menu.addItem(withTitle: "Talk to Orbi", action: #selector(talk), keyEquivalent: "t").target = self
         menu.addItem(withTitle: "Show / Hide Orbi", action: #selector(toggleShown), keyEquivalent: "o").target = self
         menu.addItem(withTitle: "Open ORBIT dashboard", action: #selector(openDashboard), keyEquivalent: "d").target = self
+        menu.addItem(withTitle: "Open Orbi in the Quest headset", action: #selector(openInQuest), keyEquivalent: "q").target = self
         menu.addItem(.separator())
         let login = NSMenuItem(title: "Open at Login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self
@@ -111,13 +112,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         menu.addItem(login)
         menu.addItem(withTitle: "Restart ORBIT server", action: #selector(restartServer), keyEquivalent: "").target = self
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit Orbi", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit Orbi", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         status.menu = menu
     }
 
     @objc func talk() { panel.orderFrontRegardless(); web.evaluateJavaScript("window.orbiToggle && window.orbiToggle()") }
     @objc func toggleShown() { panel.isVisible ? panel.orderOut(nil) : panel.orderFrontRegardless() }
     @objc func openDashboard() { NSWorkspace.shared.open(dashboardURL) }
+    /// Opens ORBIT in the Quest browser, starts AR and listening (USB cable, developer mode).
+    @objc func openInQuest() {
+        guard !orbitRoot.isEmpty else { return }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/bash")
+        p.arguments = ["-lc", "PATH=/opt/homebrew/bin:$PATH \"\(orbitRoot)/scripts/open_orbi_quest.sh\""]
+        p.currentDirectoryURL = URL(fileURLWithPath: orbitRoot)
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = out
+        p.terminationHandler = { proc in
+            let text = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = proc.terminationStatus == 0 ? "Orbi is open in the headset" : "Couldn't open Orbi in the headset"
+                alert.informativeText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                alert.runModal()
+            }
+        }
+        try? p.run()
+    }
     @objc func toggleLogin(_ item: NSMenuItem) {
         do {
             if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() } else { try SMAppService.mainApp.register() }
