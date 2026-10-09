@@ -86,6 +86,8 @@ function listen() {
 }
 
 $("stage").addEventListener("click", toggle);
+$("hide").addEventListener("click", (e) => { e.stopPropagation(); tell({ type: "hide" }); });
+$("hide").hidden = !native; // only inside Orbi.app
 window.orbiToggle = toggle; // the menu-bar "Talk" item
 
 (async function init() {

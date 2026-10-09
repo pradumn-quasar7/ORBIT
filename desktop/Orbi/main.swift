@@ -5,6 +5,7 @@
 // isn't running, the app starts it (scripts/run_demo.sh). Built by
 // scripts/build_orbi_app.sh; the ORBIT folder is baked in at build time.
 import AppKit
+import Carbon.HIToolbox
 import ServiceManagement
 import WebKit
 
@@ -34,10 +35,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     var web: WKWebView!
     var status: NSStatusItem!
     var server: Process?
+    var showItem: NSMenuItem!
+    var hideItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ note: Notification) {
         buildPanel()
         buildMenu()
+        registerHotKey()
+        if UserDefaults.standard.bool(forKey: "orbiHidden") { panel.orderOut(nil) }
+        updateShownState()
         ensureServer { [weak self] in self?.web.load(URLRequest(url: orbitURL)) }
     }
 
@@ -91,6 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
         if type == "server-down" { ensureServer {} }
+        if type == "hide" { hideOrbi() }
         if type == "state", let s = body["state"] as? String {
             status.button?.title = ["listening": "◉", "thinking": "◍", "speaking": "◎"][s] ?? "◎"
         }
@@ -102,7 +109,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         status.button?.title = "◎"
         let menu = NSMenu()
         menu.addItem(withTitle: "Talk to Orbi", action: #selector(talk), keyEquivalent: "t").target = self
-        menu.addItem(withTitle: "Show / Hide Orbi", action: #selector(toggleShown), keyEquivalent: "o").target = self
+        showItem = NSMenuItem(title: "Show Orbi", action: #selector(showOrbi), keyEquivalent: "")
+        showItem.target = self
+        hideItem = NSMenuItem(title: "Hide Orbi", action: #selector(hideOrbi), keyEquivalent: "")
+        hideItem.target = self
+        menu.addItem(showItem)
+        menu.addItem(hideItem)
+        let hint = NSMenuItem(title: "Show/Hide from anywhere: ⌥⌘O", action: nil, keyEquivalent: "")
+        hint.isEnabled = false
+        menu.addItem(hint)
         menu.addItem(withTitle: "Open ORBIT dashboard", action: #selector(openDashboard), keyEquivalent: "d").target = self
         menu.addItem(withTitle: "Open Orbi in the Quest headset", action: #selector(openInQuest), keyEquivalent: "q").target = self
         menu.addItem(.separator())
@@ -117,7 +132,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     }
 
     @objc func talk() { panel.orderFrontRegardless(); web.evaluateJavaScript("window.orbiToggle && window.orbiToggle()") }
-    @objc func toggleShown() { panel.isVisible ? panel.orderOut(nil) : panel.orderFrontRegardless() }
+    @objc func toggleShown() { panel.isVisible ? hideOrbi() : showOrbi() }
+    @objc func showOrbi() {
+        panel.orderFrontRegardless()
+        UserDefaults.standard.set(false, forKey: "orbiHidden")
+        updateShownState()
+    }
+    @objc func hideOrbi() {
+        panel.orderOut(nil)
+        UserDefaults.standard.set(true, forKey: "orbiHidden")
+        updateShownState()
+    }
+    func updateShownState() {
+        showItem?.state = panel.isVisible ? .on : .off
+        hideItem?.state = panel.isVisible ? .off : .on
+    }
+
+    /// ⌥⌘O from any app (a Carbon hot key: no extra permission needed).
+    func registerHotKey() {
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetApplicationEventTarget(), { _, _, ctx in
+            let me = Unmanaged<AppDelegate>.fromOpaque(ctx!).takeUnretainedValue()
+            DispatchQueue.main.async { me.toggleShown() }
+            return noErr
+        }, 1, &spec, Unmanaged.passUnretained(self).toOpaque(), nil)
+        var ref: EventHotKeyRef?
+        RegisterEventHotKey(UInt32(kVK_ANSI_O), UInt32(cmdKey | optionKey), EventHotKeyID(signature: OSType(0x4F524249), id: 1),
+                            GetApplicationEventTarget(), 0, &ref)
+    }
     @objc func openDashboard() { NSWorkspace.shared.open(dashboardURL) }
     /// Opens ORBIT in the Quest browser, starts AR and listening (USB cable, developer mode).
     @objc func openInQuest() {

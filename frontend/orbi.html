@@ -28,6 +28,9 @@
     #ring[data-state="thinking"] { background: #fbbf24; }
     #ring[data-state="speaking"] { background: #7aa2ff; box-shadow: 0 0 0 6px rgba(122, 162, 255, .25); }
     #ring[data-state="off"] { background: #6b7280; }
+    #hide { position: absolute; right: 10px; top: 70px; width: 24px; height: 24px; border-radius: 50%; border: 0; cursor: pointer;
+      background: rgba(16, 20, 27, .8); color: #eef2f7; font: 600 16px/24px system-ui; padding: 0; opacity: 0; transition: opacity .15s; }
+    body:hover #hide { opacity: 1; }
   </style>
 </head>
 <body>
@@ -35,6 +38,7 @@
   <div id="stage" title="Click to talk to Orbi"></div>
   <div id="ring" data-state="off"></div>
   <div id="state">click me to talk</div>
+  <button id="hide" type="button" title="Hide Orbi (⌥⌘O to show again)" aria-label="Hide Orbi">–</button>
   <script src="realtime.js"></script>
   <script src="live_core.js"></script>
   <script type="module" src="orbi.js"></script>
