@@ -24,7 +24,7 @@ from backend.app.core.cdp import CDP, CDPError, new_tab, targets
 from backend.app.services.devices import DeviceController, DeviceError
 
 RUN = Path(__file__).resolve().parents[3] / ".run"
-QUEST_PORT = 9222
+QUEST_PORT = 9335  # the Quest browser's DevTools, forwarded over USB (not 9222: Chrome on the Mac may use it)
 MAC_PORT = 9223
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0 Safari/537.36"
 

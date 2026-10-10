@@ -27,8 +27,8 @@ def controller(shell=None, pages=None):
     page = Page()
     sc = ScreenController(DeviceController(runner=shell or FakeShell(), platform="darwin"),
                           pages=lambda: pages if pages is not None else [
-                              {"url": "http://localhost:8765/ui/xr.html", "webSocketDebuggerUrl": "ws://127.0.0.1:9222/xr"},
-                              {"url": "https://news.example/story", "webSocketDebuggerUrl": "ws://127.0.0.1:9222/story"}],
+                              {"url": "http://localhost:8765/ui/xr.html", "webSocketDebuggerUrl": "ws://127.0.0.1:9335/xr"},
+                              {"url": "https://news.example/story", "webSocketDebuggerUrl": "ws://127.0.0.1:9335/story"}],
                           connect=lambda url: page)
     sc.page = page
     return sc
@@ -39,7 +39,7 @@ def test_quest_scrolls_the_page_in_front_not_orbit(monkeypatch):
     seen = []
     sc.connect = lambda url: seen.append(url) or sc.page
     assert sc.control("scroll_down", "a little", "quest") == {"ok": True, "result": "Scrolled down."}
-    assert seen == ["ws://127.0.0.1:9222/story"]  # never ORBIT's own AR page
+    assert seen == ["ws://127.0.0.1:9335/story"]  # never ORBIT's own AR page
     assert "top: el.clientHeight * 0.3" in sc.page.scripts[-1] and "behavior: 'instant'" in sc.page.scripts[-1] and sc.page.closed
     sc.control("back", None, "quest")
     assert sc.page.scripts[-1] == "history.back()"

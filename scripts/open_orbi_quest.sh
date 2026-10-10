@@ -8,7 +8,7 @@ URL="http://localhost:8765/ui/xr.html"
 adb devices | grep -q $'\tdevice$' || { echo "The Quest isn't connected over USB (plug in the cable, allow USB debugging)." >&2; exit 1; }
 curl -sf -m 3 http://localhost:8765/voice/status > /dev/null || scripts/run_demo.sh --lan > /dev/null
 adb reverse tcp:8765 tcp:8765 > /dev/null
-adb forward tcp:9222 localabstract:chrome_devtools_remote > /dev/null
+adb forward tcp:9335 localabstract:chrome_devtools_remote > /dev/null
 adb shell am start -a android.intent.action.VIEW -d "$URL" com.oculus.browser > /dev/null
 
 .venv/bin/python - <<'EOF'
@@ -17,7 +17,7 @@ sys.path.insert(0, ".")
 from backend.app.core.cdp import CDP
 
 def tab():
-    with urllib.request.urlopen("http://127.0.0.1:9222/json", timeout=3) as r:
+    with urllib.request.urlopen("http://127.0.0.1:9335/json", timeout=3) as r:
         return next((t for t in json.loads(r.read()) if "/ui/xr.html" in t.get("url", "")), None)
 
 for _ in range(20):

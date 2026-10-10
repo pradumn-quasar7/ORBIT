@@ -86,7 +86,7 @@ def keep_quest_linked(port: int, stop: "threading.Event", every: float = 4.0) ->
                 rev = subprocess.run([adb, "reverse", "--list"], capture_output=True, text=True, timeout=5).stdout
                 if f"tcp:{port}" not in rev:
                     subprocess.run([adb, "reverse", f"tcp:{port}", f"tcp:{port}"], capture_output=True, timeout=5)
-                    subprocess.run([adb, "forward", "tcp:9222", "localabstract:chrome_devtools_remote"], capture_output=True, timeout=5)
+                    subprocess.run([adb, "forward", "tcp:9335", "localabstract:chrome_devtools_remote"], capture_output=True, timeout=5)
                     print("Quest connected over USB: ORBIT is reachable at http://localhost:%d in the headset" % port, flush=True)
                 linked = True
             elif linked:
